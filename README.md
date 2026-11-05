@@ -20,26 +20,19 @@ estimate, asks you first; old estimates are kept in `estimate\revisions\vN`.
 
 ## Setup (Windows)
 
-1. Install **Node.js 22 LTS** from nodejs.org. Python is already there from `Setup Estimator.bat`.
-2. Clone this repo next to the estimator, e.g. `C:\Games\forefront-hub`, then in that folder:
-   ```
-   npm install
-   copy .env.example .env
-   ```
-3. Edit `.env`:
-   - `ESTIMATOR_DIR=C:\Games\Estimator` and `JOBS_ROOT=C:\Jobs`.
-   - `ANTHROPIC_API_KEY`: leave it blank to reuse the key saved in the Estimator app (`data\api_key.txt`).
-   - `HOMEBASE_API_TOKEN`: your Homebase API key (Homebase → Settings → API keys, starts with `hbk_`).
-   - `COMPANYCAM_TOKEN`: see below.
-   - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`: see below.
-4. Connect:
-   ```
-   npm run hub -- doctor           shows what's live and what's still mocked
-   npm run hub -- gmail login      Google sign-in; allow drafts + read
-   ```
+Double-click **Setup Forefront Hub.bat** (it can sit in Downloads). It:
+- installs Git and Node.js if they're missing;
+- downloads the hub to `C:\Games\forefront-hub` (sign in to GitHub if asked);
+- updates the Estimator;
+- installs the hub;
+- asks once for your Homebase API key;
+- adds a **Forefront Hub** icon to your desktop.
 
-Leave a setting blank and that piece runs on its mock, so the hub works before everything is connected.
-`HUB_MODE=mock` runs everything on mocks (drafts go to `.hub\outbox\*.eml`).
+Run it again any time; it only fills in what's missing. The icon starts the hub and opens http://localhost:4317, and
+it picks up the latest version each time.
+
+Settings live in `C:\Games\forefront-hub\.env` (never uploaded). The Claude key is read from the Estimator app's
+saved key. Gmail and CompanyCam are connected later (below); until then those parts run on stand-ins.
 
 ### Gmail: a Google OAuth client (one time, ~10 minutes)
 
