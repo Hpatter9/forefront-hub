@@ -1,0 +1,221 @@
+import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { z } from "zod";
+import { pickProject } from "../connectors/companycam/index.js";
+import { intakeAddress } from "../connectors/homebase/types.js";
+import { STAGES, type SendoffDraft } from "../core/job.js";
+import type { Hub } from "../hub.js";
+import { downloadPhotos, pullJob } from "../workflows/pull.js";
+import { estimateFiles } from "../workflows/sendoff.js";
+import { sync } from "../workflows/sync.js";
+
+export const SERVER = "hub";
+
+const ok = (data: unknown) => ({ content: [{ type: "text" as const, text: typeof data === "string" ? data : JSON.stringify(data, null, 2) }] });
+const fail = (e: unknown) => ({ content: [{ type: "text" as const, text: `Error: ${(e as Error).message ?? e}` }], isError: true });
+const wrap = <A>(fn: (a: A) => Promise<unknown>) => async (a: A) => {
+  try {
+    return ok(await fn(a));
+  } catch (e) {
+    return fail(e);
+  }
+};
+
+const jobNumber = z.number().int().describe("Homebase job number, e.g. 3226");
+
+/**
+ * The hub's tools for the agent. Irreversible ones (Homebase writes) ask Hunter through hub.approver inside the
+ * handler, so they're safe no matter how the agent calls them. There is no "send email" tool.
+ */
+export function hubTools(hub: Hub) {
+  const tools = [
+    // ---------------------------------------------------------------- job folder
+    tool("job_list", "List the local job folders (job.json summaries).", {}, wrap(async () =>
+      hub.jobs.list().map((j) => ({ jobNumber: j.jobNumber, name: j.name, address: j.address, stage: j.stage, estimate: j.estimate.status, folder: hub.jobs.folder(j.jobNumber) })),
+    )),
+    tool("job_get", "Read a job's job.json plus the files in its folder (sketch, photos, estimate, email, notes).", { jobNumber }, wrap(async ({ jobNumber: n }) => ({
+      folder: hub.jobs.folder(n),
+      job: hub.jobs.get(n),
+      files: Object.fromEntries((["sketch", "estimate", "email", "notes"] as const).map((s) => [s, hub.jobs.files(n, s).map((f) => path.basename(f))])),
+      photos: hub.jobs.files(n, "photos", /\.(jpe?g|png)$/i).length,
+    }))),
+    tool(
+      "job_pull",
+      "Refresh a job from Homebase into its job folder (creates the folder if new) and link its CompanyCam project and DocuSketch sketch.",
+      { jobNumber },
+      wrap(async ({ jobNumber: n }) => pullJob(hub, n)),
+    ),
+    tool(
+      "job_update",
+      "Set facts on job.json that Homebase doesn't have or got wrong (contacts, claim, insurance status, market, date of loss, estimate total).",
+      {
+        jobNumber,
+        customerName: z.string().optional(),
+        customerEmail: z.string().optional(),
+        adjusterName: z.string().optional(),
+        adjusterEmail: z.string().optional(),
+        adjusterPhone: z.string().optional(),
+        carrier: z.string().optional(),
+        claimNumber: z.string().optional(),
+        dateOfLoss: z.string().optional(),
+        insurance: z.enum(["claim", "oop", "unknown"]).optional(),
+        market: z.string().optional().describe("CODE8X (Denver metro) or COBO8X (Boulder County)"),
+        estimateTotal: z.number().optional(),
+      },
+      wrap(async (a) => {
+        const j = hub.jobs.get(a.jobNumber);
+        return hub.jobs.upsert(a.jobNumber, {
+          customer: { name: a.customerName, email: a.customerEmail },
+          adjuster: { name: a.adjusterName, email: a.adjusterEmail, phone: a.adjusterPhone },
+          carrier: a.carrier,
+          claimNumber: a.claimNumber,
+          dateOfLoss: a.dateOfLoss,
+          insurance: a.insurance,
+          market: a.market,
+          estimate: a.estimateTotal !== undefined ? { ...j.estimate, total: a.estimateTotal } : undefined,
+        });
+      }),
+    ),
+
+    // ---------------------------------------------------------------- Homebase
+    tool("homebase_list_jobs", "Jobs on the Homebase reconstruction dashboard: number, name, stage, days in stage.", { openOnly: z.boolean().default(true) }, wrap(async ({ openOnly }) => hub.homebase.listJobs({ openOnly }))),
+    tool("homebase_get_job", "Read a job from Homebase: stage, contacts, carrier, claim, financials, intake email, and the page text.", { jobNumber }, wrap(async ({ jobNumber: n }) => hub.homebase.getJob(n))),
+    tool(
+      "homebase_set_proposal",
+      "Set the proposal amount AND proposal submitted date together (the follow-up sequence keys off the date). Asks Hunter first. Normally `hub_sync` does this after the send-off emails go out.",
+      { jobNumber, amount: z.number().positive(), submittedAt: z.string().describe("YYYY-MM-DD, the day the proposal was emailed") },
+      wrap(async ({ jobNumber: n, amount, submittedAt }) => {
+        if (!(await hub.approver.confirm(`Set Homebase #${n} proposal to $${amount.toFixed(2)}, submitted ${submittedAt}?`))) return "Hunter declined; nothing changed.";
+        await hub.homebase.setProposal(n, { amount, submittedAt });
+        hub.jobs.log(n, `Homebase: proposal $${amount.toFixed(2)} on ${submittedAt}`);
+        return "Done.";
+      }),
+    ),
+    tool(
+      "homebase_set_stage",
+      `Move a job to another Homebase stage. Asks Hunter first. Stages: ${STAGES.join(", ")}.`,
+      { jobNumber, stage: z.enum(STAGES) },
+      wrap(async ({ jobNumber: n, stage }) => {
+        const cur = (await hub.homebase.getJob(n)).stage;
+        if (!(await hub.approver.confirm(`Move Homebase #${n} from ${cur || "?"} to ${stage}?`))) return "Hunter declined; nothing changed.";
+        await hub.homebase.setStage(n, stage);
+        hub.jobs.log(n, `Homebase: stage ${cur} -> ${stage}`);
+        return "Done.";
+      }),
+    ),
+    tool(
+      "homebase_add_note",
+      "Log a note or a phone call on the Homebase job. Asks Hunter first (shows the exact text).",
+      { jobNumber, kind: z.enum(["note", "call"]), body: z.string() },
+      wrap(async ({ jobNumber: n, kind, body }) => {
+        if (!(await hub.approver.confirm(`Add this ${kind} to Homebase #${n}?`, body.split("\n")))) return "Hunter declined; nothing changed.";
+        await hub.homebase.addNote(n, { kind, body });
+        if (hub.jobs.exists(n)) {
+          const f = hub.jobs.path(n, "notes", "notes.txt");
+          writeFileSync(f, `${existsSync(f) ? readFileSync(f, "utf8") : ""}[${new Date().toISOString().slice(0, 16)}] ${kind}: ${body}\n`);
+          hub.jobs.log(n, `Homebase ${kind} logged`);
+        }
+        return "Done.";
+      }),
+    ),
+
+    // ---------------------------------------------------------------- Gmail (drafts only)
+    tool("gmail_search", "Search Hunter's Forefront Gmail (Gmail search syntax).", { query: z.string(), max: z.number().int().default(10) }, wrap(async ({ query, max }) => hub.gmail.search(query, max))),
+    tool("gmail_read_thread", "Read every message in a Gmail thread.", { threadId: z.string() }, wrap(async ({ threadId }) => hub.gmail.getThread(threadId))),
+    tool(
+      "gmail_create_draft",
+      "Create a Gmail DRAFT (never sent; Hunter sends it). The job's Homebase log address is BCC'd automatically. Attachments are local file paths (use the PDFs in the job's estimate/ folder). Write the body per the forefront-estimate skill's step 6 (Hunter's voice); his Gmail signature is appended, so don't add one.",
+      {
+        jobNumber,
+        kind: z.enum(["homeowner", "adjuster", "other"]),
+        to: z.array(z.string()).min(1),
+        cc: z.array(z.string()).default([]),
+        subject: z.string(),
+        body: z.string(),
+        attachments: z.array(z.string()).default([]),
+        threadId: z.string().optional().describe("to draft a reply inside an existing thread"),
+      },
+      wrap(async (a) => {
+        const bcc = intakeAddress(a.jobNumber);
+        const files = a.attachments.map((f) => (path.isAbsolute(f) ? f : hub.jobs.path(a.jobNumber, f)));
+        const ref = await hub.gmail.createDraft({ to: a.to, cc: a.cc, bcc: [bcc], subject: a.subject, body: a.body, attachments: files, threadId: a.threadId });
+        if (hub.jobs.exists(a.jobNumber) && a.kind !== "other") {
+          const j = hub.jobs.get(a.jobNumber);
+          const d: SendoffDraft = { id: ref.id, kind: a.kind, to: a.to, subject: a.subject, messageId: ref.messageId, attachments: files.map((f) => path.basename(f)), createdAt: new Date().toISOString() };
+          hub.jobs.upsert(a.jobNumber, { sendoff: { ...j.sendoff, drafts: [...j.sendoff.drafts, d], homebaseLoggedAt: null } });
+          hub.jobs.log(a.jobNumber, `Draft (${a.kind}) "${a.subject}"`);
+        }
+        return { draftId: ref.id, bcc, note: "Draft created. Hunter reviews and sends it; then hub_sync logs it in Homebase." };
+      }),
+    ),
+    tool(
+      "hub_sync",
+      "Check which send-off drafts Hunter has sent; for those, update Homebase (proposal amount + real send date, stage -> Proposal Submitted), asking first.",
+      { jobNumber: jobNumber.optional() },
+      wrap(async ({ jobNumber: n }) => sync(hub, n)),
+    ),
+
+    // ---------------------------------------------------------------- CompanyCam / DocuSketch
+    tool("companycam_find_project", "Find CompanyCam projects by job number, name or street address.", { query: z.string() }, wrap(async ({ query }) => hub.photos.findProjects(query))),
+    tool(
+      "companycam_link_project",
+      "Link a CompanyCam project to the job (stored in job.json). Without projectId, finds it by job number / address.",
+      { jobNumber, projectId: z.string().optional() },
+      wrap(async ({ jobNumber: n, projectId }) => {
+        const j = hub.jobs.get(n);
+        const id = projectId ?? pickProject([...(await hub.photos.findProjects(String(n))), ...(await hub.photos.findProjects(j.address.split(",")[0]))], n, j.address)?.id;
+        if (!id) throw new Error("No matching CompanyCam project");
+        return hub.jobs.upsert(n, { companycamProjectId: id }).companycamProjectId;
+      }),
+    ),
+    tool(
+      "companycam_download_photos",
+      "Download all of the job's CompanyCam photos into its photos/ folder (with photos/index.json: dates and descriptions). Then run the skill's photo_sheets.py on that folder to look through them.",
+      { jobNumber },
+      wrap(async ({ jobNumber: n }) => {
+        const files = await downloadPhotos(hub, n);
+        return { folder: hub.jobs.path(n, "photos"), count: files.length };
+      }),
+    ),
+    tool(
+      "docusketch_find_sketch",
+      "Find the job's DocuSketch sketch: the delivery email (project id) and the ESX, copied into the job's sketch/ folder from Downloads when it's there.",
+      { jobNumber },
+      wrap(async ({ jobNumber: n }) => {
+        const j = hub.jobs.get(n);
+        const d = j.docusketchProjectId ? { projectId: j.docusketchProjectId } : await hub.sketches.findDelivery({ name: j.name, address: j.address });
+        if (d?.projectId && !j.docusketchProjectId) hub.jobs.upsert(n, { docusketchProjectId: d.projectId });
+        const esx = await hub.sketches.fetchEsx({ projectId: d?.projectId, sketchDir: hub.jobs.path(n, "sketch") });
+        return { delivery: d, esx, next: esx ? undefined : `Ask Hunter to download ${d?.projectId ?? "the"} ESX from https://app.docusketch.com/portal-cc/projects (or drop it in ${hub.jobs.path(n, "sketch")}).` };
+      }),
+    ),
+
+    // ---------------------------------------------------------------- the skill's deterministic scripts
+    tool(
+      "estimate_status",
+      "The job's estimate files and totals (from the skill's render.py math, without touching the PDFs).",
+      { jobNumber },
+      wrap(async ({ jobNumber: n }) => {
+        const f = estimateFiles(hub, n);
+        return { files: Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v ? path.basename(v) : null])), totals: f.estimateJson ? await hub.skill.totals(f.estimateJson) : null };
+      }),
+    ),
+    tool(
+      "photo_report",
+      "Build the adjuster's photo report from picked photos (files in the job's photos/ folder, one adjuster-facing caption each). Writes '<Last Name> - Photo Report.pdf' in estimate/.",
+      {
+        jobNumber,
+        photos: z.array(z.object({ file: z.string(), caption: z.string(), room: z.string().optional() })).min(1),
+        perPage: z.number().int().optional(),
+      },
+      wrap(async ({ jobNumber: n, photos, perPage }) => {
+        const j = hub.jobs.get(n);
+        const picks = hub.jobs.path(n, "photos", "report-picks.json");
+        writeFileSync(picks, JSON.stringify({ customer: j.customer.name || undefined, address: j.address || undefined, claim_number: j.claimNumber || undefined, date_of_loss: j.dateOfLoss || undefined, photos }, null, 2));
+        return hub.skill.photoReport({ picks, photosDir: hub.jobs.path(n, "photos"), estimateJson: estimateFiles(hub, n).estimateJson, outDir: hub.jobs.path(n, "estimate"), perPage });
+      }),
+    ),
+  ];
+  return createSdkMcpServer({ name: SERVER, version: "0.1.0", tools });
+}

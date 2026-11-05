@@ -1,0 +1,19 @@
+{
+  "customer": "Jane Sample",
+  "address": "123 Main St, Denver, CO 80211",
+  "estimate_number": "SAMPLE_123_REC",
+  "claim_number": "EX-12345",
+  "price_list": "CODE8X_OCT26",
+  "markup_pct": 5,
+  "sections": [
+    {"name": "Bathroom", "option": "", "items": [
+      {"description": "1/2\" drywall - hung, taped, ready for texture", "quantity": 64, "unit": "SF", "unit_price": 2.72, "trade": "Drywall", "price_source": "price_book"},
+      {"description": "Texture drywall - machine", "quantity": 64, "unit": "SF", "unit_price": 0.89, "trade": "Drywall", "price_source": "price_book"},
+      {"description": "Seal/prime then paint the walls (2 coats)", "quantity": 180, "unit": "SF", "unit_price": 1.21, "trade": "Painting", "price_source": "price_list"}
+    ]}
+  ],
+  "trades": [
+    {"trade": "Drywall", "option": "", "bullets": ["Replace damaged drywall — 1/2\", hung, taped, ready for texture", "Texture to match existing"], "note": ""},
+    {"trade": "Painting", "option": "", "bullets": ["Seal, prime and paint affected walls"], "note": ""}
+  ]
+}

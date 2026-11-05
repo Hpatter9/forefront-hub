@@ -1,0 +1,51 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000009001",
+    "jobNumber": 9001,
+    "name": "Sample",
+    "address": "123 Main St, Denver, CO 80211",
+    "stage": "Estimating",
+    "stageSince": "2026-10-30",
+    "lastActivityAt": "2026-11-02",
+    "url": "https://homebase.example/projects/00000000-0000-4000-8000-000000009001",
+    "contacts": [
+      { "role": "customer", "name": "Jane Sample", "email": "jane.sample@example.com", "phone": "303-555-0101" },
+      { "role": "adjuster", "name": "Alex Adjuster", "email": "alex.adjuster@carrier.example", "phone": "303-555-0199" }
+    ],
+    "carrier": "Example Mutual",
+    "claimNumber": "EX-12345",
+    "intakeEmail": "office+9001@forefrontteam.com",
+    "notes": [{ "at": "2026-10-30T15:00:00Z", "body": "Scope walk done. Bathroom ceiling and two walls, LVP throughout hall." }]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000009002",
+    "jobNumber": 9002,
+    "name": "Example",
+    "address": "45 Pine Ave, Boulder, CO 80302",
+    "stage": "Proposal Submitted",
+    "stageSince": "2026-10-20",
+    "lastActivityAt": "2026-10-24",
+    "url": "https://homebase.example/projects/00000000-0000-4000-8000-000000009002",
+    "contacts": [{ "role": "customer", "name": "Sam Example", "email": "sam@example.com", "phone": "" }],
+    "carrier": "",
+    "claimNumber": "",
+    "proposalAmount": 8450.12,
+    "proposalSubmittedAt": "2026-10-20",
+    "intakeEmail": "office+9002@forefrontteam.com",
+    "notes": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000009003",
+    "jobNumber": 9003,
+    "name": "Closedout",
+    "address": "9 Elm St, Littleton, CO 80120",
+    "stage": "Invoiced",
+    "stageSince": "2026-09-01",
+    "url": "https://homebase.example/projects/00000000-0000-4000-8000-000000009003",
+    "contacts": [],
+    "carrier": "",
+    "claimNumber": "",
+    "intakeEmail": "office+9003@forefrontteam.com",
+    "notes": []
+  }
+]
