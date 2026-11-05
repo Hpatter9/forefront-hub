@@ -1,4 +1,4 @@
-import { STAGES } from "../core/job.js";
+import { AT_OR_PAST_PROPOSAL } from "../core/job.js";
 import type { Hub } from "../hub.js";
 
 export interface SyncResult {
@@ -50,8 +50,10 @@ export async function sync(hub: Hub, only?: number): Promise<SyncResult[]> {
     const hb = await hub.homebase.getJob(job.jobNumber);
     const sameAmount = hb.proposalAmount !== undefined && Math.abs(hb.proposalAmount - amount) < 0.005;
     const needProposal = !(sameAmount && hb.proposalSubmittedAt);
-    const stageIdx = STAGES.indexOf(hb.stage as (typeof STAGES)[number]);
-    const needStage = stageIdx === -1 || stageIdx < STAGES.indexOf(PROPOSAL_SUBMITTED);
+    const needStage = !AT_OR_PAST_PROPOSAL.has(hb.stage);
+    // The real Homebase API stamps the proposal date as the day of the write; it can't be backdated.
+    const today = toLocalDate(new Date().toISOString());
+    const stampsToday = hub.homebase.kind === "api" && date !== today;
 
     if (!needProposal && !needStage) {
       hub.jobs.upsert(job.jobNumber, { sendoff: { ...hub.jobs.get(job.jobNumber).sendoff, homebaseLoggedAt: new Date().toISOString() } });
@@ -63,6 +65,7 @@ export async function sync(hub: Hub, only?: number): Promise<SyncResult[]> {
     const details = [
       needProposal ? `Proposal amount ${usd(amount)} (Homebase now: ${hb.proposalAmount !== undefined ? usd(hb.proposalAmount) : "blank"})` : "",
       needProposal ? `Proposal submitted ${date} (Homebase now: ${hb.proposalSubmittedAt || "blank"}); this starts the Day 2/5/10/21 follow-ups` : "",
+      needProposal && stampsToday ? `Note: Homebase records today's date (${today}) for the proposal, not ${date}; it can't be backdated. Fix the date on the job page if it matters.` : "",
       needStage ? `Stage ${hb.stage || "?"} -> ${PROPOSAL_SUBMITTED}` : `Stage stays ${hb.stage}`,
     ].filter(Boolean);
     if (!(await hub.approver.confirm(`Update Homebase for #${job.jobNumber} ${job.name}?`, details))) {
@@ -70,7 +73,7 @@ export async function sync(hub: Hub, only?: number): Promise<SyncResult[]> {
       continue;
     }
     if (needProposal) await hub.homebase.setProposal(job.jobNumber, { amount, submittedAt: date });
-    if (needStage) await hub.homebase.setStage(job.jobNumber, PROPOSAL_SUBMITTED);
+    if (needStage) await hub.homebase.setStage(job.jobNumber, PROPOSAL_SUBMITTED, hb.stage);
     const now = new Date().toISOString();
     const latest = hub.jobs.get(job.jobNumber);
     hub.jobs.upsert(job.jobNumber, {

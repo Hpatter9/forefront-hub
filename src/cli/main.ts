@@ -40,9 +40,10 @@ program
   .command("jobs")
   .description("Your open reconstruction jobs from Homebase: stage, days in stage, last activity")
   .option("--all", "include closed jobs")
+  .option("--mine", "only jobs where you're the estimator, PM or owner")
   .action(async (o) => {
     const h = hub();
-    const jobs = await h.homebase.listJobs({ openOnly: !o.all });
+    const jobs = await h.homebase.listJobs({ openOnly: !o.all, details: true, mine: o.mine ? h.cfg.homebase.me : undefined });
     const days = (d?: string) => (d ? Math.max(0, Math.floor((Date.now() - Date.parse(d)) / 864e5)) : undefined);
     const rows = jobs
       .map((j) => ({ ...j, inStage: days(j.stageSince), local: h.jobs.exists(j.jobNumber) ? h.jobs.get(j.jobNumber) : undefined }))
@@ -50,7 +51,8 @@ program
     for (const r of rows) {
       const est = r.local ? r.local.estimate.status : "-";
       const last = r.lastActivityAt ? `${days(r.lastActivityAt)}d ago` : "";
-      console.log(`#${String(r.jobNumber).padEnd(6)} ${r.name.slice(0, 28).padEnd(28)} ${r.stage.padEnd(20)} ${r.inStage !== undefined ? `${r.inStage}d`.padStart(4) : "    "}  est:${est.padEnd(8)} ${last}`);
+      const amt = r.proposalAmount ? `$${r.proposalAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "";
+      console.log(`#${String(r.jobNumber).padEnd(6)} ${r.name.slice(0, 22).padEnd(22)} ${r.stage.padEnd(19)} ${r.inStage !== undefined ? `${r.inStage}d`.padStart(4) : "    "}  ${amt.padStart(11)}  est:${est.padEnd(8)} ${(r.people?.estimator ?? "").padEnd(18)} ${last}`);
     }
     await done(h);
   });
@@ -146,14 +148,16 @@ program
 
 program
   .command("log <job> <kind> <text...>")
-  .description("Log a call or note on the Homebase job (asks first). kind: call | note")
-  .action(async (j, kind, text) => {
+  .description("Log a call (Activity tab) or a note (Notes feed) on the Homebase job; asks first. kind: call | note")
+  .option("--who <name>", "who the call was with")
+  .option("--inbound", "an inbound call (default outbound)")
+  .action(async (j, kind, text, o) => {
     if (!["call", "note"].includes(kind)) throw new Error("kind is call or note");
     const h = hub();
     const n = num(j);
     const body = text.join(" ");
     if (await h.approver.confirm(`Add this ${kind} to Homebase #${n}?`, [body])) {
-      await h.homebase.addNote(n, { kind, body });
+      await h.homebase.addNote(n, { kind, body, who: o.who, direction: o.inbound ? "Inbound" : "Outbound" });
       if (h.jobs.exists(n)) h.jobs.log(n, `Homebase ${kind}: ${body.slice(0, 80)}`);
       console.log("Logged.");
     }

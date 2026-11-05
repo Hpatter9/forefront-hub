@@ -5,12 +5,12 @@ that uses the **forefront-estimate** skill for all estimating. This is phase 1: 
 comes next and uses the same code.
 
 ```
-hub jobs                                   my open recon jobs: stage, days in stage, last activity
+hub jobs --mine                            my open recon jobs: stage, days in stage, proposal $, estimator
 hub pull 3226                              Homebase -> C:\Jobs\3226 Augustine\job.json, link CompanyCam + DocuSketch
 hub photos 3226                            CompanyCam photos -> photos\
 hub sendoff 3226 --to adjuster             Gmail drafts (never sent), right PDFs, BCC office+3226@...
 hub sync                                   after you hit Send: proposal $ + date + stage in Homebase (asks first)
-hub log 3226 call "Left VM for Eileen"     note/call on the Homebase job (asks first)
+hub log 3226 call "Left VM" --who Eileen   call on the job's Activity tab, or a note (asks first)
 hub ask -j 3226 "estimate this from the ESX and photos"     anything else, through the agent
 ```
 
@@ -28,12 +28,12 @@ estimate, asks you first; old estimates are kept in `estimate\revisions\vN`.
 3. Edit `.env`:
    - `ESTIMATOR_DIR=C:\Games\Estimator` and `JOBS_ROOT=C:\Jobs`.
    - `ANTHROPIC_API_KEY`: leave it blank to reuse the key saved in the Estimator app (`data\api_key.txt`).
+   - `HOMEBASE_API_TOKEN`: your Homebase API key (Homebase → Settings → API keys, starts with `hbk_`).
    - `COMPANYCAM_TOKEN`: see below.
    - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`: see below.
 4. Connect:
    ```
    npm run hub -- doctor           shows what's live and what's still mocked
-   npm run hub -- homebase login   a browser opens: log in to Homebase, then press Enter in the terminal
    npm run hub -- gmail login      Google sign-in; allow drafts + read
    ```
 
@@ -87,9 +87,8 @@ C:\Jobs\3226 Augustine\
 ## How it fits together
 
 - `src/connectors/*`: one folder per outside system, each with a small interface (`types.ts` / top of
-  `index.ts`), a **mock** and a live version. Homebase has three: `mock`, `browser` (Playwright with your login)
-  and `api` (written against [docs/homebase-api-spec.md](docs/homebase-api-spec.md), for when it exists). Switch
-  with `HOMEBASE_DRIVER`.
+  `index.ts`), a **mock** and a live version. Homebase uses its real API ([docs/homebase-api.md](docs/homebase-api.md));
+  a browser driver (`HOMEBASE_DRIVER=browser`) remains as a fallback.
 - `src/connectors/skill`: runs the forefront-estimate skill's own scripts (totals, photo report). The agent loads
   the skill itself from `ESTIMATOR_DIR\skill\forefront-estimate`, linked into `.claude\skills`. The hub never
   prices or scopes anything.
@@ -109,7 +108,7 @@ next to this one, or `ESTIMATOR_DIR`). `npm run typecheck` checks types.
 | Gmail (drafts with real attachments, signature, sent detection, search) | written; first real run is `gmail login` |
 | CompanyCam (find project, photos, download) | written against the v2 API |
 | DocuSketch (delivery email → project ID → ESX from Downloads) | written |
-| Homebase reads (dashboard, job page) | written to be forgiving; check with `hub jobs` / `hub pull` |
-| Homebase writes (proposal, stage, notes) | **need page snapshots**: run `hub homebase snapshot 3226` and send me the files |
+| Homebase reads (jobs, job, notes) | **working against the live API** (`hub jobs --mine`, `hub pull 3226`) |
+| Homebase writes (proposal, stage, call/note) | written to the API reference and tested against a fake; first real write is your first `hub sync` |
 | Agent (`hub ask`, Claude-written send-off emails) | written; needs the API key on your PC |
 | Desktop app | phase 3 |

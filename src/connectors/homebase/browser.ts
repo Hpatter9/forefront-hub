@@ -98,7 +98,7 @@ export class BrowserHomebase implements HomebaseClient {
     const jobs = parseDashboard(await links(page), this.opts.url);
     await page.close();
     this.index = new Map(jobs.map((j) => [j.jobNumber, j]));
-    const closed = new Set(["Complete", "Invoiced"]);
+    const closed = new Set(["Payment Received", "Closed Lost"]);
     return jobs.filter((j) => !filter.openOnly || !closed.has(j.stage));
   }
 

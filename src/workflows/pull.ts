@@ -30,6 +30,8 @@ export async function pullJob(hub: Hub, jobNumber: number): Promise<Job> {
       : undefined,
     carrier: keep(hb.carrier, prior?.carrier) ?? "",
     claimNumber: keep(hb.claimNumber, prior?.claimNumber) ?? "",
+    dateOfLoss: keep(hb.dateOfLoss, prior?.dateOfLoss) ?? "",
+    companycamProjectId: prior?.companycamProjectId || hb.picturesLink?.match(/companycam\.com\/projects\/(\d+)/)?.[1] || undefined,
     insurance: prior?.insurance !== "unknown" && prior?.insurance ? prior.insurance : hb.claimNumber || adjuster ? "claim" : "unknown",
   });
 

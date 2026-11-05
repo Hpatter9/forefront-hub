@@ -39,7 +39,7 @@
     "jobNumber": 9003,
     "name": "Closedout",
     "address": "9 Elm St, Littleton, CO 80120",
-    "stage": "Invoiced",
+    "stage": "Payment Received",
     "stageSince": "2026-09-01",
     "url": "https://homebase.example/projects/00000000-0000-4000-8000-000000009003",
     "contacts": [],

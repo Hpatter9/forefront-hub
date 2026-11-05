@@ -2,11 +2,16 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, s
 import path from "node:path";
 import { z } from "zod";
 
-/** The Homebase stages, in order. */
+/** Homebase's stages in pipeline order (GET /api/v1/vocabulary, 2026-11-05). */
 export const STAGES = [
-  "Lead", "Scope Walk", "Estimating", "Proposal Review", "Proposal Submitted", "Job Won", "WA/Contract Sent",
-  "Job Prep", "In Progress", "Final Walk", "Complete", "Invoiced",
+  "Qualify", "Lead", "FDA", "Scope Walk", "Adjustment", "Estimating", "Proposal Review", "Proposal Submitted",
+  "Closed Lost", "Job Won", "Waitlist", "WA/Contract Sent", "Job Prep", "Ordering Materials", "Materials Stand-by",
+  "Scheduling", "Work In Progress", "Supplement", "On-Hold", "Job Complete", "Billing Prep", "Ready to Be Sent",
+  "Sent To Insurance", "Invoiced", "Payment Received", "Lien/Collections",
 ] as const;
+
+/** Stages that mean the proposal has gone out (or the job is past it). */
+export const AT_OR_PAST_PROPOSAL = new Set<string>(STAGES.slice(STAGES.indexOf("Proposal Submitted")));
 
 const Person = z.object({
   name: z.string().default(""),

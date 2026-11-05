@@ -11,7 +11,7 @@ export { BrowserHomebase, MockHomebase, ApiHomebase };
 export function makeHomebase(cfg: Config): HomebaseClient {
   switch (cfg.homebase.driver) {
     case "api":
-      return new ApiHomebase({ url: cfg.homebase.url, token: cfg.homebase.apiToken });
+      return new ApiHomebase({ url: cfg.homebase.url, token: cfg.homebase.apiToken, actingEmail: cfg.gmail.address });
     case "browser":
       return new BrowserHomebase({
         url: cfg.homebase.url,

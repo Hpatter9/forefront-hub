@@ -20,9 +20,12 @@ export class MockHomebase implements HomebaseClient {
     this.jobs = JSON.parse(readFileSync(fixture, "utf8"));
   }
 
-  async listJobs(filter: { openOnly?: boolean } = {}) {
-    const closed = new Set(["Complete", "Invoiced"]);
-    return this.jobs.filter((j) => !filter.openOnly || !closed.has(j.stage)).map(({ contacts, notes, text, ...s }) => s);
+  async listJobs(filter: { openOnly?: boolean; mine?: string } = {}) {
+    const closed = new Set(["Payment Received", "Closed Lost"]);
+    return this.jobs
+      .filter((j) => !filter.openOnly || !closed.has(j.stage))
+      .filter((j) => !filter.mine || Object.values(j.people ?? {}).includes(filter.mine))
+      .map(({ contacts, notes, text, ...s }) => s);
   }
 
   async getJob(jobNumber: number) {

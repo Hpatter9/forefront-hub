@@ -16,7 +16,7 @@ export interface Config {
   python: string;
   anthropicApiKey: string;
   model: string;
-  homebase: { driver: "mock" | "browser" | "api"; url: string; apiToken: string; authFile: string };
+  homebase: { driver: "mock" | "browser" | "api"; url: string; apiToken: string; authFile: string; me: string };
   gmail: { driver: "mock" | "google"; clientId: string; clientSecret: string; address: string; tokenFile: string };
   companycam: { driver: "mock" | "rest"; token: string };
   docusketch: { downloadsDir: string };
@@ -40,7 +40,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
   const keyFile = path.join(estimatorDir, "data", "api_key.txt");
   if (!anthropicApiKey && existsSync(keyFile)) anthropicApiKey = readFileSync(keyFile, "utf8").trim();
 
-  const hbDriver = e("HOMEBASE_DRIVER", "browser") as Config["homebase"]["driver"];
+  const hbDriver = e("HOMEBASE_DRIVER", e("HOMEBASE_API_TOKEN") ? "api" : "browser") as Config["homebase"]["driver"];
   const gmailReady = !!(e("GOOGLE_CLIENT_ID") && e("GOOGLE_CLIENT_SECRET"));
   const ccToken = e("COMPANYCAM_TOKEN");
 
@@ -58,6 +58,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
       url: e("HOMEBASE_URL", "https://homebase.forefrontteam.com").replace(/\/$/, ""),
       apiToken: e("HOMEBASE_API_TOKEN"),
       authFile: path.join(root, "auth", "homebase.json"),
+      me: e("HOMEBASE_ME", "Hunter Patterson"),
     },
     gmail: {
       driver: live && gmailReady ? "google" : "mock",
