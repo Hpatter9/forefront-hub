@@ -161,7 +161,7 @@ function toMessage(m: gmail_v1.Schema$Message): Message {
   };
 }
 
-function openBrowser(url: string) {
+export function openBrowser(url: string) {
   const cmd = process.platform === "win32" ? ["cmd", ["/c", "start", '""', `"${url}"`]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
   try {
     spawn(cmd[0] as string, cmd[1] as string[], { stdio: "ignore", detached: true, shell: process.platform === "win32" }).unref();

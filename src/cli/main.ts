@@ -203,6 +203,10 @@ program
     await new GoogleGmail({ clientId: c.gmail.clientId, clientSecret: c.gmail.clientSecret, tokenFile: c.gmail.tokenFile, address: c.gmail.address }).login();
   });
 
+const connect = program.command("connect").description("Guided set-up for a connection: gmail | companycam");
+connect.command("gmail").description("Connect Gmail step by step").action(async () => (await import("./connect.js")).connectGmail());
+connect.command("companycam").description("Connect CompanyCam with an access token").action(async () => (await import("./connect.js")).connectCompanyCam());
+
 program
   .command("mock-send <job>")
   .description("Mock mode only: pretend you sent the job's drafts (to try `hub sync`)")
