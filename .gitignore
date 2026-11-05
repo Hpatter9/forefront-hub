@@ -8,3 +8,6 @@ snapshots/
 jobs/
 .claude/skills/forefront-estimate
 *.log
+# the hub's own copy of the estimating skill and its Python (setup.ps1)
+estimator/
+.venv-py/
