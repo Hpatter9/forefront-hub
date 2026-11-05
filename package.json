@@ -8,6 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "app": "tsx src/server/main.ts",
     "hub": "tsx src/cli/main.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

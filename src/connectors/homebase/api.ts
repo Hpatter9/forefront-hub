@@ -1,4 +1,4 @@
-import type { Contact, HomebaseClient, JobDetail, JobSummary } from "./types.js";
+import type { ActivityRow, Contact, FiledEmail, HomebaseClient, JobDetail, JobSummary } from "./types.js";
 
 /**
  * Homebase over its real JSON API (https://homebase.forefrontteam.com/api/v1, reference at /api/v1/docs).
@@ -147,9 +147,14 @@ export class ApiHomebase implements HomebaseClient {
   }
 
   /** Emails Homebase has filed on the job (metadata only), newest first. */
-  async emails(jobNumber: number) {
+  async emails(jobNumber: number): Promise<FiledEmail[]> {
     const id = await this.projectId(jobNumber);
-    return (await this.call<{ emails: any[] }>("GET", `/projects/${id}/emails`)).emails;
+    return (await this.call<{ emails: FiledEmail[] }>("GET", `/projects/${id}/emails`)).emails;
+  }
+
+  async activity(jobNumber: number): Promise<ActivityRow[]> {
+    const id = await this.projectId(jobNumber);
+    return (await this.call<{ activity: ActivityRow[] }>("GET", `/projects/${id}/activity`)).activity;
   }
 
   /** Adds a file to the job's Documents tab (estimate PDFs, photo report). */

@@ -5,6 +5,7 @@ that uses the **forefront-estimate** skill for all estimating. This is phase 1: 
 comes next and uses the same code.
 
 ```
+npm run app                                the hub's screen at http://localhost:4317 (job list, job page, Ask Claude)
 hub jobs --mine                            my open recon jobs: stage, days in stage, proposal $, estimator
 hub pull 3226                              Homebase -> C:\Jobs\3226 Augustine\job.json, link CompanyCam + DocuSketch
 hub photos 3226                            CompanyCam photos -> photos\
@@ -111,4 +112,5 @@ next to this one, or `ESTIMATOR_DIR`). `npm run typecheck` checks types.
 | Homebase reads (jobs, job, notes) | **working against the live API** (`hub jobs --mine`, `hub pull 3226`) |
 | Homebase writes (proposal, stage, call/note) | written to the API reference and tested against a fake; first real write is your first `hub sync` |
 | Agent (`hub ask`, Claude-written send-off emails) | written; needs the API key on your PC |
-| Desktop app | phase 3 |
+| Screen (`npm run app`) | job list, job page (Homebase, emails, activity, notes, estimate files, drafts), send-off / sync / log buttons with approval pop-ups, Ask Claude box |
+| Desktop app wrapper | next: Electron window around the same screen |

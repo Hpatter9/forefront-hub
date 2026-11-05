@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forefront Hub</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --ink: #1c2733; --muted: #66727f; --line: #dfe4ea; --soft: #eef2f6;
+    --navy: #16324a; --accent: #2f6fa7; --accent-ink: #ffffff; --ok: #2e7d4f; --warn: #a86400; --bad: #b3261e;
+    --pill: #e7eef6; --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f151c; --panel: #17202a; --ink: #e6ebf0; --muted: #94a1ae; --line: #2a3643; --soft: #1d2833;
+      --navy: #9cc3e6; --accent: #5b9bd5; --accent-ink: #0b1218; --ok: #6cc08e; --warn: #e0a54a; --bad: #ef7b72;
+      --pill: #22303d; --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  a { color: var(--accent); }
+  .app { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+  header.top { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header.top h1 { font-size: 16px; margin: 0; color: var(--navy); letter-spacing: .2px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+  .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--pill); color: var(--muted); white-space: nowrap; }
+  .chip.on { color: var(--ok); } .chip.off { color: var(--warn); }
+  .body { display: grid; grid-template-columns: 340px 1fr; min-height: 0; }
+  aside { border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
+  .filters { padding: 12px; display: grid; gap: 8px; border-bottom: 1px solid var(--line); }
+  .row { display: flex; gap: 8px; align-items: center; }
+  input[type=search], input[type=text], input[type=email], select, textarea { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+  .seg button { border: 0; background: transparent; padding: 6px 10px; cursor: pointer; color: var(--muted); }
+  .seg button.active { background: var(--accent); color: var(--accent-ink); }
+  .list { overflow: auto; flex: 1; }
+  .job { padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; }
+  .job:hover { background: var(--soft); }
+  .job.sel { background: var(--pill); box-shadow: inset 3px 0 0 var(--accent); }
+  .job .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .job .n { color: var(--muted); font-weight: 400; }
+  .job .amt { text-align: right; font-variant-numeric: tabular-nums; }
+  .job .sub { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .days { font-size: 12px; text-align: right; color: var(--muted); }
+  .days.old { color: var(--warn); font-weight: 600; }
+  .stage { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--pill); color: var(--navy); }
+  main { overflow: auto; min-height: 0; display: flex; flex-direction: column; }
+  .empty { margin: auto; color: var(--muted); text-align: center; padding: 40px; }
+  .jobhead { padding: 18px 20px 8px; display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+  .jobhead h2 { margin: 0; font-size: 20px; }
+  .jobhead .addr { color: var(--muted); }
+  .actions { padding: 6px 20px 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn { border: 1px solid var(--line); background: var(--panel); padding: 7px 12px; border-radius: 8px; cursor: pointer; box-shadow: var(--shadow); }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; padding: 0 20px 20px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; }
+  .card h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .card h3 button { text-transform: none; letter-spacing: 0; font-size: 12px; padding: 3px 8px; }
+  dl { display: grid; grid-template-columns: 110px 1fr; gap: 4px 10px; margin: 0; }
+  dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
+  .muted { color: var(--muted); }
+  ul.items { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  ul.items li { border-bottom: 1px dashed var(--line); padding-bottom: 8px; }
+  ul.items li:last-child { border-bottom: 0; padding-bottom: 0; }
+  .small { font-size: 12px; }
+  .tag { font-size: 11px; padding: 0 6px; border-radius: 4px; background: var(--soft); color: var(--muted); }
+  .tag.out { color: var(--accent); } .tag.sent { color: var(--ok); } .tag.draft { color: var(--warn); }
+  .photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 6px; }
+  .photos img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; background: var(--soft); }
+  .askbar { position: sticky; bottom: 0; background: linear-gradient(transparent, var(--bg) 30%); padding: 14px 20px 16px; margin-top: auto; }
+  .askbar form { display: flex; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px; box-shadow: var(--shadow); }
+  .askbar textarea { border: 0; resize: none; min-height: 40px; max-height: 160px; }
+  .askbar textarea:focus { outline: none; }
+  .console { border-top: 1px solid var(--line); background: var(--panel); max-height: 32vh; overflow: auto; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; padding: 8px 20px; white-space: pre-wrap; }
+  .console:empty { display: none; }
+  .console .t-run { color: var(--accent); } .console .t-ok { color: var(--ok); } .console .t-err { color: var(--bad); }
+  dialog { border: 1px solid var(--line); border-radius: 14px; padding: 0; width: min(520px, calc(100vw - 32px)); background: var(--panel); color: var(--ink); }
+  dialog::backdrop { background: rgba(10, 15, 20, .45); }
+  dialog .in { padding: 18px 20px; }
+  dialog h4 { margin: 0 0 10px; font-size: 16px; }
+  dialog ul { margin: 0 0 6px; padding-left: 18px; }
+  dialog .foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--line); }
+  .warnbox { background: var(--soft); border-left: 3px solid var(--warn); padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; font-size: 13px; }
+  .formgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .formgrid label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+  @media (max-width: 860px) {
+    .body { grid-template-columns: 1fr; grid-template-rows: 42vh 1fr; }
+    aside { border-right: 0; border-bottom: 1px solid var(--line); }
+    .grid { grid-template-columns: 1fr; padding: 0 16px 16px; }
+    .jobhead, .actions, .askbar { padding-left: 16px; padding-right: 16px; }
+    .formgrid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1>Forefront Hub</h1>
+    <span class="muted small" id="who"></span>
+    <div class="chips" id="chips"></div>
+  </header>
+  <div class="body">
+    <aside>
+      <div class="filters">
+        <input type="search" id="q" placeholder="Search name, street or job #">
+        <div class="row">
+          <div class="seg" id="scope"><button data-v="mine" class="active">Mine</button><button data-v="all">All recon</button></div>
+          <select id="stage"><option value="">All stages</option></select>
+        </div>
+        <div class="row small muted"><span id="count"></span><span style="margin-left:auto">sort</span>
+          <select id="sort" style="width:auto"><option value="days">Days in stage</option><option value="num">Job #</option><option value="amt">Proposal $</option></select>
+        </div>
+      </div>
+      <div class="list" id="list"><div class="empty">Loading jobs from Homebase…</div></div>
+    </aside>
+    <main id="main">
+      <div class="empty" id="placeholder">Pick a job on the left.<br><span class="small">Everything here is read live from Homebase. Anything that changes Homebase asks you first; emails are only ever drafts.</span></div>
+      <div id="job" hidden></div>
+      <div class="askbar" id="askbar" hidden>
+        <form id="askform">
+          <textarea id="prompt" rows="1" placeholder="Ask Claude about this job, e.g. “draft the adjuster send-off with the Xactimate and photos”"></textarea>
+          <button class="btn primary" id="askbtn">Ask</button>
+        </form>
+        <div class="small muted" id="askhint" style="padding:4px 4px 0"></div>
+      </div>
+      <div class="console" id="console"></div>
+    </main>
+  </div>
+</div>
+
+<dialog id="approve"><div class="in"><h4 id="ap-title"></h4><ul id="ap-details"></ul></div>
+  <div class="foot"><button class="btn" id="ap-no">No</button><button class="btn primary" id="ap-yes">Yes, go ahead</button></div></dialog>
+
+<dialog id="sendoff"><form method="dialog"><div class="in">
+  <h4>Draft the send-off</h4>
+  <div class="warnbox">Creates Gmail <b>drafts</b> only, BCC'd to <span id="so-bcc"></span>. You review and send them yourself.</div>
+  <label class="row"><input type="checkbox" id="so-home" checked> Homeowner: Reconstruction Estimate</label>
+  <label class="row"><input type="checkbox" id="so-adj"> Adjuster: Xactimate Estimate + photo report</label>
+  <p class="small muted" id="so-missing"></p>
+  </div><div class="foot"><button class="btn" value="cancel">Cancel</button><button class="btn primary" id="so-go" value="go">Create drafts</button></div></form></dialog>
+
+<dialog id="logdlg"><form method="dialog"><div class="in">
+  <h4>Log on Homebase</h4>
+  <div class="row" style="margin-bottom:8px"><div class="seg" id="lg-kind"><button type="button" data-v="call" class="active">Call</button><button type="button" data-v="note">Note</button></div>
+    <select id="lg-dir" style="width:auto"><option>Outbound</option><option>Inbound</option></select></div>
+  <input type="text" id="lg-who" placeholder="With (e.g. Eileen Brandt)" style="margin-bottom:8px">
+  <textarea id="lg-body" rows="4" placeholder="First line is the subject on the Activity tab"></textarea>
+  </div><div class="foot"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="go">Log it</button></div></form></dialog>
+
+<dialog id="editdlg"><form method="dialog"><div class="in">
+  <h4>Job details Homebase doesn't have</h4>
+  <p class="small muted">Saved in the job folder's job.json (not Homebase).</p>
+  <div class="formgrid">
+    <label>Customer email<input type="email" id="ed-cemail"></label>
+    <label>Insurance<select id="ed-ins"><option value="unknown">Unknown</option><option value="claim">Insurance claim</option><option value="oop">Out of pocket</option></select></label>
+    <label>Adjuster name<input type="text" id="ed-aname"></label>
+    <label>Adjuster email<input type="email" id="ed-aemail"></label>
+    <label>Adjuster phone<input type="text" id="ed-aphone"></label>
+    <label>Claim number<input type="text" id="ed-claim"></label>
+    <label>Carrier<input type="text" id="ed-carrier"></label>
+  </div></div><div class="foot"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="go">Save</button></div></form></dialog>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const usd = (n) => (n || n === 0) ? "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";
+const daysSince = (d) => d ? Math.max(0, Math.floor((Date.now() - Date.parse(d)) / 864e5)) : null;
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+const store = { get(k, d) { try { return JSON.parse(localStorage.getItem("hub:" + k)) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem("hub:" + k, JSON.stringify(v)); } catch {} } };
+
+let status = {}, jobs = [], scope = store.get("scope", "mine"), selected = store.get("job", null), view = null;
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { ...opts, headers: { "Content-Type": "application/json" }, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+function log(text, cls = "") {
+  const c = $("#console");
+  const line = document.createElement("div");
+  if (cls) line.className = cls;
+  line.textContent = text;
+  c.appendChild(line);
+  c.scrollTop = c.scrollHeight;
+}
+
+// ------------------------------------------------------------- status + jobs
+async function loadStatus() {
+  status = await api("/api/status");
+  $("#who").textContent = status.me;
+  const chip = (label, on, title) => `<span class="chip ${on ? "on" : "off"}" title="${esc(title)}">${on ? "●" : "○"} ${label}</span>`;
+  $("#chips").innerHTML = [
+    chip(`Homebase ${status.homebase}`, status.homebase !== "mock", "Where jobs come from"),
+    chip(`Gmail ${status.gmail}`, status.gmail === "google", status.gmail === "google" ? "Drafts go to your Gmail" : "Not connected: drafts are saved as files in the hub, not in Gmail"),
+    chip(`CompanyCam ${status.companycam}`, status.companycam === "rest", status.companycam === "rest" ? "" : "Not connected: set COMPANYCAM_TOKEN"),
+    chip(`Claude ${status.agent ? "on" : "off"}`, status.agent, status.agent ? "" : "No Anthropic API key on this machine"),
+  ].join("");
+  $("#askhint").textContent = status.agent ? "Claude uses the forefront-estimate skill and the hub's tools; it asks before anything that changes Homebase." : "Claude is off on this machine (no Anthropic API key). It works on your PC with the key from the Estimator app.";
+}
+
+async function loadJobs() {
+  $("#list").innerHTML = `<div class="empty">Loading jobs from Homebase…</div>`;
+  try {
+    jobs = await api(`/api/jobs?mine=${scope === "mine" ? 1 : 0}`);
+  } catch (e) {
+    $("#list").innerHTML = `<div class="empty">Couldn't load jobs: ${esc(e.message)}</div>`;
+    return;
+  }
+  const stages = [...new Set(jobs.map((j) => j.stage))];
+  const cur = $("#stage").value;
+  $("#stage").innerHTML = `<option value="">All stages</option>` + stages.map((s) => `<option ${s === cur ? "selected" : ""}>${esc(s)}</option>`).join("");
+  renderList();
+  if (selected) openJob(selected, false);
+}
+
+function renderList() {
+  const q = $("#q").value.trim().toLowerCase();
+  const st = $("#stage").value;
+  const sort = $("#sort").value;
+  let rows = jobs.filter((j) => (!st || j.stage === st) && (!q || `${j.jobNumber} ${j.name} ${j.address}`.toLowerCase().includes(q)));
+  const key = { days: (j) => -(daysSince(j.stageSince) ?? -1), num: (j) => -j.jobNumber, amt: (j) => -(j.proposalAmount ?? 0) }[sort];
+  rows.sort((a, b) => key(a) - key(b));
+  $("#count").textContent = `${rows.length} job${rows.length === 1 ? "" : "s"}`;
+  $("#list").innerHTML = rows.map((j) => {
+    const d = daysSince(j.stageSince);
+    const old = d !== null && ((j.stage === "Proposal Submitted" && d >= 10) || d >= 30);
+    return `<div class="job ${j.jobNumber === selected ? "sel" : ""}" data-n="${j.jobNumber}">
+      <div class="t"><span class="n">#${j.jobNumber}</span> ${esc(j.name)}</div><div class="amt">${usd(j.proposalAmount)}</div>
+      <div class="sub"><span class="stage">${esc(j.stage)}</span> ${esc(j.address.split(",")[0])}</div><div class="days ${old ? "old" : ""}">${d === null ? "" : d + "d"}</div>
+    </div>`;
+  }).join("") || `<div class="empty">No jobs match.</div>`;
+}
+
+$("#list").addEventListener("click", (e) => { const el = e.target.closest(".job"); if (el) openJob(Number(el.dataset.n)); });
+$("#q").addEventListener("input", renderList);
+$("#stage").addEventListener("change", renderList);
+$("#sort").addEventListener("change", renderList);
+for (const b of document.querySelectorAll("#scope button")) {
+  if (b.dataset.v === scope) { document.querySelectorAll("#scope button").forEach((x) => x.classList.remove("active")); b.classList.add("active"); }
+  b.addEventListener("click", () => { scope = b.dataset.v; store.set("scope", scope); document.querySelectorAll("#scope button").forEach((x) => x.classList.toggle("active", x === b)); loadJobs(); });
+}
+
+// ------------------------------------------------------------- one job
+async function openJob(n, scroll = true) {
+  selected = n; store.set("job", n);
+  renderList();
+  $("#placeholder").hidden = true;
+  $("#job").hidden = false; $("#askbar").hidden = false;
+  $("#job").innerHTML = `<div class="jobhead"><h2>#${n}</h2><span class="muted">Loading…</span></div>`;
+  try { view = await api(`/api/jobs/${n}`); } catch (e) { $("#job").innerHTML = `<div class="empty">Couldn't load #${n}: ${esc(e.message)}</div>`; return; }
+  if (selected !== n) return;
+  renderJob();
+  if (scroll) $("#main").scrollTop = 0;
+}
+
+function renderJob() {
+  const { homebase: h, local: l, files, photos, emails, activity } = view;
+  const n = h.jobNumber;
+  const d = daysSince(h.stageSince);
+  const cust = h.contacts.find((c) => c.role === "customer") || {};
+  const adjHb = h.contacts.find((c) => c.role === "adjuster");
+  const adj = (l && l.adjuster.email) ? l.adjuster : adjHb || {};
+  const ccId = l?.companycamProjectId || (h.picturesLink || "").match(/projects\/(\d+)/)?.[1];
+  const fileUrl = (sub, f) => `/api/jobs/${n}/file/${encodeURIComponent(sub + "/" + f)}`;
+  const est = files.estimate || [];
+  const drafts = l?.sendoff?.drafts || [];
+
+  $("#job").innerHTML = `
+    <div class="jobhead">
+      <div style="flex:1;min-width:240px"><h2>#${n} ${esc(h.name)}</h2><div class="addr">${esc(h.address)}</div></div>
+      <div style="text-align:right"><span class="stage" style="font-size:13px;padding:3px 10px">${esc(h.stage)}</span><div class="small muted">${d === null ? "" : d + " days in stage"}</div></div>
+    </div>
+    <div class="actions">
+      <button class="btn" data-act="pull">${l ? "Refresh job folder" : "Set up job folder"}</button>
+      <button class="btn primary" data-act="sendoff">Draft send-off…</button>
+      <button class="btn" data-act="sync" ${drafts.length ? "" : "disabled"} title="After you send the drafts: log the proposal in Homebase">Check sent &amp; log</button>
+      <button class="btn" data-act="log">Log call / note…</button>
+      <button class="btn" data-act="edit">Edit contacts…</button>
+      ${status.gmail === "mock" && drafts.some((x) => !x.sentAt) ? `<button class="btn" data-act="mocksend" title="Gmail isn't connected here, so pretend you sent the drafts">Pretend I sent them</button>` : ""}
+      <a class="btn" href="${esc(h.url)}" target="_blank" rel="noopener">Open in Homebase ↗</a>
+      ${ccId ? `<a class="btn" href="https://app.companycam.com/projects/${ccId}" target="_blank" rel="noopener">CompanyCam ↗</a>` : ""}
+    </div>
+    <div class="grid">
+      <div class="card"><h3>Homebase</h3><dl>
+        <dt>Customer</dt><dd>${esc(cust.name || "—")}${cust.email ? `<br><span class="small">${esc(cust.email)}</span>` : ""}${cust.phone ? `<br><span class="small muted">${esc(cust.phone)}</span>` : ""}</dd>
+        <dt>Adjuster</dt><dd>${adj.name || adj.email ? `${esc(adj.name)}${adj.email ? `<br><span class="small">${esc(adj.email)}</span>` : ""}${adjHb ? "" : ` <span class="tag">job folder</span>`}` : `<span class="muted">none</span>`}</dd>
+        <dt>Carrier / claim</dt><dd>${esc(h.carrier || l?.carrier || "—")} ${esc(h.claimNumber || l?.claimNumber || "")}</dd>
+        <dt>Proposal</dt><dd>${usd(h.proposalAmount) || "—"} ${h.proposalSubmittedAt ? `<span class="muted small">on ${esc(h.proposalSubmittedAt)}</span>` : ""}</dd>
+        <dt>Contract</dt><dd>${usd(h.contractAmount) || "—"}</dd>
+        <dt>Estimator / PM</dt><dd>${esc(h.people?.estimator || "—")} / ${esc(h.people?.projectManager || "—")}</dd>
+        <dt>Log address</dt><dd class="small">${esc(h.intakeEmail)}</dd>
+      </dl></div>
+
+      <div class="card"><h3>Estimate <span class="small muted" style="text-transform:none;letter-spacing:0">${l ? esc(l.estimate.status) : ""}</span></h3>
+        ${!l ? `<p class="muted">No job folder yet. <b>Set up job folder</b> pulls this job from Homebase into ${esc(view.folder)}.</p>`
+          : est.length ? `<ul class="items">${est.map((f) => `<li><a href="${fileUrl("estimate", f.name)}" target="_blank">${esc(f.name)}</a> <span class="small muted">${Math.round(f.size / 1024)} KB</span></li>`).join("")}</ul>`
+          : `<p class="muted">No estimate files yet. Ask Claude below to write one from the ESX and photos, or drop the PDFs in<br><span class="small">${esc(view.folder)}\\estimate</span></p>`}
+      </div>
+
+      <div class="card"><h3>Send-off drafts</h3>
+        ${drafts.length ? `<ul class="items">${drafts.map((x) => `<li><span class="tag ${x.sentAt ? "sent" : "draft"}">${x.sentAt ? "sent " + fmtDate(x.sentAt) : "draft"}</span> <b>${esc(x.kind)}</b> → ${esc(x.to.join(", "))}<div class="small">${esc(x.subject)}</div><div class="small muted">${esc(x.attachments.join(", "))}</div></li>`).join("")}</ul>
+          ${l?.sendoff?.homebaseLoggedAt ? `<p class="small" style="color:var(--ok)">Logged in Homebase ${fmtDate(l.sendoff.homebaseLoggedAt)}</p>` : ""}`
+          : `<p class="muted">None yet.</p>`}
+      </div>
+
+      <div class="card"><h3>Emails filed on the job</h3>
+        ${emails.length ? `<ul class="items">${emails.slice(0, 12).map((m) => `<li><span class="tag ${m.direction === "out" ? "out" : ""}">${m.direction === "out" ? "sent" : "in"}</span> <span class="small muted">${fmtDate(m.sentAt)}</span> ${esc(m.subject)}<div class="small muted">${esc(m.direction === "out" ? "to " + (m.to || []).join(", ") : "from " + (m.fromName || m.from))}${m.attachmentCount ? ` · ${m.attachmentCount} attachment${m.attachmentCount > 1 ? "s" : ""}` : ""}</div></li>`).join("")}</ul>` : `<p class="muted">None filed yet.</p>`}
+      </div>
+
+      <div class="card"><h3>Activity</h3>
+        ${activity.length ? `<ul class="items">${activity.slice(0, 10).map((a) => `<li><span class="tag">${esc(a.type)}</span> <span class="small muted">${esc(a.on)}</span> ${esc(a.subject)}<div class="small muted">${esc([a.who, a.owner].filter(Boolean).join(" · "))}</div></li>`).join("")}</ul>` : `<p class="muted">Nothing logged.</p>`}
+      </div>
+
+      <div class="card"><h3>Notes</h3>
+        ${h.notes.length ? `<ul class="items">${h.notes.slice(0, 8).map((x) => `<li><span class="small muted">${fmtDate(x.at)}</span> ${esc(x.body).replace(/\n/g, "<br>")}</li>`).join("")}</ul>` : `<p class="muted">No notes.</p>`}
+      </div>
+
+      <div class="card"><h3>Photos ${l && status.companycam === "rest" ? `<button class="btn" data-act="photos">Download from CompanyCam</button>` : ""}</h3>
+        ${photos.length ? `<div class="photos">${photos.slice(0, 24).map((p) => `<a href="${fileUrl("photos", p.name)}" target="_blank"><img loading="lazy" src="${fileUrl("photos", p.name)}" alt=""></a>`).join("")}</div>${photos.length > 24 ? `<p class="small muted">+${photos.length - 24} more in the folder</p>` : ""}`
+          : status.companycam === "rest" ? `<p class="muted">Not downloaded yet.</p>` : `<p class="muted">CompanyCam isn't connected on this machine.${ccId ? ` <a href="https://app.companycam.com/projects/${ccId}" target="_blank">Open the project ↗</a>` : ""}</p>`}
+      </div>
+    </div>`;
+}
+
+$("#job").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const n = view.homebase.jobNumber;
+  const act = b.dataset.act;
+  try {
+    if (act === "pull") await api(`/api/jobs/${n}/pull`, { method: "POST" });
+    if (act === "photos") await api(`/api/jobs/${n}/photos`, { method: "POST" });
+    if (act === "sync") await api(`/api/jobs/${n}/sync`, { method: "POST" });
+    if (act === "mocksend") { await api(`/api/jobs/${n}/mock-send`, { method: "POST" }); log(`#${n}: marked the drafts as sent (test mode). Now press “Check sent & log”.`); openJob(n, false); }
+    if (act === "sendoff") openSendoff();
+    if (act === "log") $("#logdlg").showModal();
+    if (act === "edit") openEdit();
+  } catch (err) { log(err.message, "t-err"); }
+});
+
+function openSendoff() {
+  const { homebase: h, local: l, files } = view;
+  const cust = h.contacts.find((c) => c.role === "customer") || {};
+  const adj = (l && l.adjuster.email) ? l.adjuster : h.contacts.find((c) => c.role === "adjuster") || {};
+  const est = (files.estimate || []).map((f) => f.name);
+  $("#so-bcc").textContent = h.intakeEmail;
+  $("#so-adj").checked = !!adj.email;
+  const missing = [];
+  if (!cust.email && !l?.customer?.email) missing.push("no homeowner email");
+  if (!adj.email) missing.push("no adjuster email (Edit contacts)");
+  if (!est.some((f) => f.endsWith("- Reconstruction Estimate.pdf"))) missing.push("no Reconstruction Estimate PDF in the job folder");
+  if (!est.some((f) => f.endsWith("- Xactimate Estimate.pdf"))) missing.push("no Xactimate Estimate PDF");
+  $("#so-missing").textContent = missing.length ? "Missing: " + missing.join("; ") + "." : "";
+  $("#sendoff").showModal();
+}
+$("#sendoff").addEventListener("close", async () => {
+  if ($("#sendoff").returnValue !== "go") return;
+  const to = [$("#so-home").checked && "homeowner", $("#so-adj").checked && "adjuster"].filter(Boolean);
+  if (!to.length) return;
+  try { await api(`/api/jobs/${view.homebase.jobNumber}/sendoff`, { method: "POST", body: { to } }); } catch (e) { log(e.message, "t-err"); }
+});
+
+let logKind = "call";
+for (const b of document.querySelectorAll("#lg-kind button")) b.addEventListener("click", () => { logKind = b.dataset.v; document.querySelectorAll("#lg-kind button").forEach((x) => x.classList.toggle("active", x === b)); $("#lg-dir").hidden = $("#lg-who").hidden = logKind !== "call"; });
+$("#logdlg").addEventListener("close", async () => {
+  if ($("#logdlg").returnValue !== "go" || !$("#lg-body").value.trim()) return;
+  try { await api(`/api/jobs/${view.homebase.jobNumber}/log`, { method: "POST", body: { kind: logKind, body: $("#lg-body").value.trim(), who: $("#lg-who").value.trim(), direction: $("#lg-dir").value } }); $("#lg-body").value = ""; } catch (e) { log(e.message, "t-err"); }
+});
+
+function openEdit() {
+  const { homebase: h, local: l } = view;
+  const cust = h.contacts.find((c) => c.role === "customer") || {};
+  $("#ed-cemail").value = l?.customer?.email || cust.email || "";
+  $("#ed-ins").value = l?.insurance || "unknown";
+  $("#ed-aname").value = l?.adjuster?.name || ""; $("#ed-aemail").value = l?.adjuster?.email || ""; $("#ed-aphone").value = l?.adjuster?.phone || "";
+  $("#ed-claim").value = l?.claimNumber || h.claimNumber || ""; $("#ed-carrier").value = l?.carrier || h.carrier || "";
+  $("#editdlg").showModal();
+}
+$("#editdlg").addEventListener("close", async () => {
+  if ($("#editdlg").returnValue !== "go") return;
+  try {
+    await api(`/api/jobs/${view.homebase.jobNumber}/set`, { method: "POST", body: { customerEmail: $("#ed-cemail").value, insurance: $("#ed-ins").value, adjusterName: $("#ed-aname").value, adjusterEmail: $("#ed-aemail").value, adjusterPhone: $("#ed-aphone").value, claimNumber: $("#ed-claim").value, carrier: $("#ed-carrier").value } });
+    openJob(view.homebase.jobNumber, false);
+  } catch (e) { log(e.message, "t-err"); }
+});
+
+// ------------------------------------------------------------- ask Claude
+$("#askform").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const prompt = $("#prompt").value.trim(); if (!prompt) return;
+  try { await api("/api/ask", { method: "POST", body: { prompt, job: selected } }); $("#prompt").value = ""; log("› " + prompt); } catch (err) { log(err.message, "t-err"); }
+});
+$("#prompt").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#askform").requestSubmit(); } });
+
+// ------------------------------------------------------------- live events + approvals
+const approvals = [];
+function showApproval() {
+  const a = approvals[0]; const dlg = $("#approve");
+  if (!a) { if (dlg.open) dlg.close(); return; }
+  $("#ap-title").textContent = a.action;
+  $("#ap-details").innerHTML = a.details.map((d) => `<li>${esc(d)}</li>`).join("");
+  if (!dlg.open) dlg.showModal();
+}
+async function answer(yes) {
+  const a = approvals.shift(); if (!a) return;
+  showApproval();
+  await api(`/api/approvals/${a.id}`, { method: "POST", body: { yes } }).catch(() => {});
+}
+$("#ap-yes").addEventListener("click", () => answer(true));
+$("#ap-no").addEventListener("click", () => answer(false));
+$("#approve").addEventListener("cancel", (e) => { e.preventDefault(); answer(false); });
+
+const es = new EventSource("/api/events");
+es.onmessage = (m) => {
+  const e = JSON.parse(m.data);
+  if (e.type === "log") log(e.text);
+  if (e.type === "approval") { if (!approvals.some((a) => a.id === e.id)) approvals.push(e); showApproval(); }
+  if (e.type === "approval-done") { const i = approvals.findIndex((a) => a.id === e.id); if (i >= 0) { approvals.splice(i, 1); showApproval(); } }
+  if (e.type === "task") {
+    if (e.state === "running") log(`▶ ${e.label}`, "t-run");
+    if (e.state === "done") { log(`✓ ${e.label}`, "t-ok"); if (e.job && e.job === selected) openJob(selected, false); }
+    if (e.state === "error") log(`✗ ${e.label}: ${e.error}`, "t-err");
+  }
+};
+
+loadStatus().then(loadJobs).catch((e) => log(e.message, "t-err"));
+</script>
+</body>
+</html>

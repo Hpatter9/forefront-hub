@@ -54,7 +54,35 @@ export interface HomebaseClient {
   setStage(jobNumber: number, stage: string, fromStage?: string): Promise<void>;
   /** A call goes in the job's Activity log (first line = subject), a note on its Notes feed. */
   addNote(jobNumber: number, note: { kind: "note" | "call"; body: string; who?: string; direction?: "Inbound" | "Outbound" }): Promise<void>;
+  /** Emails Homebase filed on the job (via the office+<job#> BCC), newest first. Not every driver has it. */
+  emails?(jobNumber: number): Promise<FiledEmail[]>;
+  /** The job's Activity log (calls, emails, meetings), newest first. Not every driver has it. */
+  activity?(jobNumber: number): Promise<ActivityRow[]>;
   close?(): Promise<void>;
+}
+
+export interface FiledEmail {
+  id: string;
+  direction: "in" | "out";
+  from: string;
+  fromName?: string;
+  to: string[];
+  cc?: string[];
+  sentAt: string;
+  subject: string;
+  preview?: string;
+  attachmentCount?: number;
+}
+
+export interface ActivityRow {
+  id: string;
+  type: string;
+  direction?: string | null;
+  on: string;
+  who?: string | null;
+  subject: string;
+  details?: string | null;
+  owner?: string | null;
 }
 
 /** BCC this and Homebase files the email to the job. */
