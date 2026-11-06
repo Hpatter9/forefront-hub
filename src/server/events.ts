@@ -7,7 +7,7 @@ export type HubEvent =
   | { type: "approval"; id: string; action: string; details: string[]; text?: string }
   | { type: "approval-done"; id: string; answer: boolean }
   | { type: "task"; id: string; state: "running" | "done" | "error"; label: string; error?: string; job?: number }
-  | { type: "changed"; job?: number; what: "timeline" | "mail" | "job" | "calendar" | "plan" }
+  | { type: "changed"; job?: number; what: "timeline" | "mail" | "job" | "calendar" | "plan" | "summaries" }
   | ({ type: "studio" } & StudioEvent);
 
 /** Server-sent events to every open window. */

@@ -599,6 +599,21 @@
   .gm-lab.gen .ms { color: var(--g-blue); }
   .gm-lab b.gc { background: var(--g-chip); color: var(--g-tx); }
   .gr .gsrc { font-size: 11px; font-weight: 600; color: var(--g-blue); border: 1px solid color-mix(in srgb, var(--g-blue) 45%, transparent); border-radius: 4px; padding: 0 5px; margin-right: 6px; }
+
+  /* ---- reading an email: a bright page like Gmail's */
+  #reader { --g-tx: #1f1f1f; --g-sub: #444746; --g-mut: #5f6368; --g-line: #e8eaed; --g-hover: #f1f3f4; --g-chip: #e8eaed; --g-blue: #0b57d0; --g-compose: #0b57d0; --g-compose-tx: #fff; --g-field: #f1f3f4; --g-panel: #fff; background: #fff; color: var(--g-tx); }
+  #reader .gm-bar { border-bottom: 1px solid var(--g-line); }
+  #reader .gm-ib { color: var(--g-sub); }
+  #reader .gm-ib:hover { background: var(--g-hover); color: var(--g-tx); }
+  #reader .gm-filebar select { color: var(--g-tx); }
+  #reader .gm-pill.ai { border-color: #0b57d0; color: #0b57d0; }
+  .gm-body iframe { border-radius: 0; min-height: 40px; }
+  .gm-text { font: 14px/1.6 Arial, Helvetica, sans-serif; color: #222; overflow-wrap: anywhere; }
+  .gm-text p { margin: 0 0 12px; }
+  .gm-text a { color: #0b57d0; }
+  .gm-quote { color: #5f6368; border-left: 2px solid #e0e0e0; padding-left: 12px; margin-top: 6px; }
+  .gm-more { border: 0; background: #e8eaed; color: #444746; border-radius: 6px; padding: 0 8px; height: 16px; line-height: 14px; font-size: 13px; letter-spacing: 1px; cursor: pointer; margin: 4px 0 8px; display: block; }
+  .gm-more:hover { background: #dadce0; }
 </style>
 </head>
 <body>
@@ -1407,6 +1422,7 @@ async function loadThreads() {
       <div class="dt">${t.hasAttachments ? `<span class="ms" style="font-size:16px;vertical-align:-3px;margin-right:6px">attach_file</span>` : ""}${gDate(t.date)}</div>
       <div class="acts"><button class="gm-ib" data-act1="archive" title="Archive">${msI("archive")}</button><button class="gm-ib" data-act1="trash" title="Delete">${msI("delete")}</button><button class="gm-ib" data-act1="${t.unread ? "read" : "unread"}" title="${t.unread ? "Mark as read" : "Mark as unread"}">${msI(t.unread ? "drafts" : "mark_email_unread")}</button></div>
     </div>`).join("") || `<div class="gm-empty">${q ? "No messages matched your search." : mailLabel === "INBOX" ? "Your inbox is empty." : genView ? "No drafts from Claude waiting. Drafts Claude makes for you (replies, Plan my day, send-offs) collect here until you send them." : "No conversations here."}</div>`;
+  if (!genView) applySummaries();
   renderMailBar();
 }
 $("#gm-cats").addEventListener("click", (e) => { const b = e.target.closest("[data-cat]"); if (!b) return; mailCat = b.dataset.cat; store.set("mcat", mailCat); mailPages = [null]; mailPage = 0; loadThreads(); });
@@ -1420,6 +1436,31 @@ $("#threads").addEventListener("click", async (e) => {
   openThread(id);
 });
 
+
+// A plain-text email laid out like Gmail: paragraphs, links, and the quoted history folded behind "•••".
+function textMail(body) {
+  const lines = String(body || "").replace(/\r/g, "").split("\n");
+  let cut = lines.findIndex((l, i) => /^On .+wrote:\s*$/.test(l) || /^-{2,}\s*(Original|Forwarded) Message/i.test(l) || /^From: .+/.test(l) && i > 0 && /^\s*$/.test(lines[i - 1] || "") && lines.slice(i, i + 4).some((x) => /^(Sent|Date|To|Subject):/.test(x)) || (/^>/.test(l) && lines.slice(i).every((x) => /^>|^\s*$/.test(x))));
+  if (cut < 0) cut = lines.length;
+  const fmt = (ls) => esc(ls.join("\n").replace(/\n{3,}/g, "\n\n").trim()).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>').split(/\n\n/).map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
+  const main = fmt(lines.slice(0, cut)), rest = lines.slice(cut).join("\n").trim();
+  return `<div class="gm-text">${main || "<p></p>"}${rest ? `<button type="button" class="gm-more" data-q title="Show trimmed content">•••</button><div class="gm-quote" hidden>${fmt(lines.slice(cut).map((l) => l.replace(/^>\s?/, "")))}</div>` : ""}</div>`;
+}
+
+// One-line summaries from Claude in place of subject + preview (the subject stays in the tooltip).
+let sumOn = true;
+async function applySummaries() {
+  if (!sumOn || !mailRows.length || store.get("mailSummaries", true) === false) return;
+  const rows = mailRows.filter((t) => !t.generated);
+  let r; try { r = await api("/api/mail/summaries", { method: "POST", body: { threads: rows.map((t) => ({ id: t.id, historyId: t.historyId })) } }); } catch { return; }
+  sumOn = r.on;
+  for (const [id, text] of Object.entries(r.summaries || {})) {
+    const row = $(`#threads .gr[data-t="${CSS.escape(id)}"]`); if (!row) continue;
+    const t = mailRows.find((x) => x.id === id); const ln = row.querySelector(".ln"); if (!ln || ln.dataset.sum === text) continue;
+    ln.dataset.sum = text; ln.title = `${t?.subject || ""}${t?.snippet ? ` — ${t.snippet}` : ""}`;
+    ln.querySelector(".sj").textContent = text; ln.querySelector(".sn")?.remove(); row.classList.add("summed");
+  }
+}
 async function openThread(id) {
   if (!mailLoaded) await loadMail();
   mailThread = id;
@@ -1443,18 +1484,34 @@ async function openThread(id) {
           <div class="gm-mh"><b>${esc(nameOf(m.from))}</b><span class="em">&lt;${esc(addrOf(m.from))}&gt;</span><span class="when">${new Date(m.date).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span></div>
           <div class="snip">${esc(m.body.slice(0, 160))}</div>
           <div class="gm-to">to ${esc(m.to.map((x) => (addrOf(x).toLowerCase() === "hunter@forefrontteam.com" ? "me" : nameOf(x))).join(", "))}${m.cc.length ? `, cc ${esc(m.cc.map(nameOf).join(", "))}` : ""}</div>
-          <div class="gm-body">${m.html ? `<iframe sandbox="allow-popups allow-popups-to-escape-sandbox" data-i="${i}" title="Message"></iframe>` : `<pre>${esc(m.body)}</pre>`}</div>
+          <div class="gm-body">${m.html ? `<iframe sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" data-i="${i}" title="Message" scrolling="no"></iframe>` : textMail(m.body)}</div>
           ${m.attachments.length ? `<div class="gm-atts">${m.attachments.map((a) => `<a class="gm-att" href="/api/mail/attachment/${esc(m.id)}/${esc(a.id)}?name=${encodeURIComponent(a.filename)}" target="_blank">${msI(/\.pdf$/i.test(a.filename) ? "picture_as_pdf" : /\.(jpe?g|png|gif|heic)$/i.test(a.filename) ? "image" : "attach_file")}<span>${esc(a.filename)}</span></a>`).join("")}</div>` : ""}
         </div></div>`).join("")}
       <div class="gm-replies"><button class="gm-pill" id="replybtn" type="button">${msI("reply")}Reply</button><button class="gm-pill" id="replyall" type="button">${msI("reply_all")}Reply all</button><button class="gm-pill" id="fwd" type="button">${msI("forward")}Forward</button>${status.agent ? `<button class="gm-pill ai" id="claudereply" type="button">${msI("auto_awesome")}Draft reply with Claude</button>` : ""}</div>
     </div>`;
   $("#gm-back").onclick = () => { showList(); loadThreads(); };
   $$("#reader .gm-msg.col").forEach((el) => el.addEventListener("click", () => el.classList.remove("col"), { once: true }));
+  // HTML email as Gmail shows it: full height (no inner scroll box), the sender's own layout, quoted history folded.
+  // The frame may be measured (allow-same-origin) but can't run scripts (no allow-scripts).
   $$("#reader iframe").forEach((f) => {
     const m = t.messages[Number(f.dataset.i)];
-    f.srcdoc = `<base target="_blank"><style>body{font:14px/1.5 Roboto,Arial,sans-serif;margin:12px;color:#202124;overflow-wrap:anywhere}img{max-width:100%;height:auto}blockquote,.gmail_quote{color:#5f6368}</style>${m.html}`;
-    f.onload = () => { try { f.style.height = Math.min(2400, f.contentDocument.body.scrollHeight + 30) + "px"; } catch {} };
+    f.srcdoc = `<!doctype html><html><head><base target="_blank"><style>html,body{margin:0;padding:0;background:#fff}body{font:14px/1.55 Arial,Helvetica,sans-serif;color:#222;overflow-wrap:anywhere;padding:2px 0 8px}img{max-width:100%;height:auto}table{max-width:100%}a{color:#0b57d0}.gmail_quote,blockquote[type=cite],#appendonsend,div[id*=divRplyFwdMsg],div[id*=divRplyFwdMsg]~*{display:none}body.showq .gmail_quote,body.showq blockquote[type=cite],body.showq #appendonsend,body.showq div[id*=divRplyFwdMsg],body.showq div[id*=divRplyFwdMsg]~*{display:block}</style></head><body>${m.html}</body></html>`;
+    const fit = () => { try { f.style.height = f.contentDocument.documentElement.scrollHeight + "px"; } catch {} };
+    f.onload = () => {
+      fit();
+      try {
+        const doc = f.contentDocument;
+        doc.querySelectorAll("img").forEach((im) => im.addEventListener("load", fit));
+        new ResizeObserver(fit).observe(doc.body);
+        if (doc.querySelector(".gmail_quote, blockquote[type=cite], #appendonsend, div[id*=divRplyFwdMsg]")) {
+          const b = document.createElement("button"); b.type = "button"; b.className = "gm-more"; b.title = "Show trimmed content"; b.textContent = "•••";
+          b.onclick = () => { doc.body.classList.toggle("showq"); setTimeout(fit, 30); };
+          f.after(b);
+        }
+      } catch {}
+    };
   });
+  $$("#reader .gm-more[data-q]").forEach((b) => (b.onclick = () => { b.nextElementSibling.hidden = !b.nextElementSibling.hidden; }));
   const me = "hunter@forefrontteam.com";
   const quote = (m) => `\n\nOn ${new Date(m.date).toLocaleString("en-US")}, ${m.from} wrote:\n${m.body.split("\n").map((l) => "> " + l).join("\n")}`;
   const replyTo = () => { const from = addrOf(last.from); return from.toLowerCase() === me ? last.to.join(", ") : from; };
@@ -2385,6 +2442,7 @@ es.onmessage = (m) => {
     if (e.state === "done") log(`✓ ${e.label}`, "t-ok");
     if (e.state === "error") log(`✗ ${e.label}: ${e.error}`, "t-err");
   }
+  if (e.type === "changed" && e.what === "summaries") { if (mailLoaded && !$("#gm-listview").hidden && $("#gm-listview").style.display !== "none") applySummaries(); return; }
   if (e.type === "changed" && e.what === "plan") { if (store.get("tab", "today") === "today") renderBrief(); return; }
   if (e.type === "changed") {
     if (e.what === "mail" && mailLoaded) { loadThreads(); if (mailThread) openThread(mailThread); }

@@ -16,6 +16,8 @@ export interface Config {
   python: string;
   anthropicApiKey: string;
   model: string;
+  /** A fast, cheaper model for small jobs like one-line email summaries. */
+  fastModel: string;
   homebase: { driver: "mock" | "browser" | "api"; url: string; apiToken: string; authFile: string; me: string };
   gmail: { driver: "mock" | "google"; clientId: string; clientSecret: string; address: string; tokenFile: string };
   companycam: { driver: "mock" | "rest"; token: string };
@@ -56,6 +58,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
     python: e("PYTHON", isWin ? "py" : "python3"),
     anthropicApiKey,
     model: e("HUB_MODEL", "claude-opus-5-5"),
+    fastModel: e("HUB_FAST_MODEL", "claude-haiku-5-5"),
     homebase: {
       driver: !live ? "mock" : hbDriver === "api" && !e("HOMEBASE_API_TOKEN") ? "mock" : hbDriver,
       url: e("HOMEBASE_URL", "https://homebase.forefrontteam.com").replace(/\/$/, ""),

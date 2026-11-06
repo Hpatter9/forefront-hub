@@ -427,6 +427,14 @@ const server = http.createServer(async (req, res) => {
 
     // ---- mail
     if (p === "/api/mail/labels") return send(res, 200, (await hub.gmail.labels?.()) ?? []);
+    if (p === "/api/mail/summaries" && req.method === "POST") {
+      // One-line summaries for the rows on screen: the ones already written now, the rest as they're ready.
+      const b = await body(req);
+      const ms = await import("../agent/mailSummary.js");
+      const threads = (Array.isArray(b.threads) ? b.threads : []).slice(0, 60).map((t: any) => ({ id: String(t.id), historyId: t.historyId ? String(t.historyId) : undefined }));
+      ms.requestSummaries(hub, threads, () => bus.emit({ type: "changed", what: "summaries" }));
+      return send(res, 200, { on: ms.enabled(hub), summaries: ms.summariesFor(hub, threads) });
+    }
     if (p === "/api/mail/threads" && req.method === "GET") {
       if (!hub.gmail.listThreads) return send(res, 400, { error: "This Gmail connection can't list mail." });
       return send(res, 200, await hub.gmail.listThreads({ label: q("label") || undefined, q: q("q") || undefined, pageToken: q("page") || undefined }));
