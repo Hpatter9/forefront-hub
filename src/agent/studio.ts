@@ -200,7 +200,22 @@ export function describeTool(name: string, input: Record<string, unknown>): stri
     }
     case "TodoWrite":
       return "Planning the steps";
-    default:
-      return short.replace(/_/g, " ");
+    default: {
+      const job = input.jobNumber ? ` #${input.jobNumber}` : "";
+      const plain: Record<string, string> = {
+        job_timeline: `Reading the history on${job || " a job"}`,
+        job_read: `Opening${job || " a job"}`,
+        gmail_search: "Searching Gmail",
+        gmail_read_thread: "Reading an email",
+        gmail_create_draft: `Drafting an email${job ? ` for${job}` : ""}`,
+        calendar_events: "Checking your calendar",
+        calendar_free: "Finding free time",
+        tasks_list: "Checking your tasks",
+        hub_today: "Looking at what needs you",
+        homebase_get_job: `Reading${job || " a job"} in Homebase`,
+        ToolSearch: "Getting the hub's tools ready",
+      };
+      return plain[short] ?? short.replace(/_/g, " ");
+    }
   }
 }

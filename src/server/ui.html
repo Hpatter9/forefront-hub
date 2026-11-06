@@ -567,6 +567,17 @@
   .tn .th .when { margin-left: auto; font-size: 11.5px; color: var(--muted); }
   .tn .tx { font-size: 13px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .tn.new .tx { color: var(--ink); }
+
+  /* ---- Plan my day brief */
+  .brief { margin-bottom: 16px; border-left: 4px solid var(--link); }
+  .brief .btext { font-size: 15px; line-height: 1.6; }
+  .brief .btext p { margin: 0 0 10px; }
+  .brief .btext ol, .brief .btext ul { margin: 0 0 12px; padding-left: 22px; }
+  .brief .btext li { margin: 3px 0; }
+  .brief .bwork { display: flex; gap: 10px; align-items: center; color: var(--muted); }
+  .brief .bsteps { margin-top: 8px; font-size: 12.5px; color: var(--muted); display: grid; gap: 2px; }
+  .spin { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--link); border-radius: 50%; animation: spin 0.8s linear infinite; flex: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -899,6 +910,7 @@ async function loadToday() {
     <div class="todayhead"><div style="flex:1;min-width:240px"><h2>Dashboard</h2><div class="dateline">${esc(longDate)} · ${t.open} open jobs${d.lastSync ? ` · synced ${fmtWhen(d.lastSync)}` : ""}</div></div>
       <button class="btn primary" id="plan" ${status.agent ? "" : "disabled title='Claude is off on this machine'"}>Plan my day with Claude</button></div>
     ${!d.autoFiling ? `<div class="banner">Incoming job emails file themselves to Homebase once Gmail is fully connected${status.gmail === "google" ? ": double-click <b>Connect Gmail</b> in the hub folder once more and click Allow" : ""}.</div>` : ""}
+    <div id="brief"></div>
     <div class="strip">
       ${tile("reply", t.waiting, "waiting on your reply", true)}
       ${tile("estimate", t.estimate, "need an estimate")}
@@ -930,7 +942,8 @@ async function loadToday() {
           ${d.activity.length ? `<ul class="items">${d.activity.map((a) => `<li><a href="#" data-do="open" data-n="${a.jobNumber}">#${a.jobNumber} ${esc(a.name)}</a> <span class="small muted">${fmtWhen(a.at)}</span><div class="small">${esc(a.what)}</div></li>`).join("")}</ul>` : `<p class="muted">Nothing yet. Activity from the hub shows here.</p>`}</div>
       </div>
     </div>`;
-  $("#plan")?.addEventListener("click", async () => { try { await api("/api/plan", { method: "POST" }); log("› Plan my day"); } catch (e) { log(e.message, "t-err"); } });
+  $("#plan")?.addEventListener("click", startPlan);
+  renderBrief();
 }
 $("#today").addEventListener("click", (e) => {
   const f = e.target.closest("[data-filter]");
@@ -2243,6 +2256,29 @@ document.addEventListener("click", (e) => {
   jobTab = "notes"; store.set("jobtab", "notes"); showTab("jobs"); openJob(Number(a.dataset.n));
 });
 
+
+// ============================================================= Plan my day: the brief at the top of the dashboard
+async function startPlan() {
+  try { await api("/api/plan", { method: "POST" }); } catch (e) { log(e.message, "t-err"); }
+  renderBrief();
+}
+async function renderBrief() {
+  const el = $("#brief"); if (!el) return;
+  let p; try { p = await api("/api/plan"); } catch { return; }
+  const btn = $("#plan");
+  if (btn && status.agent) { btn.disabled = p.state === "running"; btn.textContent = p.state === "running" ? "Planning your day…" : p.state === "none" ? "Plan my day with Claude" : "Plan again"; }
+  if (p.state === "none") { el.innerHTML = ""; return; }
+  const today = new Date().toDateString() === new Date(p.startedAt).toDateString();
+  if (p.state !== "running" && !today && store.get("briefHidden", "") === p.startedAt) { el.innerHTML = ""; return; }
+  const when = new Date(p.finishedAt || p.startedAt);
+  const stamp = `${today ? "Today" : when.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}, ${when.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+  const body = p.state === "running"
+    ? `<div class="bwork"><span class="spin"></span>Claude is going through your jobs, inbox, calendar and tasks…</div>${p.steps.length ? `<div class="bsteps">${p.steps.slice(-4).map((x) => `<div>${esc(x)}</div>`).join("")}</div>` : ""}`
+    : p.state === "error" ? `<div class="small" style="color:var(--bad)">${esc(p.error || "Claude couldn't finish the plan.")}</div>`
+    : `<div class="btext">${md(p.text).replace(/(^|[\s(>])#(\d{4})\b/g, '$1<a href="#" data-do="open" data-n="$2">#$2</a>')}</div>`;
+  el.innerHTML = `<div class="card brief ${p.state}"><h3><span>Today's brief <span class="small muted" style="font-weight:400">${p.state === "running" ? "working…" : esc(stamp)}</span></span>${p.state === "running" ? "" : `<span class="row" style="gap:6px">${!today ? `<span class="small muted">from an earlier day</span>` : ""}<button class="btn small" data-do="briefhide" data-at="${esc(p.startedAt)}">Hide</button></span>`}</h3>${body}</div>`;
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-do=briefhide]"); if (!b) return; store.set("briefHidden", b.dataset.at); $("#brief").innerHTML = ""; });
 const es = new EventSource("/api/events");
 es.onmessage = (m) => {
   const e = JSON.parse(m.data);
@@ -2255,6 +2291,7 @@ es.onmessage = (m) => {
     if (e.state === "done") log(`✓ ${e.label}`, "t-ok");
     if (e.state === "error") log(`✗ ${e.label}: ${e.error}`, "t-err");
   }
+  if (e.type === "changed" && e.what === "plan") { if (store.get("tab", "today") === "today") renderBrief(); return; }
   if (e.type === "changed") {
     if (e.what === "mail" && mailLoaded) { loadThreads(); if (mailThread) openThread(mailThread); }
     if ((e.what === "job" || e.what === "timeline") && view && (!e.job || e.job === view.homebase.jobNumber)) openJob(view.homebase.jobNumber, true);

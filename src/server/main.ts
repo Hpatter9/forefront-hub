@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { createReadStream, existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import http, { type IncomingMessage, type ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -291,11 +291,34 @@ const server = http.createServer(async (req, res) => {
         folders: all.length,
       });
     }
+    if (p === "/api/plan" && req.method === "GET") return send(res, 200, readPlan());
     if (p === "/api/plan" && req.method === "POST") {
       if (!cfg.anthropicApiKey) return send(res, 400, { error: "Claude is off on this machine (no Anthropic API key)." });
+      if (readPlan().state === "running") return send(res, 409, { error: "Claude is already planning your day." });
       const list = reminders(hub, { needsUpload: new Set((lastSync?.needsUpload ?? []).map((x) => x.jobNumber)) });
-      const prompt = `Plan my day. Here is everything the hub thinks needs me, as JSON (kind, job, title, detail, days waiting):\n${JSON.stringify(list.slice(0, 60))}\n\nCheck my Google Calendar and my Google Tasks (due today and overdue) for today and the next few days (hub tools) so the plan fits around what's already booked. Put it in the order I should work it, most urgent first (an adjuster or homeowner waiting on me beats a stale job; money-heavy proposals before small ones). Give me a short numbered list, one line each: job #, name, what to do. For the top replies and follow-ups, read the thread or the job (hub tools) and draft the email in Gmail for me (drafts only; I'll send). Say which drafts you made.`;
-      return send(res, 202, task("Plan my day", undefined, async () => (await import("../agent/run.js")).ask(hub, prompt)));
+      const prompt = `Plan my day. Here is everything the hub thinks needs me, as JSON (kind, job, title, detail, days waiting):\n${JSON.stringify(list.slice(0, 60))}\n\nCheck my Google Calendar and my Google Tasks (due today and overdue) for today and the next few days (hub tools) so the plan fits around what's already booked. For the top replies and follow-ups, read the thread or the job (hub tools) and draft the email in Gmail for me (drafts only; I'll send).\n\nYour final reply is my brief for the day, shown at the top of my dashboard. Write it in this shape, in markdown, and nothing else:\n**Today at a glance:** one or two sentences (what's booked, how many things are waiting, the one thing that matters most).\n\n**Do in this order**\n1. #<job> <Name>: what to do (one line each, most urgent first: an adjuster or homeowner waiting on me beats a stale job; money-heavy proposals before small ones).\n\n**On the calendar:** the day's appointments, one line each (skip if none).\n\n**Drafts ready in Gmail:** one line per draft you made (skip if none).`;
+      const plan: Plan = { state: "running", startedAt: new Date().toISOString(), text: "", steps: [] };
+      savePlan(plan);
+      return send(res, 202, task("Plan my day", undefined, async () => {
+        const { describeTool } = await import("../agent/studio.js");
+        try {
+          plan.text = await (await import("../agent/run.js")).ask(hub, prompt, {
+            onMessage: (m) => {
+              if (m.type !== "assistant") return;
+              for (const b of m.message.content) if (b.type === "tool_use") { plan.steps.push(describeTool(b.name, b.input as Record<string, unknown>)); savePlan(plan); bus.emit({ type: "changed", what: "plan" }); }
+            },
+          });
+          plan.state = "done";
+        } catch (e) {
+          plan.state = "error";
+          plan.error = (e as Error).message;
+          throw e;
+        } finally {
+          plan.finishedAt = new Date().toISOString();
+          savePlan(plan);
+          bus.emit({ type: "changed", what: "plan" });
+        }
+      }));
     }
 
     // ---- job list
@@ -676,4 +699,22 @@ function teamPeople() {
     if (who && /\s/.test(who)) seen.set(who, (seen.get(who) ?? 0) + 1);
   }
   return [...seen.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name).filter((x) => x.toLowerCase() !== cfg.homebase.me.toLowerCase());
+}
+
+// ---- Plan my day: the last brief Claude wrote, shown on the dashboard
+interface Plan { state: "running" | "done" | "error"; startedAt: string; finishedAt?: string; text: string; steps: string[]; error?: string }
+const planFile = () => path.join(cfg.stateDir, "plan.json");
+function readPlan(): Plan | { state: "none" } {
+  try {
+    const p: Plan = JSON.parse(readFileSync(planFile(), "utf8"));
+    // A run that was going when the hub closed never finished.
+    if (p.state === "running" && Date.now() - Date.parse(p.startedAt) > 20 * 60_000) return { ...p, state: "error", error: "That plan didn't finish. Try again." };
+    return p;
+  } catch {
+    return { state: "none" };
+  }
+}
+function savePlan(p: Plan) {
+  mkdirSync(cfg.stateDir, { recursive: true });
+  writeFileSync(planFile(), JSON.stringify(p, null, 2));
 }
