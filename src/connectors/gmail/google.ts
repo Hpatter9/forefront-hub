@@ -281,14 +281,17 @@ async function paced<T>(path: string, f: () => Promise<T>): Promise<T> {
 }
 
 /** Wraps the Gmail client so every method call (users.threads.get, ...) is paced and retried. */
-function throttled<T extends object>(target: T, path = ""): T {
-  return new Proxy(target, {
-    get(obj, key, recv) {
-      const v = Reflect.get(obj, key, recv);
+export function throttled<T extends object>(target: T, path = ""): T {
+  // The proxy wraps an empty object, not googleapis' own: its resources (gmail.users, ...) are read-only,
+  // non-configurable properties, and a proxy may not hand back a wrapped copy of those from its target.
+  return new Proxy({} as T, {
+    get(_shell, key) {
+      const v = Reflect.get(target, key);
       const p = path ? `${path}.${String(key)}` : String(key);
-      if (typeof v === "function") return (...args: unknown[]) => paced(p, () => v.apply(obj, args));
+      if (typeof v === "function") return (...args: unknown[]) => paced(p, () => v.apply(target, args));
       if (v && typeof v === "object" && /^(users|threads|messages|drafts|labels|attachments|settings|sendAs|history)$/.test(String(key))) return throttled(v as object, p);
       return v;
     },
+    has: (_shell, key) => Reflect.has(target, key),
   });
 }
