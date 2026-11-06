@@ -302,6 +302,18 @@ const server = http.createServer(async (req, res) => {
       });
     }
     if (p === "/api/plan" && req.method === "GET") return send(res, 200, { ...readPlan(), schedule: BRIEF });
+    if (p === "/api/plan/check" && req.method === "POST") {
+      // Tick an item of the brief off (or back on). Kept with the brief, so a new brief starts with none ticked.
+      const b = await body(req);
+      const cur = readPlan();
+      if (!("startedAt" in cur) || cur.state === "running") return send(res, 409, { error: "There's no finished brief to tick off." });
+      const done = { ...(cur.done ?? {}) };
+      if (b.done) done[String(b.key)] = true;
+      else delete done[String(b.key)];
+      savePlan({ ...cur, done });
+      bus.emit({ type: "changed", what: "plan" });
+      return send(res, 200, { done });
+    }
     if (p === "/api/plan" && req.method === "POST") {
       const r = startPlan("button");
       return "error" in r ? send(res, r.code, { error: r.error }) : send(res, 202, r);
@@ -749,7 +761,7 @@ function teamPeople() {
 }
 
 // ---- Plan my day: the last brief Claude wrote, shown on the dashboard
-interface Plan { state: "running" | "done" | "error"; startedAt: string; finishedAt?: string; text: string; steps: string[]; error?: string; trigger?: "button" | "morning" }
+interface Plan { state: "running" | "done" | "error"; startedAt: string; finishedAt?: string; text: string; steps: string[]; error?: string; trigger?: "button" | "morning"; /** Items ticked off on the Brief tab, by item key. */ done?: Record<string, boolean> }
 
 function startPlan(trigger: "button" | "morning"): { taskId: string } | { error: string; code: number } {
   if (!cfg.anthropicApiKey) return { error: "Claude is off on this machine (no Anthropic API key).", code: 400 };

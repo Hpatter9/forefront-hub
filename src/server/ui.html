@@ -636,6 +636,22 @@
   #reader .gm-pill.send { background: #0b57d0; color: #fff; border-color: #0b57d0; }
   .drafttag { color: #d93025; font-weight: 600; }
   .gm .gr .drafttag { color: #f28b82; }
+
+  /* ---- Today's brief tab */
+  .briefpage { max-width: 900px; margin: 0 auto; padding: 28px 28px 40px; display: grid; gap: 14px; }
+  .bhead { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  .bhead h2 { margin: 0; font-size: 30px; font-weight: 500; }
+  .bprog { display: flex; gap: 12px; align-items: center; font-size: 14px; }
+  .bprog .bar { flex: 1; height: 8px; border-radius: 4px; background: var(--soft); overflow: hidden; }
+  .bprog .bar span { display: block; height: 100%; background: var(--ok); border-radius: 4px; transition: width .3s; }
+  .brief li.bitem { padding: 4px 0 4px 30px; text-indent: -30px; }
+  .brief ul li.bitem { list-style: none; margin-left: -18px; }
+  .brief .bchk { width: 18px; height: 18px; margin: 0 10px 0 0; vertical-align: -3px; accent-color: var(--ok); cursor: pointer; text-indent: 0; }
+  .brief li.done { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent); }
+  .brief li.done a { color: var(--muted); }
+  .briefline { width: 100%; display: flex; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--link); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; color: var(--ink); font: inherit; font-size: 15px; cursor: pointer; text-align: left; }
+  .briefline:hover { background: var(--panel-2); }
+  .briefline .go { margin-left: auto; color: var(--link); font-size: 14px; }
 </style>
 </head>
 <body>
@@ -644,6 +660,7 @@
     <a class="logo" href="#" id="logo"><svg viewBox="0 0 44 40" aria-hidden="true"><path d="M22 3 3 19h5v18h28V19h5L22 3zm0 5.5L33 18v15H11V18l11-9.5z" fill="currentColor"/></svg><b>HUB</b><span>BY FOREFRONT</span></a>
     <nav class="tabs" id="tabs">
       <button data-tab="today" class="active" title="Dashboard"><span class="ms">space_dashboard</span><span class="nm">Dashboard</span> <span class="count" id="todaycount" hidden></span></button>
+      <button data-tab="brief" title="Today's brief"><span class="ms">checklist</span><span class="nm">Brief</span> <span class="count" id="briefcount" hidden></span></button>
       <button data-tab="jobs" title="Jobs"><span class="ms">work</span><span class="nm">Jobs</span></button>
       <button data-tab="est" title="Estimator"><span class="ms">calculate</span><span class="nm">Estimator</span></button>
       <button data-tab="mail" title="Gmail"><span class="ms">mail</span><span class="nm">Gmail</span> <span class="count" id="mailcount" hidden></span></button>
@@ -669,6 +686,7 @@
   </div>
 
   <!-- TODAY -->
+  <section class="view" id="v-brief" hidden><div class="scroll"><div class="briefpage" id="briefpage"><div class="empty">Loading…</div></div></div></section>
   <section class="view" id="v-today"><div class="scroll"><div class="dash" id="today"><div class="empty">Loading…</div></div></div></section>
   <div class="tip" id="tip" hidden></div>
 
@@ -919,12 +937,13 @@ conApply();
 function showTab(t) {
   store.set("tab", t);
   $$("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === t));
-  for (const v of ["today", "jobs", "est", "mail", "cal", "music"]) $("#v-" + v).hidden = v !== t;
+  for (const v of ["today", "brief", "jobs", "est", "mail", "cal", "music"]) $("#v-" + v).hidden = v !== t;
+  if (t === "brief") renderBrief();
   document.querySelector(".askbar form").hidden = t === "est";
   if (t === "est") loadEst();
   if (t === "cal") loadCal();
   if (t === "music" && !$("#sp-bar")) renderMusic();
-  setCrumbs(t === "jobs" && view ? `Jobs / <b>#${view.homebase.jobNumber}</b>` : `<b>${{ today: "Dashboard", jobs: "Jobs", est: "Estimator", mail: "Gmail", cal: "Calendar", music: "Music" }[t]}</b>`);
+  setCrumbs(t === "jobs" && view ? `Jobs / <b>#${view.homebase.jobNumber}</b>` : `<b>${{ today: "Dashboard", brief: "Today's brief", jobs: "Jobs", est: "Estimator", mail: "Gmail", cal: "Calendar", music: "Music" }[t]}</b>`);
   if (t === "today") loadToday();
   if (t === "mail" && !mailLoaded) loadMail();
 }
@@ -2496,29 +2515,62 @@ document.addEventListener("click", (e) => {
 });
 
 
-// ============================================================= Plan my day: the brief at the top of the dashboard
+// ============================================================= Today's brief: its own tab, every item a checkbox
+// The dashboard keeps one line ("Today's brief: 3 of 11 done · Open"). Ticks are saved with the brief, so a new
+// brief (the 7 AM one, or Plan again) starts with nothing ticked.
 async function startPlan() {
   try { await api("/api/plan", { method: "POST" }); } catch (e) { log(e.message, "t-err"); }
-  renderBrief();
+  showTab("brief");
 }
+const briefKey = (t) => { let h = 5381; for (const c of t.replace(/\s+/g, " ").trim().toLowerCase()) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return h.toString(36); };
+let briefPlan = null;
 async function renderBrief() {
-  const el = $("#brief"); if (!el) return;
   let p; try { p = await api("/api/plan"); } catch { return; }
+  briefPlan = p;
+  const page = $("#briefpage"), line = $("#brief");
+  const today = p.startedAt && new Date().toDateString() === new Date(p.startedAt).toDateString();
+  const sch = p.schedule && /^\d/.test(p.schedule.at) ? `Runs on its own at ${new Date(`2000-01-01T${p.schedule.at.padStart(5, "0")}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${p.schedule.days === "1-5" ? " on weekdays" : p.schedule.days === "0-6" ? " every day" : ""}` : "";
+  const planBtn = status.agent ? `<button class="btn ${p.state === "none" ? "primary" : ""}" id="briefplan" ${p.state === "running" ? "disabled" : ""}>${p.state === "running" ? "Planning your day…" : p.state === "none" ? "Plan my day with Claude" : "Plan again"}</button>` : "";
+  // The checklist: every list item in the brief gets a box.
+  let total = 0, doneN = 0, html = "";
+  if (p.state === "done") {
+    const box = document.createElement("div");
+    box.innerHTML = md(p.text).replace(/(^|[\s(>])#(\d{4})\b/g, '$1<a href="#" data-do="open" data-n="$2">#$2</a>');
+    box.querySelectorAll("li").forEach((li) => {
+      const key = briefKey(li.textContent); const on = !!p.done?.[key]; total++; if (on) doneN++;
+      li.classList.add("bitem"); if (on) li.classList.add("done");
+      li.insertAdjacentHTML("afterbegin", `<input type="checkbox" class="bchk" data-key="${key}" ${on ? "checked" : ""} aria-label="Done">`);
+    });
+    html = box.innerHTML;
+  }
+  const left = total - doneN;
+  $("#briefcount").textContent = left; $("#briefcount").hidden = !(p.state === "done" && today && left);
+  if (page) {
+    const when = new Date(p.finishedAt || p.startedAt || Date.now());
+    const stamp = p.startedAt ? `${p.trigger === "morning" ? "Made on its own · " : ""}${today ? "Today" : when.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}, ${when.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : "";
+    page.innerHTML = `<div class="bhead"><div style="flex:1;min-width:220px"><h2>Today's brief</h2><div class="dateline">${esc(stamp)}${stamp && sch ? " · " : ""}${esc(sch)}${p.startedAt && !today ? ` · <b>from an earlier day</b>` : ""}</div></div>${planBtn}</div>
+      ${p.state === "done" && total ? `<div class="bprog"><div class="bar"><span style="width:${Math.round((doneN / total) * 100)}%"></span></div><b>${doneN} of ${total} done</b>${doneN ? `<button class="linkbtn" data-do="briefclear">Untick all</button>` : ""}</div>` : ""}
+      <div class="card brief ${p.state}">${p.state === "none" ? `<p class="muted" style="margin:0">No brief yet. ${status.agent ? "Press <b>Plan my day with Claude</b>, or wait for the morning one." : "Claude is off on this machine."}</p>`
+        : p.state === "running" ? `<div class="bwork"><span class="spin"></span>Claude is going through your jobs, inbox, calendar and tasks…</div>${p.steps.length ? `<div class="bsteps">${p.steps.slice(-5).map((x) => `<div>${esc(x)}</div>`).join("")}</div>` : ""}`
+        : p.state === "error" ? `<div class="small" style="color:var(--bad)">${esc(p.error || "Claude couldn't finish the plan.")}</div>`
+        : `<div class="btext">${html}</div>`}</div>`;
+    $("#briefplan")?.addEventListener("click", startPlan);
+  }
+  if (line) {
+    line.innerHTML = p.state === "none" ? "" : `<button class="briefline" type="button" data-do="gobrief">${msI("checklist")}<span>Today's brief: ${p.state === "running" ? "Claude is working on it…" : p.state === "error" ? "didn't finish" : total ? `<b>${doneN} of ${total} done</b>${today ? "" : " (from an earlier day)"}` : "ready"}</span><span class="go">Open →</span></button>`;
+  }
   const btn = $("#plan");
   if (btn && status.agent) { btn.disabled = p.state === "running"; btn.textContent = p.state === "running" ? "Planning your day…" : p.state === "none" ? "Plan my day with Claude" : "Plan again"; }
-  if (p.state === "none") { el.innerHTML = ""; return; }
-  const today = new Date().toDateString() === new Date(p.startedAt).toDateString();
-  if (p.state !== "running" && !today && store.get("briefHidden", "") === p.startedAt) { el.innerHTML = ""; return; }
-  const when = new Date(p.finishedAt || p.startedAt);
-  const stamp = `${p.trigger === "morning" ? "Made on its own · " : ""}${today ? "Today" : when.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}, ${when.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
-  const sch = p.schedule && /^\d/.test(p.schedule.at) ? `Runs on its own at ${new Date(`2000-01-01T${p.schedule.at.padStart(5, "0")}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${p.schedule.days === "1-5" ? " on weekdays" : p.schedule.days === "0-6" ? " every day" : ""}` : "";
-  const body = p.state === "running"
-    ? `<div class="bwork"><span class="spin"></span>Claude is going through your jobs, inbox, calendar and tasks…</div>${p.steps.length ? `<div class="bsteps">${p.steps.slice(-4).map((x) => `<div>${esc(x)}</div>`).join("")}</div>` : ""}`
-    : p.state === "error" ? `<div class="small" style="color:var(--bad)">${esc(p.error || "Claude couldn't finish the plan.")}</div>`
-    : `<div class="btext">${md(p.text).replace(/(^|[\s(>])#(\d{4})\b/g, '$1<a href="#" data-do="open" data-n="$2">#$2</a>')}</div>`;
-  el.innerHTML = `<div class="card brief ${p.state}"><h3><span>Today's brief <span class="small muted" style="font-weight:400">${p.state === "running" ? "working…" : esc(stamp)}</span></span>${p.state === "running" ? "" : `<span class="row" style="gap:6px">${!today ? `<span class="small muted">from an earlier day</span>` : sch ? `<span class="small muted">${esc(sch)}</span>` : ""}<button class="btn small" data-do="briefhide" data-at="${esc(p.startedAt)}">Hide</button></span>`}</h3>${body}</div>`;
 }
-document.addEventListener("click", (e) => { const b = e.target.closest("[data-do=briefhide]"); if (!b) return; store.set("briefHidden", b.dataset.at); $("#brief").innerHTML = ""; });
+document.addEventListener("change", async (e) => {
+  const c = e.target.closest(".bchk"); if (!c) return;
+  c.closest("li")?.classList.toggle("done", c.checked);
+  try { await api("/api/plan/check", { method: "POST", body: { key: c.dataset.key, done: c.checked } }); } catch (err) { log(err.message, "t-err"); }
+});
+document.addEventListener("click", async (e) => {
+  const g = e.target.closest("[data-do=gobrief]"); if (g) { showTab("brief"); return; }
+  const u = e.target.closest("[data-do=briefclear]"); if (u && briefPlan?.done) { for (const k of Object.keys(briefPlan.done)) await api("/api/plan/check", { method: "POST", body: { key: k, done: false } }).catch(() => {}); renderBrief(); }
+});
 const es = new EventSource("/api/events");
 es.onmessage = (m) => {
   const e = JSON.parse(m.data);
@@ -2532,7 +2584,7 @@ es.onmessage = (m) => {
     if (e.state === "error") log(`✗ ${e.label}: ${e.error}`, "t-err");
   }
   if (e.type === "changed" && e.what === "summaries") { if (mailLoaded && !$("#gm-listview").hidden && $("#gm-listview").style.display !== "none") applySummaries(); return; }
-  if (e.type === "changed" && e.what === "plan") { if (store.get("tab", "today") === "today") renderBrief(); return; }
+  if (e.type === "changed" && e.what === "plan") { renderBrief(); return; }
   if (e.type === "changed") {
     if (e.what === "mail" && mailLoaded) { loadThreads(); if (mailThread) openThread(mailThread); }
     if ((e.what === "job" || e.what === "timeline") && view && (!e.job || e.job === view.homebase.jobNumber)) openJob(view.homebase.jobNumber, true);
@@ -2546,6 +2598,7 @@ setInterval(() => { loadSyncState(); if (store.get("tab", "today") === "today") 
 renderRecent();
 spHandleRedirect().catch((e) => { spLastErr = e.message; log(`Spotify: ${e.message}`, "t-err"); store.set("tab", "music"); }).finally(() => { if (spTok.get() && store.get("tab", "today") !== "music") renderMusic().catch(() => {}); });
 loadStatus().then(async () => {
+  renderBrief();
   showTab(store.get("tab", "today"));
   await loadJobs();
   loadSyncState();
