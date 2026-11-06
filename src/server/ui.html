@@ -1647,22 +1647,35 @@ const IC = {
   vol: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M9.74 2.5A.75.75 0 0 1 11 3.06v9.88a.75.75 0 0 1-1.26.56L6.1 10.25H2.75A.75.75 0 0 1 2 9.5v-3c0-.41.34-.75.75-.75h3.35l3.64-3.25zM12.5 5.05a3.5 3.5 0 0 1 0 5.9l-.74-1.3a2 2 0 0 0 0-3.3l.74-1.3z"/></svg>',
   dev: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 2.75C6 1.78 6.78 1 7.75 1h6.5c.97 0 1.75.78 1.75 1.75v10.5c0 .97-.78 1.75-1.75 1.75h-6.5C6.78 15 6 14.22 6 13.25V2.75zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .14.11.25.25.25h6.5c.14 0 .25-.11.25-.25V2.75a.25.25 0 0 0-.25-.25h-6.5zM11 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm0-6.5a1.25 1.25 0 1 0 0 2.5A1.25 1.25 0 0 0 11 4zM1 3.75C1 3.34 1.34 3 1.75 3H4v1.5H2.5v8H4V14H1.75a.75.75 0 0 1-.75-.75v-9.5z"/></svg>',
 };
-let spClientId = "", spDevice = null, spSDK = null, spState = null, spView = { kind: "home" }, spLibrary = [], spMe = null, spTimer = null, spDevices = [];
+let spLastErr = "", spForceSetup = false, spClientId = "", spDevice = null, spSDK = null, spState = null, spView = { kind: "home" }, spLibrary = [], spMe = null, spTimer = null, spDevices = [];
 const spTok = { get() { try { return JSON.parse(localStorage.getItem("hub:sp") || "null"); } catch { return null; } }, set(v) { try { localStorage.setItem("hub:sp", JSON.stringify(v)); } catch {} }, clear() { try { localStorage.removeItem("hub:sp"); } catch {} } };
 const b64url = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const fmtMs = (ms) => { const s = Math.floor((ms || 0) / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
 
 async function spLogin() {
+  await spEnsureClient();
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
   const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
   const state = b64url(crypto.getRandomValues(new Uint8Array(12)));
   sessionStorage.setItem("sp:verifier", verifier); sessionStorage.setItem("sp:state", state);
   location.href = `https://accounts.spotify.com/authorize?${new URLSearchParams({ client_id: spClientId, response_type: "code", redirect_uri: SP_REDIRECT, code_challenge_method: "S256", code_challenge: challenge, scope: SP_SCOPES, state })}`;
 }
+// The Client ID comes from the hub's .env. Load it before any token call: the sign-in redirect lands before the
+// Music tab has been drawn, and a blank client_id makes Spotify answer "invalid_client".
+async function spEnsureClient() {
+  if (!spClientId) { try { spClientId = (await api("/api/settings/spotify")).clientId || ""; } catch {} }
+  if (!spClientId) throw new Error("No Spotify Client ID saved in the hub yet. Open Music to set it up.");
+  return spClientId;
+}
 async function spTokenRequest(params) {
-  const r = await fetch("https://accounts.spotify.com/api/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: spClientId, ...params }) });
-  const j = await r.json();
-  if (!r.ok) throw new Error(j.error_description || j.error || "Spotify sign-in failed");
+  const client_id = await spEnsureClient();
+  const r = await fetch("https://accounts.spotify.com/api/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id, ...params }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    if (j.error === "invalid_client") throw new Error("Spotify doesn't recognize the Client ID saved in the hub. In Music, click \"Change Client ID\" and paste it again from your app's Settings on developer.spotify.com.");
+    if (j.error === "invalid_grant" && params.grant_type === "refresh_token") { spTok.clear(); throw new Error("Spotify signed the hub out. Log in again in Music."); }
+    throw new Error(j.error_description || j.error || "Spotify sign-in failed");
+  }
   const old = spTok.get() || {};
   spTok.set({ access: j.access_token, refresh: j.refresh_token || old.refresh, exp: Date.now() + (j.expires_in - 60) * 1000 });
 }
@@ -1721,7 +1734,7 @@ const spCmd = async (path, method = "PUT") => { try { await sp(path, { method })
 const img = (images, cls = "") => images?.[0]?.url ? `<img src="${esc(images[0].url)}" alt="" loading="lazy" class="${cls}">` : `<span class="ph">♪</span>`;
 async function renderMusic() {
   const root = $("#sp");
-  try { spClientId = (await api("/api/settings/spotify")).clientId; } catch {}
+  if (!spForceSetup) { try { spClientId = (await api("/api/settings/spotify")).clientId; } catch {} }
   if (location.hostname === "localhost") {
     root.innerHTML = `<div class="sp-main" style="grid-column:1/-1;grid-row:1/-1"><div class="sp-setup"><h1>Music</h1><p>Spotify only signs in at <code>127.0.0.1</code>, not <code>localhost</code>. Open the hub at <a href="http://127.0.0.1:${location.port}/">http://127.0.0.1:${location.port}</a> (the desktop icon does from now on).</p></div></div>`; return;
   }
@@ -1734,12 +1747,13 @@ async function renderMusic() {
       <input type="text" id="sp-cid" placeholder="Client ID (32 letters and numbers)">
       <button class="sp-green" id="sp-save">Save and sign in</button>
       <p style="color:#b3b3b3;font-size:13px">Playing music inside the hub needs Spotify Premium. Without it, the hub still shows your library and controls Spotify on your phone or computer.</p></div></div>`;
-    $("#sp-save").onclick = async () => { try { await api("/api/settings/spotify", { method: "POST", body: { clientId: $("#sp-cid").value } }); spClientId = $("#sp-cid").value.trim(); spLogin(); } catch (e) { log(e.message, "t-err"); } };
+    $("#sp-save").onclick = async () => { try { await api("/api/settings/spotify", { method: "POST", body: { clientId: $("#sp-cid").value } }); spClientId = $("#sp-cid").value.trim(); spForceSetup = false; spTok.clear(); await spLogin(); } catch (e) { log(e.message, "t-err"); } };
     return;
   }
   if (!spTok.get()) {
-    root.innerHTML = `<div class="sp-main" style="grid-column:1/-1;grid-row:1/-1"><div class="sp-setup"><h1>Music</h1><p>Sign in to Spotify to bring your playlists and library into the hub.</p><button class="sp-green" id="sp-login">Log in to Spotify</button></div></div>`;
-    $("#sp-login").onclick = spLogin; return;
+    root.innerHTML = `<div class="sp-main" style="grid-column:1/-1;grid-row:1/-1"><div class="sp-setup"><h1>Music</h1><p>Sign in to Spotify to bring your playlists and library into the hub.</p>${spLastErr ? `<p style="color:#f3727f">${esc(spLastErr)}</p>` : ""}<button class="sp-green" id="sp-login">Log in to Spotify</button><p style="margin-top:18px"><button class="sp-pill" id="sp-cidchange" type="button">Change Client ID</button></p></div></div>`;
+    $("#sp-login").onclick = () => spLogin().catch((e) => log(`Spotify: ${e.message}`, "t-err"));
+    $("#sp-cidchange").onclick = () => { spClientId = ""; spForceSetup = true; renderMusic(); }; return;
   }
   root.innerHTML = `<div class="sp-lib" id="sp-lib"><h3>Your Library</h3><div class="sp-msg">Loading…</div></div>
     <div class="sp-main" id="sp-main"><div class="sp-msg">Loading…</div></div>
@@ -2044,7 +2058,7 @@ es.onmessage = (m) => {
 setInterval(() => { loadSyncState(); if (store.get("tab", "today") === "today") loadToday(); if (mailLoaded && !$("#composedlg").open) loadThreads(); }, 120000);
 
 renderRecent();
-spHandleRedirect().catch((e) => log(`Spotify: ${e.message}`, "t-err")).finally(() => { if (spTok.get() && store.get("tab", "today") !== "music") renderMusic().catch(() => {}); });
+spHandleRedirect().catch((e) => { spLastErr = e.message; log(`Spotify: ${e.message}`, "t-err"); store.set("tab", "music"); }).finally(() => { if (spTok.get() && store.get("tab", "today") !== "music") renderMusic().catch(() => {}); });
 loadStatus().then(async () => {
   showTab(store.get("tab", "today"));
   await loadJobs();
