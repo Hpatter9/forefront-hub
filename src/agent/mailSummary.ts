@@ -127,6 +127,6 @@ ${items.map((x, i) => `#${i + 1}\n${x.text}`).join("\n\n---\n\n")}`;
 
 /** Keeps a summary to one line of at most 10 words. */
 export function shorten(s: string): string {
-  const w = String(s ?? "").replace(/\s+/g, " ").replace(/^["'“]|["'”.]+$/g, "").trim().split(" ").filter(Boolean);
+  const w = String(s ?? "").replace(/\s+/g, " ").trim().replace(/^["'“]+|["'”.]+$/g, "").trim().split(" ").filter(Boolean);
   return w.slice(0, 10).join(" ");
 }
