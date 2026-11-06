@@ -125,6 +125,27 @@
   .rem { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; }
   .rem .l { min-width: 0; } .rem .r { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
   .rem .ttl { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dash { padding: 18px 20px 30px; display: grid; gap: 16px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 2px; text-align: left; cursor: pointer; color: var(--ink); font: inherit; }
+  .tile:hover { border-color: var(--accent); }
+  .tile .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .tile .k { font-size: 12px; color: var(--muted); }
+  .tile.hot .v { color: var(--bad); }
+  .cols { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .side { display: grid; gap: 16px; }
+  .bars { display: grid; gap: 6px; }
+  .barrow { display: grid; grid-template-columns: 140px 1fr 40px; gap: 8px; align-items: center; font-size: 13px; cursor: pointer; border-radius: 6px; padding: 2px 4px; }
+  .barrow:hover { background: var(--soft); }
+  .barrow .track { height: 12px; display: flex; align-items: center; }
+  .barrow .fill { height: 12px; background: var(--accent); border-radius: 0 4px 4px 0; min-width: 3px; }
+  .barrow .c { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl td { padding: 6px 4px; border-bottom: 1px dashed var(--line); vertical-align: top; }
+  .tbl tr:last-child td { border-bottom: 0; }
+  .tbl .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--panel); font-size: 12px; padding: 4px 8px; border-radius: 6px; z-index: 60; }
+  @media (max-width: 1000px) { .cols { grid-template-columns: 1fr; } }
   .alldone { background: var(--panel); border: 1px dashed var(--line); border-radius: 12px; padding: 24px; text-align: center; color: var(--muted); }
 
   /* mail */
@@ -192,9 +213,9 @@
   <header class="top">
     <h1>Forefront Hub</h1>
     <nav class="tabs" id="tabs">
-      <button data-tab="today" class="active">Today <span class="count" id="todaycount" hidden></span></button>
+      <button data-tab="today" class="active">Dashboard <span class="count" id="todaycount" hidden></span></button>
       <button data-tab="jobs">Jobs</button>
-      <button data-tab="mail">Mail <span class="count" id="mailcount" hidden></span></button>
+      <button data-tab="mail">Gmail <span class="count" id="mailcount" hidden></span></button>
     </nav>
     <div class="topright">
       <span id="chips" class="row"></span>
@@ -205,7 +226,8 @@
   </header>
 
   <!-- TODAY -->
-  <section class="view" id="v-today"><div class="scroll"><div class="today" id="today"><div class="empty">Loading…</div></div></div></section>
+  <section class="view" id="v-today"><div class="scroll"><div class="dash" id="today"><div class="empty">Loading…</div></div></div></section>
+  <div class="tip" id="tip" hidden></div>
 
   <!-- JOBS -->
   <section class="view" id="v-jobs" hidden>
@@ -370,26 +392,60 @@ const ACTIONS = {
   upload: (r) => `<button class="btn small primary" data-do="upload" data-n="${r.jobNumber}">Upload</button>`,
   stale: (r) => `<button class="btn small" data-do="claude" data-p="Job #${r.jobNumber} hasn't been touched in a week. Look at where it stands and tell me the next step; draft any email that's needed (draft only).">What's next?</button>`,
 };
+function remRow(r) {
+  return `<div class="rem"><div class="l"><div class="ttl"><a href="#" data-do="open" data-n="${r.jobNumber}">#${r.jobNumber} ${esc(r.name)}</a> · ${esc(r.title)}</div><div class="small muted">${esc(r.detail)}${r.detail ? " · " : ""}<span class="stage">${esc(r.stage)}</span>${r.days && r.days < 999 ? ` · ${r.days} day${r.days === 1 ? "" : "s"}` : ""}</div></div><div class="r">${ACTIONS[r.kind]?.(r) ?? ""}</div></div>`;
+}
+let dashFilter = null;
 async function loadToday() {
   let d;
-  try { d = await api("/api/today"); } catch (e) { $("#today").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  try { d = await api("/api/dashboard"); } catch (e) { $("#today").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  const t = d.totals;
+  const urgent = t.waiting + (d.unfiled?.length || 0);
+  $("#todaycount").textContent = urgent; $("#todaycount").hidden = !urgent;
   const by = Object.fromEntries(d.groups.map((g) => [g.kind, []]));
   for (const r of d.reminders) (by[r.kind] ??= []).push(r);
-  const total = d.reminders.length;
-  $("#todaycount").textContent = total; $("#todaycount").hidden = !total;
   const date = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const max = Math.max(1, ...d.byStage.map((x) => x.count));
+  const tile = (k, v, label, hot) => `<button class="tile ${hot && v ? "hot" : ""}" data-filter="${k}" type="button"><span class="v">${v}</span><span class="k">${label}</span></button>`;
+  const groups = d.groups.filter((g) => by[g.kind]?.length && (!dashFilter || g.kind === dashFilter));
   $("#today").innerHTML = `
-    <div class="todayhead"><h2>${esc(date)}</h2><span class="muted">${total ? `${total} thing${total === 1 ? "" : "s"} to handle across ${d.folders} jobs` : `${d.folders} jobs, nothing waiting`}</span>
-      <span style="margin-left:auto"></span><button class="btn primary" id="plan" ${status.agent ? "" : "disabled title='Claude is off on this machine'"}>Plan my day with Claude</button></div>
-    ${!d.lastSync && !d.folders ? `<div class="alldone">The first sync is still running. Reminders appear when it finishes (about a minute).</div>` : ""}
-    ${!d.autoFiling ? `<div class="banner">Incoming job emails are filed to Homebase automatically once Gmail is fully connected${status.gmail === "google" ? ": double-click <b>Connect Gmail</b> in the hub folder once more and click Allow" : ""}.</div>` : ""}
-    ${d.unfiled?.length ? `<div class="group"><h3>Emails to file <span class="muted">${d.unfiled.length} · couldn't tell which job; pick one</span></h3>
-      ${d.unfiled.map((u) => `<div class="rem"><div class="l"><div class="ttl">${esc(u.subject || "(no subject)")}</div><div class="small muted">from ${esc(u.from)} · ${fmtDate(u.at)}</div></div><div class="r">${u.candidates.map((c) => `<button class="btn small primary" data-do="fileto" data-thread="${esc(u.threadId)}" data-msg="${esc(u.messageId)}" data-n="${c.jobNumber}">#${c.jobNumber} ${esc(c.name)}</button>`).join("")}<button class="btn small" data-do="thread" data-thread="${esc(u.threadId)}">Open</button><button class="btn small" data-do="notjob" data-msg="${esc(u.messageId)}">Not a job email</button></div></div>`).join("")}</div>` : ""}
-    ${d.groups.filter((g) => by[g.kind]?.length).map((g) => `<div class="group"><h3>${esc(g.label)} <span class="muted">${by[g.kind].length} · ${esc(g.hint)}</span></h3>
-      ${by[g.kind].map((r) => `<div class="rem"><div class="l"><div class="ttl"><a href="#" data-do="open" data-n="${r.jobNumber}">#${r.jobNumber} ${esc(r.name)}</a> · ${esc(r.title)}</div><div class="small muted">${esc(r.detail)}${r.detail ? " · " : ""}<span class="stage">${esc(r.stage)}</span>${r.days && r.days < 999 ? ` · ${r.days} day${r.days === 1 ? "" : "s"}` : ""}</div></div><div class="r">${ACTIONS[r.kind]?.(r) ?? ""}</div></div>`).join("")}</div>`).join("")}
-    ${d.lastSync && !total ? `<div class="alldone">You're caught up. Nothing is waiting on you.</div>` : ""}`;
+    <div class="todayhead"><h2>${esc(date)}</h2><span class="muted">${d.folders} jobs synced${d.lastSync ? ` · ${fmtWhen(d.lastSync)}` : ""}</span><span style="margin-left:auto"></span>
+      <button class="btn primary" id="plan" ${status.agent ? "" : "disabled title='Claude is off on this machine'"}>Plan my day with Claude</button></div>
+    <div class="tiles">
+      ${tile("reply", t.waiting, "waiting on your reply", true)}
+      ${tile("estimate", t.estimate, "need an estimate")}
+      ${tile("followup", t.followup, "proposals to follow up")}
+      ${tile("proposals", t.proposalsOut, `proposals out · ${usd(t.proposalsAmount).replace(/\.\d\d$/, "")}`)}
+      ${tile("stale", t.stale, "not touched this week")}
+      ${tile("", t.open, "open jobs")}
+    </div>
+    ${!d.autoFiling ? `<div class="banner">Incoming job emails file themselves to Homebase once Gmail is fully connected${status.gmail === "google" ? ": double-click <b>Connect Gmail</b> in the hub folder once more and click Allow" : ""}.</div>` : ""}
+    <div class="cols">
+      <div class="side">
+        ${d.unfiled?.length && (!dashFilter || dashFilter === "reply") ? `<div class="group"><h3>Emails to file <span class="muted">${d.unfiled.length} · couldn't tell which job; pick one</span></h3>
+          ${d.unfiled.map((u) => `<div class="rem"><div class="l"><div class="ttl">${esc(u.subject || "(no subject)")}</div><div class="small muted">from ${esc(u.from)} · ${fmtDate(u.at)}</div></div><div class="r">${u.candidates.map((c) => `<button class="btn small primary" data-do="fileto" data-thread="${esc(u.threadId)}" data-msg="${esc(u.messageId)}" data-n="${c.jobNumber}">#${c.jobNumber} ${esc(c.name)}</button>`).join("")}<button class="btn small" data-do="thread" data-thread="${esc(u.threadId)}">Open</button><button class="btn small" data-do="notjob" data-msg="${esc(u.messageId)}">Not a job email</button></div></div>`).join("")}</div>` : ""}
+        ${dashFilter ? `<div class="row"><span class="muted">Showing: ${esc(d.groups.find((g) => g.kind === dashFilter)?.label ?? dashFilter)}</span><button class="btn small" data-filter="">Show everything</button></div>` : ""}
+        ${groups.map((g) => `<div class="group"><h3>${esc(g.label)} <span class="muted">${by[g.kind].length} · ${esc(g.hint)}</span></h3>${by[g.kind].map(remRow).join("")}</div>`).join("") || `<div class="alldone">${d.lastSync || d.folders ? "You're caught up. Nothing is waiting on you." : "The first sync is still running. This fills in when it finishes (about a minute)."}</div>`}
+      </div>
+      <div class="side">
+        <div class="card"><h3>Pipeline by stage</h3>
+          <div class="bars">${d.byStage.map((x) => `<div class="barrow" data-stage="${esc(x.stage)}" data-tip="${esc(x.stage)}: ${x.count} job${x.count === 1 ? "" : "s"}${x.amount ? ` · ${usd(x.amount)} in proposals` : ""}"><span>${esc(x.stage)}</span><span class="track"><span class="fill" style="width:${(x.count / max) * 100}%"></span></span><span class="c">${x.count}</span></div>`).join("") || `<p class="muted">No jobs yet.</p>`}</div></div>
+        <div class="card"><h3>Proposals out <span class="small muted" style="text-transform:none;letter-spacing:0">largest first</span></h3>
+          ${d.proposals.length ? `<table class="tbl"><tbody>${d.proposals.map((x) => `<tr><td><a href="#" data-do="open" data-n="${x.jobNumber}">#${x.jobNumber} ${esc(x.name)}</a>${x.waiting ? ` <span class="tag in">reply</span>` : ""}<div class="small muted">${x.lastTouch ? esc(x.lastTouch) : "no activity"}</div></td><td class="num">${usd(x.amount) || "—"}<div class="small muted">${daysSince(x.lastTouchAt) ?? "?"}d quiet</div></td></tr>`).join("")}</tbody></table>` : `<p class="muted">None out.</p>`}</div>
+        <div class="card"><h3>Recent activity</h3>
+          ${d.activity.length ? `<ul class="items">${d.activity.map((a) => `<li><a href="#" data-do="open" data-n="${a.jobNumber}">#${a.jobNumber} ${esc(a.name)}</a> <span class="small muted">${fmtWhen(a.at)}</span><div class="small">${esc(a.what)}</div></li>`).join("")}</ul>` : `<p class="muted">Nothing yet. Activity from the hub shows here.</p>`}</div>
+      </div>
+    </div>`;
   $("#plan")?.addEventListener("click", async () => { try { await api("/api/plan", { method: "POST" }); log("› Plan my day"); } catch (e) { log(e.message, "t-err"); } });
 }
+$("#today").addEventListener("click", (e) => {
+  const f = e.target.closest("[data-filter]");
+  if (f) { const k = f.dataset.filter; if (k === "proposals") { showTab("jobs"); $("#stage").value = "Proposal Submitted"; $("#sort").value = "amt"; renderList(); return; } dashFilter = k && dashFilter !== k ? k : null; loadToday(); return; }
+  const s = e.target.closest("[data-stage]");
+  if (s) { showTab("jobs"); $("#stage").value = s.dataset.stage; renderList(); }
+});
+$("#today").addEventListener("mousemove", (e) => { const r = e.target.closest("[data-tip]"); const tip = $("#tip"); if (!r) { tip.hidden = true; return; } tip.textContent = r.dataset.tip; tip.hidden = false; tip.style.left = Math.min(e.clientX + 12, innerWidth - 260) + "px"; tip.style.top = e.clientY + 14 + "px"; });
+$("#today").addEventListener("mouseleave", () => ($("#tip").hidden = true));
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("[data-do]"); if (!b) return;
   e.preventDefault();

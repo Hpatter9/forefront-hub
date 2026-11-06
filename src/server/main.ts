@@ -15,6 +15,7 @@ import { syncAll, type SyncAllResult } from "../workflows/background.js";
 import { editContact, editFields, FIELDS, fieldValues, SECTIONS, setAdjuster } from "../workflows/fields.js";
 import { timeline } from "../workflows/timeline.js";
 import { REMINDER_GROUPS, reminders } from "../workflows/reminders.js";
+import { STAGES } from "../core/job.js";
 import { TemplateWriter, type Recipient } from "../workflows/writer.js";
 import { autoFile, dismissUnfiled, fileMessage, inboxState } from "../workflows/inbox.js";
 import { addFile } from "../workflows/uploads.js";
@@ -218,6 +219,46 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/today") {
       const upload = new Set((lastSync?.needsUpload ?? []).map((x) => x.jobNumber));
       return send(res, 200, { reminders: reminders(hub, { needsUpload: upload }), groups: REMINDER_GROUPS, lastSync: lastSync?.at ?? null, folders: hub.jobs.list().length, unfiled: inboxState(hub).unfiled, autoFiling: hub.gmail.kind === "google" && (hub.gmail.fullAccess?.() ?? false) });
+    }
+    // ---- the dashboard: everything on one page, from the job folders the sync keeps fresh (no extra Homebase calls)
+    if (p === "/api/dashboard") {
+      const upload = new Set((lastSync?.needsUpload ?? []).map((x) => x.jobNumber));
+      const all = hub.jobs.list();
+      const open = all.filter((j) => !["Payment Received", "Closed Lost"].includes(j.stage));
+      const rem = reminders(hub, { needsUpload: upload });
+      const byStage = STAGES.map((s) => {
+        const js = open.filter((j) => j.stage === s);
+        return { stage: s, count: js.length, amount: js.reduce((t, j) => t + (j.pulse.proposalAmount ?? 0), 0) };
+      }).filter((x) => x.count);
+      const proposals = open
+        .filter((j) => j.stage === "Proposal Submitted")
+        .map((j) => ({ jobNumber: j.jobNumber, name: j.name, amount: j.pulse.proposalAmount, lastTouchAt: j.pulse.lastTouchAt || j.stageSince, lastTouch: j.pulse.lastTouch, waiting: !!j.pulse.waiting }))
+        .sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0));
+      const activity = all
+        .flatMap((j) => j.log.filter((l) => !/^(Pulled from Homebase|From Homebase:)/.test(l.what)).map((l) => ({ ...l, jobNumber: j.jobNumber, name: j.name })))
+        .sort((a, b) => b.at.localeCompare(a.at))
+        .slice(0, 15);
+      const count = (k: string) => rem.filter((r) => r.kind === k).length;
+      return send(res, 200, {
+        totals: {
+          open: open.length,
+          waiting: count("reply"),
+          estimate: count("estimate"),
+          followup: count("followup"),
+          proposalsOut: proposals.length,
+          proposalsAmount: proposals.reduce((t, x) => t + (x.amount ?? 0), 0),
+          stale: count("stale"),
+        },
+        byStage,
+        proposals: proposals.slice(0, 12),
+        activity,
+        reminders: rem,
+        groups: REMINDER_GROUPS,
+        unfiled: inboxState(hub).unfiled,
+        autoFiling: hub.gmail.kind === "google" && (hub.gmail.fullAccess?.() ?? false),
+        lastSync: lastSync?.at ?? null,
+        folders: all.length,
+      });
     }
     if (p === "/api/plan" && req.method === "POST") {
       if (!cfg.anthropicApiKey) return send(res, 400, { error: "Claude is off on this machine (no Anthropic API key)." });
