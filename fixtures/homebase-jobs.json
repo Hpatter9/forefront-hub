@@ -9,13 +9,55 @@
     "lastActivityAt": "2026-11-02",
     "url": "https://homebase.example/projects/00000000-0000-4000-8000-000000009001",
     "contacts": [
-      { "role": "customer", "name": "Jane Sample", "email": "jane.sample@example.com", "phone": "303-555-0101" },
-      { "role": "adjuster", "name": "Alex Adjuster", "email": "alex.adjuster@carrier.example", "phone": "303-555-0199" }
+      {
+        "role": "customer",
+        "name": "Jane Sample",
+        "email": "jane.sample@example.com",
+        "phone": "303-555-0101"
+      },
+      {
+        "role": "adjuster",
+        "name": "Alex Adjuster",
+        "email": "alex.adjuster@carrier.example",
+        "phone": "303-555-0199"
+      }
     ],
     "carrier": "Example Mutual",
     "claimNumber": "EX-12345",
     "intakeEmail": "office+9001@forefrontteam.com",
-    "notes": [{ "at": "2026-10-30T15:00:00Z", "body": "Scope walk done. Bathroom ceiling and two walls, LVP throughout hall." }]
+    "notes": [
+      {
+        "at": "2026-10-30T15:00:00Z",
+        "body": "Scope walk done. Bathroom ceiling and two walls, LVP throughout hall."
+      }
+    ],
+    "noteFeed": [
+      {
+        "id": "note-2",
+        "body": "@Hunter Patterson homeowner asked if we can start the bathroom first. Can you check with the adjuster?",
+        "author": "Recon Desk — Sam Office",
+        "authorId": "t-1",
+        "postedAt": "2026-11-04T16:20:00Z",
+        "replies": [
+          {
+            "id": "note-2-r1",
+            "body": "Will do, calling Alex this afternoon.",
+            "author": "🧮 Estimating hub — Hunter Patterson",
+            "authorId": "t-2",
+            "postedAt": "2026-11-04T17:05:00Z",
+            "replies": []
+          }
+        ]
+      },
+      {
+        "id": "note-1",
+        "body": "Scope walk done. Bathroom ceiling and two walls, LVP throughout hall.",
+        "author": "Hunter Patterson",
+        "authorId": "t-2",
+        "postedAt": "2026-10-30T15:00:00Z",
+        "replies": []
+      }
+    ]
   },
   {
     "id": "00000000-0000-4000-8000-000000009002",
@@ -26,7 +68,14 @@
     "stageSince": "2026-10-20",
     "lastActivityAt": "2026-10-24",
     "url": "https://homebase.example/projects/00000000-0000-4000-8000-000000009002",
-    "contacts": [{ "role": "customer", "name": "Sam Example", "email": "sam@example.com", "phone": "" }],
+    "contacts": [
+      {
+        "role": "customer",
+        "name": "Sam Example",
+        "email": "sam@example.com",
+        "phone": ""
+      }
+    ],
     "carrier": "",
     "claimNumber": "",
     "proposalAmount": 8450.12,

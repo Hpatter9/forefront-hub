@@ -534,6 +534,39 @@
   /* folded side panels */
   .split.z-jobs > aside, .calwrap.z-cal .calside, .est.z-est .est-side { visibility: hidden; overflow: hidden; padding: 0; border: 0; min-width: 0; }
   @media (max-width: 980px) { .zgrip, .zopen { display: none; } }
+
+  /* ---- Homebase Notes */
+  .notes { display: grid; gap: 14px; max-width: 860px; padding-top: 12px; }
+  .ncomp { display: grid; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .nthread { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; margin-bottom: 12px; }
+  .nt { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; }
+  .nt.reply { margin-left: 44px; padding-left: 12px; border-left: 2px solid var(--line); }
+  .av { width: 32px; height: 32px; border-radius: 50%; color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 600; flex: none; }
+  .nt.reply .av { width: 28px; height: 28px; font-size: 11px; }
+  .nh { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .nh .via { font-size: 11px; color: var(--muted); background: var(--soft); border-radius: 4px; padding: 0 6px; }
+  .nh .when { font-size: 12px; color: var(--muted); margin-left: auto; }
+  .nx { margin-top: 3px; line-height: 1.5; overflow-wrap: anywhere; }
+  .mention { color: var(--link); font-weight: 600; }
+  .mention.me { background: color-mix(in srgb, var(--link) 22%, transparent); border-radius: 4px; padding: 0 3px; }
+  .nreply { margin-left: 44px; }
+  .linkbtn { background: none; border: 0; color: var(--link); cursor: pointer; padding: 0; font: inherit; font-size: 13px; }
+  .nrbox { display: grid; gap: 6px; }
+  .mpop { position: absolute; z-index: 20; left: 8px; top: 100%; margin-top: 2px; min-width: 240px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px #0006; padding: 4px; display: grid; }
+  .mpop button { display: flex; gap: 8px; align-items: center; background: none; border: 0; color: var(--ink); padding: 6px 8px; border-radius: 6px; cursor: pointer; font: inherit; text-align: left; }
+  .mpop button.on, .mpop button:hover { background: var(--panel-2); }
+  .mpop .av { width: 24px; height: 24px; font-size: 10px; }
+  .tnotes { display: grid; }
+  .tn { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; padding: 9px 6px; border-top: 1px solid var(--line); color: var(--ink); text-decoration: none; border-radius: 6px; }
+  .tn:first-child { border-top: 0; }
+  .tn:hover { background: var(--panel-2); }
+  .tn.new { box-shadow: inset 3px 0 0 var(--link); }
+  .tn .av { width: 28px; height: 28px; font-size: 11px; }
+  .tn .tb { display: grid; gap: 2px; min-width: 0; }
+  .tn .th { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; font-size: 13px; }
+  .tn .th .when { margin-left: auto; font-size: 11.5px; color: var(--muted); }
+  .tn .tx { font-size: 13px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .tn.new .tx { color: var(--ink); }
 </style>
 </head>
 <body>
@@ -861,6 +894,7 @@ async function loadToday() {
   const tile = (k, v, label, hot) => `<button class="tile ${hot && v ? "hot" : ""} ${k && dashFilter === k ? "on" : ""}" data-filter="${k}" type="button"><span class="v">${v}</span><span class="k">${label}</span></button>`;
   const groups = d.groups.filter((g) => by[g.kind]?.length && (!dashFilter || g.kind === dashFilter));
   const longDate = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  const notesCard = await teamNotesCard();
   $("#today").innerHTML = `
     <div class="todayhead"><div style="flex:1;min-width:240px"><h2>Dashboard</h2><div class="dateline">${esc(longDate)} · ${t.open} open jobs${d.lastSync ? ` · synced ${fmtWhen(d.lastSync)}` : ""}</div></div>
       <button class="btn primary" id="plan" ${status.agent ? "" : "disabled title='Claude is off on this machine'"}>Plan my day with Claude</button></div>
@@ -881,6 +915,7 @@ async function loadToday() {
         ${groups.map((g) => `<div class="group"><h3>${esc(g.label)} <span class="muted">${by[g.kind].length} · ${esc(g.hint)}</span></h3>${by[g.kind].map(remRow).join("")}</div>`).join("") || `<div class="alldone">${d.lastSync || d.folders ? "Nothing is waiting on you." : "The first sync is still running. This fills in when it finishes (about a minute)."}</div>`}
         </div></div>
       <div class="side">
+        ${notesCard}
         <div class="card"><h3>Today <button class="btn small" data-do="gocal">Calendar</button></h3>
           ${d.calendarConnected ? (d.schedule.length ? `<ul class="items">${d.schedule.map((e) => `<li><span class="sw" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${esc(e.color || "#7aa7ff")}"></span> <b>${e.allDay ? "All day" : hm(e.start)}</b> ${esc(e.title)}${e.location ? `<div class="small muted">${esc(e.location)}</div>` : ""}${e.jobNumber ? ` <a href="#" class="small" data-do="open" data-n="${e.jobNumber}">#${e.jobNumber}</a>` : ""}</li>`).join("")}</ul>` : `<p class="muted" style="margin:0">Nothing on the calendar today.</p>`) : `<p class="muted" style="margin:0">Connect Google Calendar (Connect Gmail) to see today here.</p>`}
           ${d.tasksDue?.length ? `<div class="small muted" style="margin:12px 0 4px">Tasks due</div>${d.tasksDue.map((k) => `<div class="row" style="gap:6px;padding:3px 0"><button class="btn small" data-do="taskdone" data-list="${esc(k.listId)}" data-task="${esc(k.id)}" title="Mark done">☐</button><span style="flex:1;min-width:0">${esc(k.title)}</span>${k.due < ymd(new Date()) ? `<span class="small" style="color:var(--bad)">${fmtDate(k.due + "T12:00")}</span>` : ""}</div>`).join("")}` : ""}
@@ -985,7 +1020,7 @@ function renderJob() {
         <a class="btn" href="${esc(h.url)}" target="_blank" rel="noopener">Homebase ↗</a>
         ${ccId ? `<a class="btn" href="https://app.companycam.com/projects/${esc(ccId)}" target="_blank" rel="noopener">CompanyCam ↗</a>` : ""}
       </div>
-      <div class="subtabs" id="subtabs">${[["overview", "Dashboard"], ["details", "Details"], ["timeline", "Timeline"], ["photos", "Photos"], ["files", `Documents ${(view.hbFiles?.docs?.length ?? 0) + (view.files?.estimate?.length ?? 0)}`]].map(([k, v]) => `<button data-sub="${k}" class="${jobTab === k ? "active" : ""}">${v}</button>`).join("")}</div>
+      <div class="subtabs" id="subtabs">${[["overview", "Dashboard"], ["notes", "Notes"], ["details", "Details"], ["timeline", "Timeline"], ["photos", "Photos"], ["files", `Documents ${(view.hbFiles?.docs?.length ?? 0) + (view.files?.estimate?.length ?? 0)}`]].map(([k, v]) => `<button data-sub="${k}" class="${jobTab === k ? "active" : ""}">${v}</button>`).join("")}</div>
     </div>
     <div id="jobbody"></div>`;
   renderJobTab();
@@ -1020,6 +1055,7 @@ function renderJobTab() {
   if (t === "overview") return renderOverview(el);
   if (t === "details") return renderDetails(el);
   if (t === "timeline") return renderTimeline(el);
+  if (t === "notes") return renderNotes(el);
   if (t === "photos") return renderPhotos(el);
   if (t === "files") return renderFiles(el);
 }
@@ -2130,6 +2166,83 @@ function zgrips() {
 }
 document.addEventListener("click", (e) => { const t = e.target.closest("[data-zone-toggle]"); if (t) zfold(t.dataset.zoneToggle); });
 zgrips(); for (const k of Object.keys(ZONES)) zapply(k);
+// ============================================================= Homebase Notes: the team's internal conversation per job
+let notesData = null, notesPeople = [];
+const initials = (n) => (n || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+const avatarColor = (n) => { let h = 0; for (const c of n || "") h = (h * 31 + c.charCodeAt(0)) % 360; return `hsl(${h} 45% 42%)`; };
+function noteWho(author) { const m = String(author || "").split(/\s+[—–-]\s+/); return m.length > 1 ? { person: m.slice(1).join(" — "), via: m[0] } : { person: author || "Someone", via: "" }; }
+function noteBody(t) {
+  return esc(t).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')
+    .replace(/(^|\s)@([A-Z][\w'’.-]*(?:\s[A-Z][\w'’.-]*)?)/g, (m, sp, nm) => `${sp}<span class="mention ${nm.toLowerCase().startsWith(String(notesData?.me || "Hunter").split(" ")[0].toLowerCase()) ? "me" : ""}">@${nm}</span>`).replace(/\n/g, "<br>");
+}
+function noteHtml(x, reply) {
+  const w = noteWho(x.author);
+  return `<div class="nt ${reply ? "reply" : ""}"><div class="av" style="background:${avatarColor(w.person)}">${esc(initials(w.person))}</div><div class="nb"><div class="nh"><b>${esc(w.person)}</b>${w.via ? `<span class="via">${esc(w.via)}</span>` : ""}<span class="when" title="${esc(new Date(x.postedAt).toLocaleString())}">${fmtWhen(x.postedAt)}</span></div><div class="nx">${noteBody(x.body)}</div></div></div>`;
+}
+async function renderNotes(el) {
+  const n = view.homebase.jobNumber;
+  el.innerHTML = `<div class="notes"><div class="ncomp"><textarea id="nt-new" rows="3" placeholder="Write a note for the team… type @ to mention someone"></textarea><div class="row"><button class="btn primary small" data-nt="post">Post note</button><span class="small muted">Posts to the job's Notes tab in Homebase. People you @mention get the Homebase bell.</span></div></div><div id="nt-list"><div class="empty">Loading notes from Homebase…</div></div></div>`;
+  mentionBox($("#nt-new"));
+  try { notesData = await api(`/api/jobs/${n}/notes`); } catch (e) { $("#nt-list").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  if (jobTab !== "notes" || view.homebase.jobNumber !== n) return;
+  notesPeople = notesData.people || [];
+  const list = notesData.notes;
+  $("#nt-list").innerHTML = (notesData.live ? "" : `<div class="banner" style="margin-bottom:12px">Showing the last copy from the background sync: Homebase didn't answer just now.</div>`) + (list.length ? list.map((x) => `<div class="nthread" data-note="${esc(x.id)}">${noteHtml(x)}${x.replies.map((r) => noteHtml(r, true)).join("")}
+      ${notesData.canReply ? `<div class="nreply"><button class="linkbtn" data-nt="open">Reply</button><div class="nrbox" hidden><textarea rows="2" placeholder="Reply… (@ to mention)"></textarea><div class="row"><button class="btn primary small" data-nt="reply">Reply</button><button class="btn small" data-nt="cancel">Cancel</button></div></div></div>` : ""}</div>`).join("") : `<div class="empty">No notes on this job yet. Start the conversation above.</div>`);
+  $$("#nt-list .nrbox textarea").forEach(mentionBox);
+}
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-nt]"); if (!b || !view) return;
+  const n = view.homebase.jobNumber, th = b.closest(".nthread");
+  try {
+    if (b.dataset.nt === "post") { const t = $("#nt-new").value.trim(); if (!t) return; await api(`/api/jobs/${n}/note`, { method: "POST", body: { body: t } }); $("#nt-new").value = ""; }
+    if (b.dataset.nt === "open") { b.hidden = true; th.querySelector(".nrbox").hidden = false; th.querySelector(".nrbox textarea").focus(); }
+    if (b.dataset.nt === "cancel") { th.querySelector(".nrbox").hidden = true; th.querySelector("[data-nt=open]").hidden = false; }
+    if (b.dataset.nt === "reply") { const ta = th.querySelector(".nrbox textarea"), t = ta.value.trim(); if (!t) return; await api(`/api/jobs/${n}/notes/${encodeURIComponent(th.dataset.note)}/reply`, { method: "POST", body: { body: t } }); ta.value = ""; }
+  } catch (err) { log(err.message, "t-err"); }
+});
+// @mention type-ahead: names come from everyone who has written on a job's Notes tab.
+function mentionBox(ta) {
+  const pop = document.createElement("div"); pop.className = "mpop"; pop.hidden = true; ta.parentElement.style.position = "relative"; ta.after(pop);
+  let hits = [], at = -1, pick = 0;
+  const close = () => { pop.hidden = true; hits = []; };
+  const insert = (name) => { const v = ta.value, c = ta.selectionStart; ta.value = v.slice(0, at) + "@" + name + " " + v.slice(c); const p = at + name.length + 2; ta.setSelectionRange(p, p); close(); ta.focus(); };
+  ta.addEventListener("input", async () => {
+    const c = ta.selectionStart, m = ta.value.slice(0, c).match(/(^|\s)@([\w'’.-]*(?:\s[\w'’.-]*)?)$/);
+    if (!m) return close();
+    if (!notesPeople.length) { try { notesPeople = (await api("/api/notes/recent?days=365")).people; } catch {} }
+    at = c - m[2].length - 1; const q = m[2].toLowerCase();
+    hits = notesPeople.filter((p) => p.toLowerCase().includes(q)).slice(0, 6); pick = 0;
+    if (!hits.length) return close();
+    pop.innerHTML = hits.map((p, i) => `<button type="button" class="${i === pick ? "on" : ""}" data-i="${i}"><span class="av" style="background:${avatarColor(p)}">${esc(initials(p))}</span>${esc(p)}</button>`).join(""); pop.hidden = false;
+  });
+  ta.addEventListener("keydown", (e) => {
+    if (pop.hidden) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); pick = (pick + (e.key === "ArrowDown" ? 1 : hits.length - 1)) % hits.length; pop.querySelectorAll("button").forEach((x, i) => x.classList.toggle("on", i === pick)); }
+    else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insert(hits[pick]); }
+    else if (e.key === "Escape") close();
+  });
+  pop.addEventListener("mousedown", (e) => { const x = e.target.closest("[data-i]"); if (x) { e.preventDefault(); insert(hits[Number(x.dataset.i)]); } });
+  ta.addEventListener("blur", () => setTimeout(close, 150));
+}
+// Dashboard: the team's latest notes across every job (from the background sync), mentions of you first.
+async function teamNotesCard() {
+  let d; try { d = await api("/api/notes/recent?days=14"); } catch { return ""; }
+  notesPeople = d.people || notesPeople;
+  const seen = store.get("notesSeen", "");
+  const others = d.notes.filter((x) => !x.mine);
+  const rows = [...others.filter((x) => x.mentionsMe), ...others.filter((x) => !x.mentionsMe)].slice(0, 10);
+  const fresh = others.filter((x) => x.at > seen).length;
+  return `<div class="card" id="teamnotes"><h3><span>Team notes ${fresh ? `<span class="tag in">${fresh} new</span>` : ""}</span>${fresh ? `<button class="btn small" data-do="notesseen">Mark read</button>` : ""}</h3>
+    ${rows.length ? `<div class="tnotes">${rows.map((x) => `<a href="#" class="tn ${x.at > seen ? "new" : ""} ${x.mentionsMe ? "me" : ""}" data-do="opennotes" data-n="${x.jobNumber}"><span class="av" style="background:${avatarColor(x.author)}">${esc(initials(x.author))}</span><span class="tb"><span class="th"><b>${esc(x.author)}</b> on #${x.jobNumber} ${esc(x.name)}${x.mentionsMe ? ` <span class="tag in">@you</span>` : ""}<span class="when">${fmtWhen(x.at)}</span></span>${x.thread ? `<span class="small muted">↳ reply to “${esc(x.thread.slice(0, 60))}”</span>` : ""}<span class="tx">${esc(x.body.slice(0, 180))}</span></span></a>`).join("")}</div>` : `<p class="muted" style="margin:0">No notes from the team in the last two weeks.</p>`}</div>`;
+}
+document.addEventListener("click", (e) => {
+  const a = e.target.closest("[data-do=opennotes],[data-do=notesseen]"); if (!a) return;
+  e.preventDefault();
+  if (a.dataset.do === "notesseen") { store.set("notesSeen", new Date().toISOString()); loadToday(); return; }
+  jobTab = "notes"; store.set("jobtab", "notes"); showTab("jobs"); openJob(Number(a.dataset.n));
+});
+
 const es = new EventSource("/api/events");
 es.onmessage = (m) => {
   const e = JSON.parse(m.data);

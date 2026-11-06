@@ -35,8 +35,27 @@ export interface JobDetail extends JobSummary {
   /** The CompanyCam link on the job, when Homebase has one. */
   picturesLink?: string;
   notes: { at: string; body: string }[];
+  /** The Notes tab as Homebase has it: newest first, replies under each note (drivers that can). */
+  noteFeed?: HbNote[];
   /** The job page as text, for the agent to read anything the parser missed. */
   text?: string;
+}
+
+/** One post on a job's Notes tab: Forefront's internal conversation about the job. */
+export interface HbNote {
+  id: string;
+  body: string;
+  /** As Homebase stamps it: "Recon Desk — Shannon Hoag", or just the person's name. */
+  author: string;
+  authorId: string | null;
+  postedAt: string;
+  replies: HbNote[];
+}
+
+/** "Recon Desk — Shannon Hoag" -> { person: "Shannon Hoag", via: "Recon Desk" }. */
+export function noteAuthor(author: string): { person: string; via: string } {
+  const m = (author || "").split(/\s+[—–-]\s+/);
+  return m.length > 1 ? { person: m.slice(1).join(" — ").trim(), via: m[0].trim() } : { person: (author || "").trim(), via: "" };
 }
 
 export interface HomebaseClient {
@@ -54,6 +73,10 @@ export interface HomebaseClient {
   setStage(jobNumber: number, stage: string, fromStage?: string): Promise<void>;
   /** A call goes in the job's Activity log (first line = subject), a note on its Notes feed. */
   addNote(jobNumber: number, note: { kind: "note" | "call"; body: string; who?: string; direction?: "Inbound" | "Outbound" }): Promise<void>;
+  /** The job's Notes tab with replies, newest first. */
+  noteFeed?(jobNumber: number): Promise<HbNote[]>;
+  /** Answers one note on the Notes tab (one level deep, like Homebase). "@First Last" in the body mentions someone. */
+  replyNote?(jobNumber: number, noteId: string, body: string): Promise<void>;
   /** Emails Homebase filed on the job (via the office+<job#> BCC), newest first. Not every driver has it. */
   emails?(jobNumber: number): Promise<FiledEmail[]>;
   /** The job's Activity log (calls, emails, meetings), newest first. Not every driver has it. */

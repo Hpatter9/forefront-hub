@@ -7,7 +7,8 @@ import { loadConfig } from "../core/config.js";
 import { describe, makeHub, type Hub } from "../hub.js";
 import { MockGmail } from "../connectors/gmail/mock.js";
 import { intakeAddress } from "../connectors/homebase/types.js";
-import { pullJob } from "../workflows/pull.js";
+import { pullJob, saveNotes, savedNotes } from "../workflows/pull.js";
+import { noteAuthor, type HbNote } from "../connectors/homebase/types.js";
 import { estimateFiles, sendoff } from "../workflows/sendoff.js";
 import { sync } from "../workflows/sync.js";
 import { syncFiles, uploadToHomebase } from "../workflows/files.js";
@@ -224,6 +225,7 @@ const server = http.createServer(async (req, res) => {
       cfg.spotify.clientId = id;
       return send(res, 200, { ok: true });
     }
+    if (p === "/api/notes/recent") return send(res, 200, { me: cfg.homebase.me, notes: recentNotes(Number(q("days") || 14)), people: teamPeople() });
     if (p === "/api/meta") {
       return send(res, 200, { fields: FIELDS, sections: SECTIONS, vocab: (await hub.homebase.vocabulary?.().catch(() => ({}))) ?? {}, reminderGroups: REMINDER_GROUPS });
     }
@@ -312,6 +314,17 @@ const server = http.createServer(async (req, res) => {
       if (req.method === "GET") {
         if (action === "") return send(res, 200, await jobView(n));
         if (action === "timeline") return send(res, 200, await timeline(hub, n));
+        if (action === "notes") {
+          let notes: HbNote[] = [], live = false;
+          try {
+            notes = (await hub.homebase.noteFeed?.(n)) ?? [];
+            live = !!hub.homebase.noteFeed;
+            if (live && hub.jobs.exists(n)) saveNotes(hub, n, notes);
+          } catch {
+            notes = hub.jobs.exists(n) ? savedNotes(hub, n) : [];
+          }
+          return send(res, 200, { notes, live, canReply: !!hub.homebase.replyNote, me: cfg.homebase.me, people: teamPeople() });
+        }
         if (action === "photos") return send(res, 200, await photosView(n));
         if (action.startsWith("file/")) {
           const file = path.join(hub.jobs.folder(n), decodeURIComponent(action.slice(5)));
@@ -338,6 +351,18 @@ const server = http.createServer(async (req, res) => {
         return send(res, 202, task(`Add ${name} to #${n}`, n, () => addFile(hub, n, name, bytes, { toHomebase: q("homebase") !== "0" }), "job"));
       }
       const b = await body(req);
+      const rn = action.match(/^notes\/([\w-]+)\/reply$/);
+      if (rn) {
+        const text = String(b.body ?? "").trim();
+        if (!text) return send(res, 400, { error: "Write the reply first." });
+        if (!hub.homebase.replyNote) return send(res, 400, { error: "This Homebase connection can't reply to notes." });
+        return send(res, 202, task(`Reply to a note on #${n}`, n, async () => {
+          if (!(await approver.confirm(`Post this reply on the Notes tab of Homebase #${n}?`, [text]))) return hub.say("Not posted.");
+          await hub.homebase.replyNote!(n, rn[1], text);
+          hub.jobs.log(n, `Homebase note reply: ${text.slice(0, 80)}`);
+          hub.say(`Replied on Homebase #${n}.`);
+        }, "timeline"));
+      }
       switch (action) {
         case "pull":
           return send(res, 202, task(`Refresh #${n} from Homebase`, n, () => pullJob(hub, n), "job"));
@@ -622,3 +647,33 @@ server.listen(port, host, () => {
   console.log(`Forefront hub running at http://${host === "0.0.0.0" ? "localhost" : host}:${port}`);
   for (const l of describe(hub)) console.log(`  ${l}`);
 });
+
+// ---- Homebase Notes across every job folder (saved by the background sync), for the dashboard
+function recentNotes(days: number) {
+  const since = Date.now() - days * 86400_000;
+  const me = cfg.homebase.me.toLowerCase();
+  const first = me.split(" ")[0];
+  const out: { jobNumber: number; name: string; noteId: string; replyTo?: string; author: string; via: string; body: string; at: string; mine: boolean; mentionsMe: boolean; thread?: string }[] = [];
+  for (const j of hub.jobs.list()) {
+    for (const n of savedNotes(hub, j.jobNumber)) {
+      for (const x of [n, ...n.replies]) {
+        const t = Date.parse(x.postedAt);
+        if (!(t > since)) continue;
+        const a = noteAuthor(x.author);
+        const body = x.body.toLowerCase();
+        out.push({ jobNumber: j.jobNumber, name: j.name, noteId: n.id, replyTo: x === n ? undefined : n.id, author: a.person, via: a.via, body: x.body, at: x.postedAt, mine: a.person.toLowerCase() === me, mentionsMe: body.includes(`@${me}`) || new RegExp(`@${first}\\b`).test(body), thread: x === n ? undefined : n.body.slice(0, 120) });
+      }
+    }
+  }
+  return out.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 60);
+}
+
+/** Everyone who has written on a job's Notes tab: the names @mentions can use. */
+function teamPeople() {
+  const seen = new Map<string, number>();
+  for (const j of hub.jobs.list()) for (const n of savedNotes(hub, j.jobNumber)) for (const x of [n, ...n.replies]) {
+    const who = noteAuthor(x.author).person;
+    if (who && /\s/.test(who)) seen.set(who, (seen.get(who) ?? 0) + 1);
+  }
+  return [...seen.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name).filter((x) => x.toLowerCase() !== cfg.homebase.me.toLowerCase());
+}

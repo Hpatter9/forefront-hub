@@ -2,12 +2,12 @@ import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { HUB_ROOT } from "../../core/config.js";
-import type { DocumentKind, HomebaseClient, HomebaseDocument, JobDetail } from "./types.js";
+import type { DocumentKind, HbNote, HomebaseClient, HomebaseDocument, JobDetail } from "./types.js";
 
 export interface MockWrite {
   at: string;
   jobNumber: number;
-  op: "setProposal" | "setContractAmount" | "setStage" | "addNote" | "uploadDocument" | "updateFields" | "createContact" | "updateContact";
+  op: "setProposal" | "setContractAmount" | "setStage" | "addNote" | "uploadDocument" | "updateFields" | "createContact" | "updateContact" | "replyNote";
   args: unknown;
 }
 
@@ -28,7 +28,7 @@ export class MockHomebase implements HomebaseClient {
     return this.jobs
       .filter((j) => !filter.openOnly || !closed.has(j.stage))
       .filter((j) => !filter.mine || Object.values(j.people ?? {}).includes(filter.mine))
-      .map(({ contacts, notes, text, ...s }) => s);
+      .map(({ contacts, notes, noteFeed, text, ...s }) => s);
   }
 
   async getJob(jobNumber: number) {
@@ -58,8 +58,21 @@ export class MockHomebase implements HomebaseClient {
   }
 
   async addNote(jobNumber: number, note: { kind: "note" | "call"; body: string }) {
-    this.find(jobNumber).notes.push({ at: new Date().toISOString(), body: `[${note.kind}] ${note.body}` });
+    const j = this.find(jobNumber), at = new Date().toISOString();
+    j.notes.push({ at, body: `[${note.kind}] ${note.body}` });
+    if (note.kind === "note") (j.noteFeed ??= []).unshift({ id: `note-${Date.now()}`, body: note.body, author: "🧮 Estimating hub — Hunter Patterson", authorId: null, postedAt: at, replies: [] });
     this.record(jobNumber, "addNote", note);
+  }
+
+  async noteFeed(jobNumber: number): Promise<HbNote[]> {
+    return structuredClone(this.find(jobNumber).noteFeed ?? []);
+  }
+
+  async replyNote(jobNumber: number, noteId: string, body: string) {
+    const n = (this.find(jobNumber).noteFeed ?? []).find((x) => x.id === noteId);
+    if (!n) throw new Error("Homebase (mock): that note isn't on this job");
+    n.replies.push({ id: `${noteId}-r${n.replies.length + 1}`, body, author: "🧮 Estimating hub — Hunter Patterson", authorId: null, postedAt: new Date().toISOString(), replies: [] });
+    this.record(jobNumber, "replyNote", { noteId, body });
   }
 
   /** Editable fields set through the mock, overlaid on the fixture (shaped like the real API's job read). */

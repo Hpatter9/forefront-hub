@@ -1,6 +1,7 @@
-import { writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { photoFileName, pickProject } from "../connectors/companycam/index.js";
+import type { HbNote } from "../connectors/homebase/types.js";
 import { lastName, type Job } from "../core/job.js";
 import type { Hub } from "../hub.js";
 
@@ -37,6 +38,9 @@ export async function pullJob(hub: Hub, jobNumber: number, opts: { quiet?: boole
     companycamProjectId: prior?.companycamProjectId || hb.picturesLink?.match(/companycam\.com\/projects\/(\d+)/)?.[1] || undefined,
     insurance: prior?.insurance !== "unknown" && prior?.insurance ? prior.insurance : hb.claimNumber || adjuster ? "claim" : "unknown",
   });
+
+  // The Notes tab (Forefront's internal conversation), kept in the folder for the dashboard's team-notes card.
+  if (hb.noteFeed) saveNotes(hub, jobNumber, hb.noteFeed);
 
   if (lookups && !job.companycamProjectId) {
     try {
@@ -89,4 +93,20 @@ export async function downloadPhotos(hub: Hub, jobNumber: number, o: { size?: "o
   writeFileSync(path.join(dir, "index.json"), JSON.stringify(index, null, 2));
   hub.say(`${files.length} photo${files.length === 1 ? "" : "s"} copied from CompanyCam${o.size === "web" ? " (previews)" : ""}`);
   return files;
+}
+
+/** Keeps the job's Homebase Notes tab in notes/homebase-notes.json. */
+export function saveNotes(hub: Hub, jobNumber: number, feed: HbNote[]) {
+  const f = hub.jobs.path(jobNumber, "notes", "homebase-notes.json");
+  mkdirSync(path.dirname(f), { recursive: true });
+  writeFileSync(f, JSON.stringify({ at: new Date().toISOString(), notes: feed }, null, 2));
+}
+
+export function savedNotes(hub: Hub, jobNumber: number): HbNote[] {
+  const f = hub.jobs.path(jobNumber, "notes", "homebase-notes.json");
+  try {
+    return existsSync(f) ? JSON.parse(readFileSync(f, "utf8")).notes ?? [] : [];
+  } catch {
+    return [];
+  }
 }

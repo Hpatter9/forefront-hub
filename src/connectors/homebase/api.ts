@@ -1,4 +1,4 @@
-import type { ActivityRow, Contact, DocumentKind, FieldResult, FiledEmail, HomebaseClient, HomebaseDocument, JobDetail, JobSummary } from "./types.js";
+import type { ActivityRow, Contact, DocumentKind, FieldResult, FiledEmail, HbNote, HomebaseClient, HomebaseDocument, JobDetail, JobSummary } from "./types.js";
 
 /**
  * Homebase over its real JSON API (https://homebase.forefrontteam.com/api/v1, reference at /api/v1/docs).
@@ -112,6 +112,7 @@ export class ApiHomebase implements HomebaseClient {
       contractAmount: p.money?.contractAmount ?? undefined,
       intakeEmail: `office+${jobNumber}@forefrontteam.com`,
       notes: notes.map((n: any) => ({ at: n.postedAt, body: `${n.author ? `${n.author}: ` : ""}${n.body}` })),
+      noteFeed: notes.map(toNote),
       picturesLink: p.brief?.picturesLink ?? p.picturesLink ?? undefined,
     };
   }
@@ -144,6 +145,16 @@ export class ApiHomebase implements HomebaseClient {
     } else {
       await this.call("POST", `/projects/${id}/notes`, { body: note.body, prefix: NOTE_PREFIX });
     }
+  }
+
+  async noteFeed(jobNumber: number): Promise<HbNote[]> {
+    const id = await this.projectId(jobNumber);
+    return (await this.call<{ notes: any[] }>("GET", `/projects/${id}/notes`)).notes.map(toNote);
+  }
+
+  async replyNote(jobNumber: number, noteId: string, body: string) {
+    const id = await this.projectId(jobNumber);
+    await this.call("POST", `/projects/${id}/notes/${noteId}/replies`, { body, prefix: NOTE_PREFIX });
   }
 
   /** Emails Homebase has filed on the job (metadata only), newest first. */
@@ -271,4 +282,8 @@ async function pool<T, R>(items: T[], n: number, fn: (t: T) => Promise<R>): Prom
     }),
   );
   return out;
+}
+
+function toNote(n: any): HbNote {
+  return { id: String(n.id), body: String(n.body ?? ""), author: String(n.author ?? ""), authorId: n.authorId ?? null, postedAt: String(n.postedAt ?? ""), replies: (n.replies ?? []).map(toNote) };
 }
