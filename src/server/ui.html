@@ -588,6 +588,13 @@
   .brief .bsteps { margin-top: 8px; font-size: 12.5px; color: var(--muted); display: grid; gap: 2px; }
   .spin { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--link); border-radius: 50%; animation: spin 0.8s linear infinite; flex: none; }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---- drive time before calendar appointments */
+  .drive { position: absolute; border-radius: 4px; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--muted) 22%, transparent) 0 6px, transparent 6px 12px); border: 1px dashed color-mix(in srgb, var(--muted) 60%, transparent); color: var(--muted); font-size: 11px; overflow: hidden; cursor: pointer; display: flex; align-items: flex-end; }
+  .drive span { padding: 0 5px 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .drive.late { border-color: var(--bad); color: var(--bad); background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--bad) 18%, transparent) 0 6px, transparent 6px 12px); }
+  .evdrive { opacity: .85; font-size: 10.5px; }
+  .evtravel { display: block; margin-top: 6px; color: var(--muted); font-weight: 400; }
 </style>
 </head>
 <body>
@@ -795,7 +802,7 @@
     <label style="align-self:end"><span class="row"><input type="checkbox" id="ev-allday" style="width:auto"> All day</span></label>
     <label>Job<select id="ev-job"><option value="">(none)</option></select></label>
     <label>Calendar<select id="ev-cal"></select></label>
-    <label class="wide">Location<input type="text" id="ev-loc"></label>
+    <label class="wide">Location<input type="text" id="ev-loc"><span class="small evtravel" id="ev-travel" hidden></span></label>
     <label class="wide">Notes<textarea id="ev-desc" rows="3"></textarea></label>
     <label>Invite (emails, comma-separated)<input type="text" id="ev-att"></label>
     <label>Reminder<select id="ev-rem"><option value="">Calendar default</option><option value="10">10 min before</option><option value="30">30 min before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></label>
@@ -964,7 +971,7 @@ async function loadToday() {
       <div class="side">
         ${notesCard}
         <div class="card"><h3>Today <button class="btn small" data-do="gocal">Calendar</button></h3>
-          ${d.calendarConnected ? (d.schedule.length ? `<ul class="items">${d.schedule.map((e) => `<li><span class="sw" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${esc(e.color || "#7aa7ff")}"></span> <b>${e.allDay ? "All day" : hm(e.start)}</b> ${esc(e.title)}${e.location ? `<div class="small muted">${esc(e.location)}</div>` : ""}${e.jobNumber ? ` <a href="#" class="small" data-do="open" data-n="${e.jobNumber}">#${e.jobNumber}</a>` : ""}</li>`).join("")}</ul>` : `<p class="muted" style="margin:0">Nothing on the calendar today.</p>`) : `<p class="muted" style="margin:0">Connect Google Calendar (Connect Gmail) to see today here.</p>`}
+          ${d.calendarConnected ? (d.schedule.length ? `<ul class="items">${d.schedule.map((e) => `<li><span class="sw" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${esc(e.color || "#7aa7ff")}"></span> <b>${e.allDay ? "All day" : hm(e.start)}</b> ${esc(e.title)}${e.location ? `<div class="small muted">${esc(e.location)}</div>` : ""}${d.travel?.[e.id] ? `<div class="small ${d.travel[e.id].late ? "" : "muted"}">${d.travel[e.id].late ? `<span style="color:var(--bad)">⚠ ${d.travel[e.id].late} min short from ${esc(d.travel[e.id].fromLabel)}</span>` : `🚗 Leave by <b>${hm(d.travel[e.id].leaveBy)}</b> · ${d.travel[e.id].minutes} min from ${esc(d.travel[e.id].fromLabel)}`} · <a href="${esc(d.travel[e.id].mapsUrl)}" target="_blank" rel="noopener">Directions</a></div>` : ""}${e.jobNumber ? ` <a href="#" class="small" data-do="open" data-n="${e.jobNumber}">#${e.jobNumber}</a>` : ""}</li>`).join("")}</ul>` : `<p class="muted" style="margin:0">Nothing on the calendar today.</p>`) : `<p class="muted" style="margin:0">Connect Google Calendar (Connect Gmail) to see today here.</p>`}
           ${d.tasksDue?.length ? `<div class="small muted" style="margin:12px 0 4px">Tasks due</div>${d.tasksDue.map((k) => `<div class="row" style="gap:6px;padding:3px 0"><button class="btn small" data-do="taskdone" data-list="${esc(k.listId)}" data-task="${esc(k.id)}" title="Mark done">☐</button><span style="flex:1;min-width:0">${esc(k.title)}</span>${k.due < ymd(new Date()) ? `<span class="small" style="color:var(--bad)">${fmtDate(k.due + "T12:00")}</span>` : ""}</div>`).join("")}` : ""}
         </div>
         <div class="card"><h3><span><span class="muted small" style="font-variant-numeric:tabular-nums">01</span> Stages</span></h3>
@@ -1611,10 +1618,23 @@ async function renderCal() {
       showTasks && taskLists.length ? api(`/api/tasks?${new URLSearchParams({ start: ymd(start), end: ymd(new Date(end.getTime() - 864e5)), completed: "1" })}`) : [],
     ]);
   } catch (e) { $("#cal-body").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
-  calView === "month" ? renderMonth(start) : renderWeek(start, calView === "day" ? 1 : 7);
+  const draw = () => (calView === "month" ? renderMonth(start) : renderWeek(start, calView === "day" ? 1 : 7));
+  draw();
+  // Drive times arrive a moment later (each new address is looked up once, then kept).
+  if (calEvents.some((e) => !e.allDay && e.location)) {
+    const key = `${start.toISOString()}|${end.toISOString()}`; calLegsKey = key;
+    api(`/api/cal/travel?${new URLSearchParams({ start: start.toISOString(), end: end.toISOString() })}`).then((t) => { if (calLegsKey !== key) return; calLegs = t.legs || {}; travelKind = t.kind; const sc = $("#cal-body").scrollTop; draw(); $("#cal-body").scrollTop = sc; }).catch(() => {});
+  }
+}
+let calLegs = {}, calLegsKey = "", travelKind = "";
+const legLabel = (g) => `${g.minutes} min drive`;
+function legLine(g) {
+  if (!g) return "";
+  const t = new Date(g.leaveBy).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return `${g.late ? `<b style="color:var(--bad)">⚠ ${g.late} min short</b> coming from ${esc(g.fromLabel)}. ` : ""}About <b>${g.minutes} min</b> (${g.miles} mi) from ${esc(g.fromLabel)}${g.traffic ? " with traffic" : ""} · leave by <b>${t}</b> · <a href="${esc(g.mapsUrl)}" target="_blank" rel="noopener">Directions ↗</a>`;
 }
 const taskChip = (k) => `<div class="ev chip" style="background:var(--panel-2);color:var(--ink);border-color:var(--line)" data-task="${esc(k.id)}" data-list="${esc(k.listId)}" title="${esc(k.title)}"><span data-check="1" style="cursor:pointer">${k.completed ? "☑" : "☐"}</span> <span style="${k.completed ? "text-decoration:line-through;opacity:.6" : ""}">${esc(k.title)}</span></div>`;
-const evChip = (e) => `<div class="ev chip" style="background:${esc(e.color || "#7aa7ff")}" data-ev="${esc(e.id)}" data-cal="${esc(e.calendarId)}" title="${esc(e.title)}">${e.allDay ? "" : hm(e.start) + " "}${esc(e.title)}</div>`;
+const evChip = (e) => `<div class="ev chip" style="background:${esc(e.color || "#7aa7ff")}" data-ev="${esc(e.id)}" data-cal="${esc(e.calendarId)}" title="${esc(e.title)}${calLegs[e.id] ? ` · ${calLegs[e.id].minutes} min drive` : ""}">${e.allDay ? "" : hm(e.start) + " "}${esc(e.title)}${calLegs[e.id] ? ` <span class="evdrive">🚗${calLegs[e.id].minutes}m</span>` : ""}</div>`;
 function renderWeek(start, days) {
   const today = new Date();
   const dates = Array.from({ length: days }, (_, i) => new Date(start.getTime() + i * 864e5));
@@ -1629,6 +1649,7 @@ function renderWeek(start, days) {
     const pos = (iso) => { const t = new Date(iso); return ((t.getHours() + t.getMinutes() / 60) - H0) * HOUR_H; };
     html += `<div class="col" data-day="${ymd(d)}" style="height:${hours.length * HOUR_H}px">${hours.map((_, i) => `<div class="hr" style="top:${i * HOUR_H}px"></div>`).join("")}
       ${sameDay(d, today) ? `<div class="now" style="top:${pos(today.toISOString())}px"></div>` : ""}
+      ${placed.map(({ e, l }) => { const g = calLegs[e.id]; if (!g) return ""; const top = Math.max(0, pos(g.leaveBy)), bot = pos(e.start); return bot - top < 6 ? "" : `<div class="drive ${g.late ? "late" : ""}" data-ev="${esc(e.id)}" data-cal="${esc(e.calendarId)}" style="top:${top}px;height:${bot - top - 1}px;left:calc(${(l / n) * 100}% + 2px);width:calc(${100 / n}% - 4px)" title="Leave by ${hm(g.leaveBy)}: ${g.minutes} min from ${esc(g.fromLabel)}"><span>🚗 ${g.late ? `${g.late} min short` : `leave ${hm(g.leaveBy)} · ${g.minutes} min`}</span></div>`; }).join("")}
       ${placed.map(({ e, l }) => { const top = Math.max(0, pos(e.start)); const h = Math.max(20, pos(e.end) - top - 2); return `<div class="ev" data-ev="${esc(e.id)}" data-cal="${esc(e.calendarId)}" style="top:${top}px;height:${h}px;left:calc(${(l / n) * 100}% + 2px);width:calc(${100 / n}% - 4px);background:${esc(e.color || "#7aa7ff")}"><b>${esc(e.title)}</b>${hm(e.start)}${e.location ? ` · ${esc(e.location.split(",")[0])}` : ""}</div>`; }).join("")}</div>`;
   }
   $("#cal-body").innerHTML = html + "</div>";
@@ -1681,6 +1702,8 @@ function openEvent(o) {
   $("#ev-cal").disabled = editing;
   $("#ev-del").hidden = !editing;
   $("#ev-meta").innerHTML = editing ? [o.meet ? `<a href="${esc(o.meet)}" target="_blank" rel="noopener">Join Meet</a>` : "", o.link ? `<a href="${esc(o.link)}" target="_blank" rel="noopener">Open in Google Calendar</a>` : "", o.jobNumber ? `<a href="#" data-do="open" data-n="${o.jobNumber}">Open job #${o.jobNumber}</a>` : ""].filter(Boolean).join(" · ") : "";
+  const g = o.id ? calLegs[o.id] : null;
+  $("#ev-travel").hidden = !g; $("#ev-travel").innerHTML = legLine(g);
   $("#evdlg").showModal();
 }
 $("#ev-job").addEventListener("change", () => {

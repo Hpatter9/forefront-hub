@@ -9,6 +9,7 @@ import { DocuSketch } from "../src/connectors/docusketch/index.js";
 import { MockGmail } from "../src/connectors/gmail/mock.js";
 import { MockCalendar } from "../src/connectors/calendar/index.js";
 import { MockTasks } from "../src/connectors/tasks/index.js";
+import { MockTravel } from "../src/connectors/travel/index.js";
 import { MockHomebase } from "../src/connectors/homebase/mock.js";
 import { EstimateSkill } from "../src/connectors/skill/index.js";
 import { JobStore } from "../src/core/job.js";
@@ -32,6 +33,7 @@ export function testHub(answer = true) {
     gmail,
     calendar: new MockCalendar(cfg.stateDir),
     tasks: new MockTasks(cfg.stateDir),
+    travel: new MockTravel(),
     photos: new MockCompanyCam(),
     sketches: new DocuSketch(gmail, cfg.docusketch.downloadsDir),
     skill: new EstimateSkill(cfg.skillDir, PYTHON),

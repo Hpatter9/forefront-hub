@@ -1,3 +1,4 @@
+import { makeTravel, type TravelClient } from "./connectors/travel/index.js";
 import path from "node:path";
 import { CliApprover, type Approver } from "./core/approval.js";
 import { loadConfig, type Config } from "./core/config.js";
@@ -18,6 +19,7 @@ export interface Hub {
   gmail: MailClient;
   calendar: CalendarClient;
   tasks: TasksClient;
+  travel: TravelClient;
   photos: PhotoClient;
   sketches: SketchSource;
   skill: EstimateSkill;
@@ -34,6 +36,7 @@ export function makeHub(cfg: Config = loadConfig(), approver: Approver = new Cli
     gmail,
     calendar: makeCalendar(cfg),
     tasks: makeTasks(cfg),
+    travel: makeTravel(cfg),
     photos: makeCompanyCam(cfg),
     sketches: new DocuSketch(gmail, cfg.docusketch.downloadsDir),
     skill: new EstimateSkill(cfg.skillDir, cfg.python),

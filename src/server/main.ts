@@ -280,6 +280,7 @@ const server = http.createServer(async (req, res) => {
         byStage,
         proposals: proposals.slice(0, 12),
         schedule,
+        travel: await import("../workflows/travel.js").then((t) => t.travelFor(hub, schedule)).catch(() => ({})),
         tasksDue,
         tasksConnected: hub.tasks.connected(),
         calendarConnected: hub.calendar.connected(),
@@ -467,6 +468,11 @@ const server = http.createServer(async (req, res) => {
     }
     // ---- calendar
     if (p === "/api/cal/calendars") return send(res, 200, await hub.calendar.calendars());
+    if (p === "/api/cal/travel") {
+      const { travelFor } = await import("../workflows/travel.js");
+      const ev = await hub.calendar.events({ start: q("start"), end: q("end") });
+      return send(res, 200, { kind: hub.travel.kind, start: cfg.travel.start, legs: await travelFor(hub, ev) });
+    }
     if (p === "/api/cal/events" && req.method === "GET") {
       const ids = q("cals") ? q("cals").split(",") : undefined;
       return send(res, 200, await hub.calendar.events({ start: q("start"), end: q("end"), calendarIds: ids, q: q("q") || undefined }));
@@ -692,7 +698,7 @@ function startPlan(trigger: "button" | "morning"): { taskId: string } | { error:
   return task(trigger === "morning" ? "Morning brief" : "Plan my day", undefined, async () => {
     const { describeTool } = await import("../agent/studio.js");
     try {
-      plan.text = await (await import("../agent/run.js")).ask(hub, prompt, {
+      plan.text = await (await import("../agent/run.js")).ask(hub, prompt + (await travelNote()), {
         onMessage: (m) => {
           if (m.type !== "assistant") return;
           for (const b of m.message.content) if (b.type === "tool_use") { plan.steps.push(describeTool(b.name, b.input as Record<string, unknown>)); savePlan(plan); bus.emit({ type: "changed", what: "plan" }); }
@@ -737,4 +743,21 @@ function readPlan(): Plan | { state: "none" } {
 function savePlan(p: Plan) {
   mkdirSync(cfg.stateDir, { recursive: true });
   writeFileSync(planFile(), JSON.stringify(p, null, 2));
+}
+
+/** Today's drive times, for Plan my day: when to leave for each appointment with an address. */
+async function travelNote(): Promise<string> {
+  if (!hub.calendar.connected()) return "";
+  try {
+    const d0 = new Date(), d1 = new Date();
+    d0.setHours(0, 0, 0, 0);
+    d1.setHours(24, 0, 0, 0);
+    const ev = await hub.calendar.events({ start: d0.toISOString(), end: d1.toISOString() });
+    const legs = await (await import("../workflows/travel.js")).travelFor(hub, ev);
+    const hm = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Denver" });
+    const lines = ev.filter((e) => legs[e.id]).map((e) => { const g = legs[e.id]; return `- ${hm(e.start)} ${e.title} at ${e.location}: ${g.minutes} min drive from ${g.fromLabel}${g.traffic ? " (with traffic)" : ""}, leave by ${hm(g.leaveBy)}${g.late ? `; ${g.late} min short coming straight from ${g.fromLabel}` : ""}`; });
+    return lines.length ? `\n\nDrive times for today's appointments (already worked out; use them, and put the leave-by time on each calendar line of the brief; call out any that are short):\n${lines.join("\n")}` : "";
+  } catch {
+    return "";
+  }
 }

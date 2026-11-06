@@ -1,4 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { loadConfig } from "../core/config.js";
@@ -128,5 +129,37 @@ export async function connectCompanyCam() {
   const me: any = await res.json();
   setEnv({ COMPANYCAM_TOKEN: token });
   console.log(`\nCompanyCam is connected as ${[me.first_name, me.last_name].filter(Boolean).join(" ") || me.email_address || "you"}.`);
+  console.log("Restart the hub (close its window, open the desktop icon) to use it.");
+}
+
+/** Google Maps key for drive times with traffic on calendar events (the Routes API, in the Gmail project). */
+export async function connectGoogleMaps() {
+  console.log("Connecting Google Maps (drive times with traffic for your calendar).");
+  console.log("Use the same Google Cloud project as Gmail (Forefront Hub). Check it's the project selected at the top of each page.");
+  step(1, "Turn on the Routes API: click Enable on the page that opens.");
+  console.log("   Google asks for a billing account the first time (Maps needs one on file). Your use stays inside the");
+  console.log("   free monthly allowance: the hub asks only for events with an address, and keeps answers for hours.");
+  openBrowser("https://console.cloud.google.com/apis/library/routes.googleapis.com");
+  await ask("   Press Enter once it says API Enabled... ");
+  step(2, "Make a key: on the page that opens, click + Create credentials > API key, then copy the key.");
+  console.log("   Recommended: click Edit API key > API restrictions > Restrict key > tick Routes API > Save,");
+  console.log("   so the key can only be used for drive times.");
+  openBrowser("https://console.cloud.google.com/apis/credentials");
+  const key = (await ask("\n3. Paste the key here and press Enter: ")).trim();
+  if (!key) throw new Error("No key; run Connect Google Maps again when you have one.");
+  const { GoogleTravel } = await import("../connectors/travel/index.js");
+  const cfg = loadConfig();
+  const from = cfg.travel.start || "169 Inverness Dr W, Englewood, CO 80112";
+  const d = await new GoogleTravel(path.join(os.tmpdir(), "forefront-hub-maps-check"), key).drive(from, "Denver Union Station, Denver, CO").catch((e: Error) => {
+    const m = e.message;
+    if (/API_KEY_INVALID|API key not valid/i.test(m)) throw new Error("Google didn't accept that key. Copy it again (all of it) and rerun Connect Google Maps.");
+    if (/SERVICE_DISABLED|has not been used|is disabled/i.test(m)) throw new Error("The Routes API isn't on yet for that key's project. Click Enable on the Routes API page (step 1), wait a minute, then rerun.");
+    if (/BILLING|billing/i.test(m)) throw new Error("Google wants a billing account on the project before Maps works. Add one (Billing in the console menu), then rerun.");
+    if (/PERMISSION_DENIED|API_KEY_SERVICE_BLOCKED|referer|restrict/i.test(m)) throw new Error("That key isn't allowed to use the Routes API. Edit the key's API restrictions to include Routes API, then rerun.");
+    throw e;
+  });
+  if (!d) throw new Error("Google answered but found no route for the test trip. Try again in a minute.");
+  setEnv({ GOOGLE_MAPS_API_KEY: key });
+  console.log(`\nGoogle Maps is connected. Test trip, office to Union Station right now: ${d.minutes} min, ${d.miles} mi with traffic.`);
   console.log("Restart the hub (close its window, open the desktop icon) to use it.");
 }

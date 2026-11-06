@@ -101,6 +101,11 @@ C:\Jobs\3226 Augustine\
   the dashboard (`src/workflows/brief.ts`). If the hub opens later, it runs then (until 5 PM). Change it in `.env`:
   `HUB_BRIEF_TIME=08:00`, `HUB_BRIEF_DAYS=0-6` (every day), or `HUB_BRIEF_TIME=off`.
 
+- **Drive times**: calendar events with an address show a "leave by" block, the drive time from the previous
+  appointment (or the office, or `HUB_DAY_START_ADDRESS`), and a warning when back-to-back visits don't leave
+  enough time (`src/workflows/travel.ts`, `src/connectors/travel`). With `GOOGLE_MAPS_API_KEY` (double-click
+  **Connect Google Maps**) the times include traffic; without it the hub uses OpenStreetMap, padded 20%.
+
 `npm test` runs everything on mocks, including the skill's real Python scripts (it expects the estimator repo
 next to this one, or `ESTIMATOR_DIR`). `npm run typecheck` checks types.
 
