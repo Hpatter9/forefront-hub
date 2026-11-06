@@ -678,6 +678,7 @@
       <div class="calside">
         <button class="btn primary" id="cal-new" type="button">New event</button>
         <div><div class="small muted" style="margin-bottom:6px">My calendars</div><div id="cal-list" style="display:grid;gap:6px"></div></div>
+        <div id="cal-hidden" hidden></div>
         <div><div class="small muted" style="margin-bottom:6px">Free time (next 5 workdays)</div><div class="row" style="margin-bottom:6px"><select id="cal-dur" style="width:auto"><option value="30">30 min</option><option value="60" selected>1 hour</option><option value="120">2 hours</option></select><button class="btn small" id="cal-free" type="button">Find</button></div><div class="slots" id="cal-slots"></div></div>
       </div>
       <div class="calmain">
@@ -809,7 +810,7 @@
   </div>
   <div class="small muted" id="ev-meta"></div>
   <input type="hidden" id="ev-id"><input type="hidden" id="ev-calid">
-  </div><div class="foot"><button class="btn" value="delete" id="ev-del" style="margin-right:auto">Delete</button><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="save">Save</button></div></form></dialog>
+  </div><div class="foot"><button class="btn" value="delete" id="ev-del">Delete</button><button class="btn" type="button" id="ev-hide" style="margin-right:auto" title="Hide it in the hub only. Google Calendar and everyone who looks at your calendar still see it.">Hide on my screen</button><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="save">Save</button></div></form></dialog>
 
 <dialog id="taskdlg"><form method="dialog"><div class="in">
   <h4 id="tk-h">Task</h4>
@@ -971,7 +972,7 @@ async function loadToday() {
       <div class="side">
         ${notesCard}
         <div class="card"><h3>Today <button class="btn small" data-do="gocal">Calendar</button></h3>
-          ${d.calendarConnected ? (d.schedule.length ? `<ul class="items">${d.schedule.map((e) => `<li><span class="sw" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${esc(e.color || "#7aa7ff")}"></span> <b>${e.allDay ? "All day" : hm(e.start)}</b> ${esc(e.title)}${e.location ? `<div class="small muted">${esc(e.location)}</div>` : ""}${d.travel?.[e.id] ? `<div class="small ${d.travel[e.id].late ? "" : "muted"}">${d.travel[e.id].late ? `<span style="color:var(--bad)">⚠ ${d.travel[e.id].late} min short from ${esc(d.travel[e.id].fromLabel)}</span>` : `🚗 Leave by <b>${hm(d.travel[e.id].leaveBy)}</b> · ${d.travel[e.id].minutes} min from ${esc(d.travel[e.id].fromLabel)}`} · <a href="${esc(d.travel[e.id].mapsUrl)}" target="_blank" rel="noopener">Directions</a></div>` : ""}${e.jobNumber ? ` <a href="#" class="small" data-do="open" data-n="${e.jobNumber}">#${e.jobNumber}</a>` : ""}</li>`).join("")}</ul>` : `<p class="muted" style="margin:0">Nothing on the calendar today.</p>`) : `<p class="muted" style="margin:0">Connect Google Calendar (Connect Gmail) to see today here.</p>`}
+          ${(d.schedule = (d.schedule || []).filter((e) => !isHiddenEv(e))) && ""}${d.calendarConnected ? (d.schedule.length ? `<ul class="items">${d.schedule.map((e) => `<li><span class="sw" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${esc(e.color || "#7aa7ff")}"></span> <b>${e.allDay ? "All day" : hm(e.start)}</b> ${esc(e.title)}${e.location ? `<div class="small muted">${esc(e.location)}</div>` : ""}${d.travel?.[e.id] ? `<div class="small ${d.travel[e.id].late ? "" : "muted"}">${d.travel[e.id].late ? `<span style="color:var(--bad)">⚠ ${d.travel[e.id].late} min short from ${esc(d.travel[e.id].fromLabel)}</span>` : `🚗 Leave by <b>${hm(d.travel[e.id].leaveBy)}</b> · ${d.travel[e.id].minutes} min from ${esc(d.travel[e.id].fromLabel)}`} · <a href="${esc(d.travel[e.id].mapsUrl)}" target="_blank" rel="noopener">Directions</a></div>` : ""}${e.jobNumber ? ` <a href="#" class="small" data-do="open" data-n="${e.jobNumber}">#${e.jobNumber}</a>` : ""}</li>`).join("")}</ul>` : `<p class="muted" style="margin:0">Nothing on the calendar today.</p>`) : `<p class="muted" style="margin:0">Connect Google Calendar (Connect Gmail) to see today here.</p>`}
           ${d.tasksDue?.length ? `<div class="small muted" style="margin:12px 0 4px">Tasks due</div>${d.tasksDue.map((k) => `<div class="row" style="gap:6px;padding:3px 0"><button class="btn small" data-do="taskdone" data-list="${esc(k.listId)}" data-task="${esc(k.id)}" title="Mark done">☐</button><span style="flex:1;min-width:0">${esc(k.title)}</span>${k.due < ymd(new Date()) ? `<span class="small" style="color:var(--bad)">${fmtDate(k.due + "T12:00")}</span>` : ""}</div>`).join("")}` : ""}
         </div>
         <div class="card"><h3><span><span class="muted small" style="font-variant-numeric:tabular-nums">01</span> Stages</span></h3>
@@ -1618,6 +1619,8 @@ async function renderCal() {
       showTasks && taskLists.length ? api(`/api/tasks?${new URLSearchParams({ start: ymd(start), end: ymd(new Date(end.getTime() - 864e5)), completed: "1" })}`) : [],
     ]);
   } catch (e) { $("#cal-body").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  calEvents = calEvents.filter((e) => !isHiddenEv(e));
+  renderHiddenList();
   const draw = () => (calView === "month" ? renderMonth(start) : renderWeek(start, calView === "day" ? 1 : 7));
   draw();
   // Drive times arrive a moment later (each new address is looked up once, then kept).
@@ -1627,6 +1630,17 @@ async function renderCal() {
   }
 }
 let calLegs = {}, calWhy = {}, calLegsKey = "", travelKind = "";
+// Events hidden on this screen only (e.g. a repeating Desk day that's there for other people): the whole series,
+// or every event with that title on that calendar. Google Calendar and everyone else still see them.
+const hideKey = (e) => (e.recurringId ? `r:${e.recurringId}` : `t:${e.calendarId}|${(e.title || "").trim().toLowerCase()}`);
+const hiddenEvs = () => store.get("calHidden", []);
+const isHiddenEv = (e) => hiddenEvs().some((h) => h.key === hideKey(e) || (h.title && h.cal === e.calendarId && h.title === (e.title || "").trim().toLowerCase()));
+function hideEv(e) { const l = hiddenEvs().filter((h) => h.key !== hideKey(e)); l.push({ key: hideKey(e), title: (e.title || "").trim().toLowerCase(), label: e.title, cal: e.calendarId }); store.set("calHidden", l); }
+function renderHiddenList() {
+  const l = hiddenEvs(), el = $("#cal-hidden"); if (!el) return;
+  el.hidden = !l.length;
+  el.innerHTML = `<div class="small muted" style="margin-bottom:6px">Hidden on your screen</div>${l.map((h, i) => `<div class="row" style="gap:6px;font-size:13px"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Others still see it on your calendar">${esc(h.label)}</span><button class="btn small" type="button" data-unhide="${i}">Show</button></div>`).join("")}`;
+}
 const legLabel = (g) => `${g.minutes} min drive`;
 function legLine(g) {
   if (!g) return "";
@@ -1688,6 +1702,9 @@ $("#cal-body").addEventListener("click", async (e) => {
 });
 
 // ---- event dialog
+let evOpen = null;
+$("#ev-hide").addEventListener("click", () => { if (!evOpen) return; hideEv(evOpen); $("#evdlg").close("cancel"); renderCal(); if (store.get("tab", "today") === "today") loadToday(); log(`Hid “${evOpen.title}” on your screen. Others still see it. Calendar > Hidden on your screen > Show brings it back.`); });
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-unhide]"); if (!b) return; const l = hiddenEvs(); l.splice(Number(b.dataset.unhide), 1); store.set("calHidden", l); renderCal(); });
 function openEvent(o) {
   const editing = !!o.id;
   $("#ev-h").textContent = editing ? "Edit event" : "New event";
@@ -1701,6 +1718,8 @@ function openEvent(o) {
   if (o.calendarId) $("#ev-cal").value = o.calendarId;
   $("#ev-cal").disabled = editing;
   $("#ev-del").hidden = !editing;
+  $("#ev-hide").hidden = !editing; $("#ev-hide").textContent = o.recurringId ? "Hide this series on my screen" : "Hide on my screen";
+  evOpen = o;
   $("#ev-meta").innerHTML = editing ? [o.meet ? `<a href="${esc(o.meet)}" target="_blank" rel="noopener">Join Meet</a>` : "", o.link ? `<a href="${esc(o.link)}" target="_blank" rel="noopener">Open in Google Calendar</a>` : "", o.jobNumber ? `<a href="#" data-do="open" data-n="${o.jobNumber}">Open job #${o.jobNumber}</a>` : ""].filter(Boolean).join(" · ") : "";
   const g = o.id ? calLegs[o.id] : null;
   const loc = (o.location || "").trim();
