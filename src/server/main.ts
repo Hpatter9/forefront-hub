@@ -280,7 +280,7 @@ const server = http.createServer(async (req, res) => {
         byStage,
         proposals: proposals.slice(0, 12),
         schedule,
-        travel: await import("../workflows/travel.js").then((t) => t.travelFor(hub, schedule)).catch(() => ({})),
+        travel: await import("../workflows/travel.js").then(async (t) => t.travelFor(hub, schedule, { calendars: await myCalendars() })).catch(() => ({})),
         tasksDue,
         tasksConnected: hub.tasks.connected(),
         calendarConnected: hub.calendar.connected(),
@@ -471,7 +471,7 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/cal/travel") {
       const { travelFor } = await import("../workflows/travel.js");
       const ev = await hub.calendar.events({ start: q("start"), end: q("end") });
-      return send(res, 200, { kind: hub.travel.kind, start: cfg.travel.start, legs: await travelFor(hub, ev) });
+      return send(res, 200, { kind: hub.travel.kind, start: cfg.travel.start, legs: await travelFor(hub, ev, { calendars: await myCalendars() }) });
     }
     if (p === "/api/cal/events" && req.method === "GET") {
       const ids = q("cals") ? q("cals").split(",") : undefined;
@@ -753,11 +753,17 @@ async function travelNote(): Promise<string> {
     d0.setHours(0, 0, 0, 0);
     d1.setHours(24, 0, 0, 0);
     const ev = await hub.calendar.events({ start: d0.toISOString(), end: d1.toISOString() });
-    const legs = await (await import("../workflows/travel.js")).travelFor(hub, ev);
+    const legs = await (await import("../workflows/travel.js")).travelFor(hub, ev, { calendars: await myCalendars() });
     const hm = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Denver" });
-    const lines = ev.filter((e) => legs[e.id]).map((e) => { const g = legs[e.id]; return `- ${hm(e.start)} ${e.title} at ${e.location}: ${g.minutes} min drive from ${g.fromLabel}${g.rush ? " (rush hour)" : ""}, leave by ${hm(g.leaveBy)}${g.late ? `; ${g.late} min short coming straight from ${g.fromLabel}` : ""}`; });
+    const lines = ev.filter((e) => legs[e.id]).map((e) => { const g = legs[e.id]; return `- ${hm(e.start)} ${e.title} at ${g.to}: ${g.minutes} min drive from ${g.fromLabel}${g.rush ? " (rush hour)" : ""}, leave by ${hm(g.leaveBy)}${g.late ? `; ${g.late} min short coming straight from ${g.fromLabel}` : ""}`; });
     return lines.length ? `\n\nDrive times for today's appointments (already worked out; use them, and put the leave-by time on each calendar line of the brief; call out any that are short):\n${lines.join("\n")}` : "";
   } catch {
     return "";
   }
+}
+
+/** Your own calendar (not shared team calendars): the one drive times are worked out for. */
+async function myCalendars(): Promise<Set<string>> {
+  const cals = await hub.calendar.calendars().catch(() => []);
+  return new Set(["primary", ...cals.filter((c) => c.primary).map((c) => c.id)]);
 }
