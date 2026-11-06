@@ -408,8 +408,18 @@
   .askbar { padding: 10px 28px 12px; border-top: 1px solid var(--line); display: grid; gap: 6px; }
   .askbar form { display: flex; gap: 8px; }
   .askbar textarea { min-height: 40px; max-height: 140px; resize: none; }
-  .console { max-height: 22vh; overflow: auto; font: 12px/1.5 var(--mono); white-space: pre-wrap; color: var(--muted); }
-  .console:empty { display: none; }
+  .console { height: var(--con-h, 150px); overflow: auto; font: 12px/1.5 var(--mono); white-space: pre-wrap; color: var(--muted); }
+  .conwrap { position: relative; display: grid; gap: 4px; }
+  .conwrap[hidden] { display: none; }
+  .congrip { position: absolute; left: 0; right: 0; top: -9px; height: 10px; cursor: row-resize; }
+  .congrip::after { content: ""; position: absolute; left: 50%; top: 3px; width: 44px; height: 4px; margin-left: -22px; border-radius: 2px; background: var(--line); }
+  .congrip:hover::after, .congrip.drag::after { background: var(--link); }
+  .conhead { display: flex; gap: 10px; align-items: center; font-size: 12px; color: var(--muted); min-width: 0; }
+  .conhead button { background: none; border: 0; color: var(--muted); cursor: pointer; padding: 2px 4px; font: inherit; border-radius: 4px; white-space: nowrap; }
+  .conhead button:hover { color: var(--ink); background: var(--soft); }
+  .conlast { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); }
+  .conwrap.open .conlast { visibility: hidden; }
+  .conwrap:not(.open) .console, .conwrap:not(.open) .congrip { display: none; }
   .console .t-run { color: var(--link); } .console .t-ok { color: var(--ok); } .console .t-err { color: var(--bad); }
   .attached { display: flex; gap: 6px; flex-wrap: wrap; }
 
@@ -724,7 +734,11 @@
     </form>
     <div class="attached small" id="attached"></div>
     <input type="file" id="filepick" multiple hidden>
-    <div class="console" id="console"></div>
+    <div class="conwrap" id="conwrap" hidden>
+      <div class="congrip" id="congrip" title="Drag to make Claude's activity taller or shorter"></div>
+      <div class="conhead"><button type="button" id="contoggle" title="Show or hide Claude's activity"></button><span class="conlast" id="conlast"></span><button type="button" id="conclear" title="Clear the activity log">Clear</button></div>
+      <div class="console" id="console"></div>
+    </div>
   </footer>
   </div>
 </div>
@@ -829,7 +843,28 @@ async function api(path, opts = {}) {
   if (!r.ok) throw new Error(j.error || r.statusText);
   return j;
 }
-function log(text, cls = "") { const c = $("#console"); const d = document.createElement("div"); if (cls) d.className = cls; d.textContent = text; c.appendChild(d); c.scrollTop = c.scrollHeight; }
+function log(text, cls = "") {
+  const c = $("#console"); const d = document.createElement("div"); if (cls) d.className = cls; d.textContent = text; c.appendChild(d); c.scrollTop = c.scrollHeight;
+  while (c.childElementCount > 500) c.firstElementChild.remove();
+  $("#conwrap").hidden = false; const last = $("#conlast"); last.textContent = text; last.className = "conlast " + cls;
+}
+// Claude's activity box: fold it to one line, drag its top edge to resize, or clear it (remembered).
+function conApply() {
+  const open = store.get("conOpen", true), w = $("#conwrap");
+  w.classList.toggle("open", open);
+  $("#contoggle").textContent = (open ? "▾" : "▸") + " Claude's activity";
+  w.style.setProperty("--con-h", store.get("conH", 150) + "px");
+}
+$("#contoggle").addEventListener("click", () => { store.set("conOpen", !store.get("conOpen", true)); conApply(); $("#console").scrollTop = $("#console").scrollHeight; });
+$("#conclear").addEventListener("click", () => { $("#console").innerHTML = ""; $("#conwrap").hidden = true; });
+$("#congrip").addEventListener("pointerdown", (e) => {
+  e.preventDefault(); const g = e.currentTarget; g.setPointerCapture(e.pointerId); g.classList.add("drag");
+  const y0 = e.clientY, h0 = $("#console").getBoundingClientRect().height;
+  const move = (ev) => { const h = Math.round(Math.max(40, Math.min(window.innerHeight * 0.7, h0 + (y0 - ev.clientY)))); $("#conwrap").style.setProperty("--con-h", h + "px"); g.dataset.h = h; };
+  g.addEventListener("pointermove", move);
+  g.addEventListener("pointerup", () => { g.removeEventListener("pointermove", move); g.classList.remove("drag"); if (g.dataset.h) { if (Number(g.dataset.h) < 60) { store.set("conOpen", false); } else store.set("conH", Number(g.dataset.h)); delete g.dataset.h; conApply(); } }, { once: true });
+});
+conApply();
 
 // ============================================================= tabs
 function showTab(t) {
