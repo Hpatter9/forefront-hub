@@ -147,7 +147,10 @@ export class Studio {
     this.live.set(job, q);
     this.emit({ kind: "state", job, running: true });
     try {
-      for await (const m of q) this.handle(job, s, m, add);
+      const { withDraftSource } = await import("../workflows/generated.js");
+      await withDraftSource("Estimator", async () => {
+        for await (const m of q) this.handle(job, s, m, add);
+      });
     } catch (e) {
       add("error", (e as Error).message);
     } finally {

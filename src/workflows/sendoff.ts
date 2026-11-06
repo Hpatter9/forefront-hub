@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { createGeneratedDraft } from "./generated.js";
 import path from "node:path";
 import { intakeAddress } from "../connectors/homebase/types.js";
 import type { SendoffDraft } from "../core/job.js";
@@ -104,7 +105,7 @@ export async function sendoff(hub: Hub, jobNumber: number, o: SendoffOptions): P
       attachments: p.attachments.map((a) => path.basename(a)),
       priceList: est.price_list,
     });
-    const ref = await hub.gmail.createDraft({ to: [p.to], cc: o.cc, bcc: [bcc], subject, body, attachments: p.attachments });
+    const ref = await createGeneratedDraft(hub, { to: [p.to], cc: o.cc, bcc: [bcc], subject, body, attachments: p.attachments }, { jobNumber, source: "Send-off" });
     const d: SendoffDraft = { id: ref.id, kind: p.kind, to: [p.to], subject, messageId: ref.messageId, attachments: p.attachments.map((a) => path.basename(a)), createdAt: new Date().toISOString() };
     drafts.push(d);
     writeFileSync(hub.jobs.path(jobNumber, "email", `${d.createdAt.slice(0, 10)}-${p.kind}.txt`), `To: ${p.to}\nBcc: ${bcc}\nSubject: ${subject}\nAttachments: ${d.attachments.join(", ")}\n\n${body}\n`);

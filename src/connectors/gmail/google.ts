@@ -58,6 +58,15 @@ export class GoogleGmail implements MailClient {
       userId: "me",
       requestBody: { message: { raw, threadId: d.threadId } },
     });
+    // Label just this draft message (not the whole thread), so it shows under the label in Gmail too.
+    if (d.labels?.length && data.message?.id) {
+      try {
+        const ids = await Promise.all(d.labels.map((l) => this.ensureLabel(l)));
+        await this.gmail().users.messages.modify({ userId: "me", id: data.message.id, requestBody: { addLabelIds: ids } });
+      } catch {
+        // A label is a nice-to-have; the draft is made either way.
+      }
+    }
     return { id: data.id!, messageId, threadId: data.message?.threadId ?? undefined };
   }
 

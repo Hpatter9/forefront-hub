@@ -14,6 +14,8 @@ export interface DraftInput {
   /** Put the draft in an existing thread (a reply). */
   threadId?: string;
   inReplyTo?: string;
+  /** Gmail labels to put on the draft (created if missing), e.g. "Claude drafts". */
+  labels?: string[];
 }
 
 export interface DraftRef {

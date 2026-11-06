@@ -468,6 +468,14 @@ const server = http.createServer(async (req, res) => {
     }
     // ---- calendar
     if (p === "/api/cal/calendars") return send(res, 200, await hub.calendar.calendars());
+    if (p === "/api/mail/generated") {
+      // The Gmail tab's "Claude drafts" folder: drafts the hub made, shaped like the thread list.
+      const { openGeneratedDrafts } = await import("../workflows/generated.js");
+      const list = await openGeneratedDrafts(hub);
+      const qq = q("q").toLowerCase();
+      const rows = list.filter((g) => !qq || `${g.subject} ${g.to.join(" ")} ${g.snippet} ${g.jobNumber ?? ""}`.toLowerCase().includes(qq));
+      return send(res, 200, { threads: rows.map((g) => ({ id: g.threadId ?? g.draftId, draftId: g.draftId, from: `To: ${g.to.join(", ")}`, to: g.to, subject: g.subject, snippet: g.snippet, date: g.createdAt, unread: false, starred: false, messageCount: 1, labelIds: ["DRAFT"], hasAttachments: g.attachments > 0, generated: { source: g.source, jobNumber: g.jobNumber } })), count: list.length });
+    }
     if (p === "/api/travel/drive") {
       // A drive time on request, for any address: from the office unless another start is given.
       const to = q("to"), from = q("from") || cfg.travel.start;
@@ -709,12 +717,14 @@ function startPlan(trigger: "button" | "morning"): { taskId: string } | { error:
   return task(trigger === "morning" ? "Morning brief" : "Plan my day", undefined, async () => {
     const { describeTool } = await import("../agent/studio.js");
     try {
-      plan.text = await (await import("../agent/run.js")).ask(hub, prompt + (await travelNote()), {
+      const { withDraftSource } = await import("../workflows/generated.js");
+      const note = await travelNote();
+      plan.text = await withDraftSource(trigger === "morning" ? "Morning brief" : "Plan my day", async () => (await import("../agent/run.js")).ask(hub, prompt + note, {
         onMessage: (m) => {
           if (m.type !== "assistant") return;
           for (const b of m.message.content) if (b.type === "tool_use") { plan.steps.push(describeTool(b.name, b.input as Record<string, unknown>)); savePlan(plan); bus.emit({ type: "changed", what: "plan" }); }
         },
-      });
+      }));
       plan.state = "done";
     } catch (e) {
       plan.state = "error";

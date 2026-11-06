@@ -1,4 +1,5 @@
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
+import { createGeneratedDraft } from "../workflows/generated.js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
@@ -141,7 +142,7 @@ export function hubTools(hub: Hub) {
         const files = a.attachments.map((f) => (path.isAbsolute(f) || !a.jobNumber ? f : hub.jobs.path(a.jobNumber, f)));
         let inReplyTo: string | undefined;
         if (a.threadId) inReplyTo = (await hub.gmail.getThread(a.threadId).catch(() => null))?.messages.at(-1)?.messageIdHeader;
-        const ref = await hub.gmail.createDraft({ to: a.to, cc: a.cc, bcc, subject: a.subject, body: a.body, attachments: files, threadId: a.threadId, inReplyTo });
+        const ref = await createGeneratedDraft(hub, { to: a.to, cc: a.cc, bcc, subject: a.subject, body: a.body, attachments: files, threadId: a.threadId, inReplyTo }, { jobNumber: a.jobNumber });
         if (a.jobNumber && hub.jobs.exists(a.jobNumber)) hub.jobs.log(a.jobNumber, `Draft "${a.subject}" to ${a.to.join(", ")}`);
         if (a.jobNumber && hub.jobs.exists(a.jobNumber) && a.kind !== "other") {
           const j = hub.jobs.get(a.jobNumber);

@@ -595,6 +595,10 @@
   .drive.late { border-color: var(--bad); color: var(--bad); background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--bad) 18%, transparent) 0 6px, transparent 6px 12px); }
   .evdrive { opacity: .85; font-size: 10.5px; }
   .evtravel { display: block; margin-top: 6px; color: var(--muted); font-weight: 400; }
+
+  .gm-lab.gen .ms { color: var(--g-blue); }
+  .gm-lab b.gc { background: var(--g-chip); color: var(--g-tx); }
+  .gr .gsrc { font-size: 11px; font-weight: 600; color: var(--g-blue); border: 1px solid color-mix(in srgb, var(--g-blue) 45%, transparent); border-radius: 4px; padding: 0 5px; margin-right: 6px; }
 </style>
 </head>
 <body>
@@ -1319,9 +1323,9 @@ $("#logdlg").addEventListener("close", async () => {
 });
 
 // ============================================================= MAIL (Gmail-style)
-let mailLoaded = false, mailLabel = store.get("mlabel", "INBOX"), mailCat = store.get("mcat", "primary"), mailThread = null;
+let genCount = 0, mailLoaded = false, mailLabel = store.get("mlabel", "INBOX"), mailCat = store.get("mcat", "primary"), mailThread = null;
 let mailPages = [null], mailPage = 0, mailNext = null, mailRows = [], mailSel = new Set(), threadView = null;
-const GLABELS = [["INBOX", "Inbox", "inbox"], ["STARRED", "Starred", "star"], ["SENT", "Sent", "send"], ["DRAFT", "Drafts", "draft"], ["IMPORTANT", "Important", "label_important"], ["SPAM", "Spam", "report"], ["TRASH", "Trash", "delete"]];
+const GLABELS = [["INBOX", "Inbox", "inbox"], ["STARRED", "Starred", "star"], ["SENT", "Sent", "send"], ["DRAFT", "Drafts", "draft"], ["HUB_DRAFTS", "Claude drafts", "auto_awesome"], ["IMPORTANT", "Important", "label_important"], ["SPAM", "Spam", "report"], ["TRASH", "Trash", "delete"]];
 const GCATS = [["primary", "Primary", "inbox"], ["promotions", "Promotions", "sell"], ["social", "Social", "group"], ["updates", "Updates", "info"]];
 const AVC = ["#e8710a", "#1a73e8", "#d93025", "#188038", "#9334e6", "#e52592", "#12b5cb", "#f9ab00", "#5f6368"];
 const nameOf = (from) => (from || "").replace(/<.*>/, "").replace(/"/g, "").trim() || (from || "").replace(/[<>]/g, "");
@@ -1332,12 +1336,13 @@ const msI = (n, fill) => `<span class="ms${fill ? " fill" : ""}">${n}</span>`;
 
 async function loadMail() {
   mailLoaded = true;
-  const labels = await api("/api/mail/labels").catch(() => []);
+  const [labels, gen] = await Promise.all([api("/api/mail/labels").catch(() => []), api("/api/mail/generated").catch(() => null)]);
+  if (gen) genCount = gen.count;
   const user = labels.filter((l) => l.type === "user").sort((a, b) => a.name.localeCompare(b.name));
   const inbox = labels.find((l) => l.id === "INBOX");
   $("#mailcount").textContent = inbox?.unread || ""; $("#mailcount").hidden = !inbox?.unread;
   $("#labels").innerHTML = `<button class="gm-compose" id="compose" type="button">${msI("edit")}<span class="nm">Compose</span></button>` +
-    GLABELS.filter(([id]) => labels.some((l) => l.id === id) || ["INBOX", "STARRED", "SENT", "DRAFT"].includes(id)).map(([id, nm, ic]) => `<button class="gm-lab ${id === mailLabel ? "on" : ""}" data-label="${id}" type="button">${msI(ic, id === mailLabel)}<span class="nm">${nm}</span>${id === "INBOX" && inbox?.unread ? `<b>${inbox.unread}</b>` : ""}</button>`).join("") +
+    GLABELS.filter(([id]) => labels.some((l) => l.id === id) || ["INBOX", "STARRED", "SENT", "DRAFT", "HUB_DRAFTS"].includes(id)).map(([id, nm, ic]) => `<button class="gm-lab ${id === mailLabel ? "on" : ""} ${id === "HUB_DRAFTS" ? "gen" : ""}" data-label="${id}" type="button" ${id === "HUB_DRAFTS" ? 'title="Drafts Claude and the hub made for you. Review, then send."' : ""}>${msI(ic, id === mailLabel)}<span class="nm">${nm}</span>${id === "INBOX" && inbox?.unread ? `<b>${inbox.unread}</b>` : id === "HUB_DRAFTS" && genCount ? `<b class="gc">${genCount}</b>` : ""}</button>`).join("") +
     (user.length ? `<div class="gm-labh">Labels</div>` + user.map((l) => `<button class="gm-lab ${l.id === mailLabel ? "on" : ""}" data-label="${esc(l.id)}" type="button">${msI("label")}<span class="nm">${esc(l.name)}</span></button>`).join("") : "");
   if (typeof zgrips === "function") zgrips(); // the folder list was redrawn: put its resize edge back
   $("#compose").addEventListener("click", () => openCompose({}));
@@ -1375,7 +1380,7 @@ $("#gm-bar").addEventListener("click", async (e) => {
   await Promise.all(ids.map((id) => api(`/api/mail/threads/${id}/modify`, { method: "POST", body: change }).catch(() => {})));
   mailSel = new Set(); loadThreads(); loadMailCounts();
 });
-async function loadMailCounts() { const labels = await api("/api/mail/labels").catch(() => []); const inbox = labels.find((l) => l.id === "INBOX"); $("#mailcount").textContent = inbox?.unread || ""; $("#mailcount").hidden = !inbox?.unread; const b = $('#labels [data-label="INBOX"] b'); if (b) b.textContent = inbox?.unread || ""; }
+async function loadMailCounts() { const labels = await api("/api/mail/labels").catch(() => []); const inbox = labels.find((l) => l.id === "INBOX"); $("#mailcount").textContent = inbox?.unread || ""; $("#mailcount").hidden = !inbox?.unread; const b = $('#labels [data-label="INBOX"] b'); if (b) b.textContent = inbox?.unread || ""; const gen = await api("/api/mail/generated").catch(() => null); if (gen) { genCount = gen.count; const lab = $('#labels [data-label="HUB_DRAFTS"]'); if (lab) { lab.querySelector("b")?.remove(); if (genCount) lab.insertAdjacentHTML("beforeend", `<b class="gc">${genCount}</b>`); } } }
 async function loadThreads() {
   const q = $("#mq").value.trim();
   const inboxTabs = !q && mailLabel === "INBOX";
@@ -1387,20 +1392,21 @@ async function loadThreads() {
   const catQ = mailCat === "primary" ? "-category:promotions -category:social -category:updates -category:forums" : `category:${mailCat}`;
   const params = q ? { q } : inboxTabs ? { label: "INBOX", q: catQ } : { label: mailLabel };
   const tok = mailPages[mailPage];
+  const genView = mailLabel === "HUB_DRAFTS" && !q;
   let r;
-  try { r = await api(`/api/mail/threads?${new URLSearchParams({ ...params, ...(tok ? { page: tok } : {}) })}`); } catch (e) { $("#threads").innerHTML = `<div class="gm-empty">${esc(e.message)}</div>`; return; }
+  try { r = genView ? await api("/api/mail/generated") : await api(`/api/mail/threads?${new URLSearchParams({ ...params, ...(tok ? { page: tok } : {}) })}`); if (genView) { genCount = r.count; } } catch (e) { $("#threads").innerHTML = `<div class="gm-empty">${esc(e.message)}</div>`; return; }
   mailRows = r.threads; mailNext = r.nextPageToken || null;
   if (inboxTabs) { const n = mailRows.filter((t) => t.unread).length, on = $("#gm-cats .gm-cat.on"); if (on && n) on.insertAdjacentHTML("beforeend", `<span class="newc">${n} new</span>`); }
   mailSel = new Set([...mailSel].filter((id) => mailRows.some((t) => t.id === id)));
-  const sentView = mailLabel === "SENT" && !q, draftView = mailLabel === "DRAFT" && !q;
+  const sentView = mailLabel === "SENT" && !q, draftView = (mailLabel === "DRAFT" || mailLabel === "HUB_DRAFTS") && !q;
   $("#threads").innerHTML = mailRows.map((t) => `<div class="gr ${t.unread ? "unread" : ""} ${mailSel.has(t.id) ? "sel" : ""}" data-t="${esc(t.id)}">
       <input type="checkbox" class="gm-cb" ${mailSel.has(t.id) ? "checked" : ""} aria-label="Select">
       <button class="star ${t.starred ? "on" : ""}" type="button" title="${t.starred ? "Starred" : "Not starred"}">${msI("star", t.starred)}</button>
-      <div class="who">${draftView ? `<span style="color:#f28b82">Draft</span>` : esc(sentView ? "Me" : nameOf(t.from))}${t.messageCount > 1 ? ` <small>${t.messageCount}</small>` : ""}</div>
-      <div class="ln">${(t.labelIds || []).includes("IMPORTANT") && mailLabel !== "IMPORTANT" ? "" : ""}<span class="sj">${esc(t.subject || "(no subject)")}</span><span class="sn"> - ${esc(t.snippet)}</span></div>
+      <div class="who">${t.generated ? `<span class="gsrc">${esc(t.generated.source)}</span>${esc(t.to?.map(nameOf).join(", ") || "")}` : draftView ? `<span style="color:#f28b82">Draft</span>` : esc(sentView ? "Me" : nameOf(t.from))}${t.messageCount > 1 ? ` <small>${t.messageCount}</small>` : ""}</div>
+      <div class="ln">${(t.labelIds || []).includes("IMPORTANT") && mailLabel !== "IMPORTANT" ? "" : ""}${t.generated?.jobNumber ? `<span class="chip">#${t.generated.jobNumber}</span>` : ""}<span class="sj">${esc(t.subject || "(no subject)")}</span><span class="sn"> - ${esc(t.snippet)}</span></div>
       <div class="dt">${t.hasAttachments ? `<span class="ms" style="font-size:16px;vertical-align:-3px;margin-right:6px">attach_file</span>` : ""}${gDate(t.date)}</div>
       <div class="acts"><button class="gm-ib" data-act1="archive" title="Archive">${msI("archive")}</button><button class="gm-ib" data-act1="trash" title="Delete">${msI("delete")}</button><button class="gm-ib" data-act1="${t.unread ? "read" : "unread"}" title="${t.unread ? "Mark as read" : "Mark as unread"}">${msI(t.unread ? "drafts" : "mark_email_unread")}</button></div>
-    </div>`).join("") || `<div class="gm-empty">${q ? "No messages matched your search." : mailLabel === "INBOX" ? "Your inbox is empty." : "No conversations here."}</div>`;
+    </div>`).join("") || `<div class="gm-empty">${q ? "No messages matched your search." : mailLabel === "INBOX" ? "Your inbox is empty." : genView ? "No drafts from Claude waiting. Drafts Claude makes for you (replies, Plan my day, send-offs) collect here until you send them." : "No conversations here."}</div>`;
   renderMailBar();
 }
 $("#gm-cats").addEventListener("click", (e) => { const b = e.target.closest("[data-cat]"); if (!b) return; mailCat = b.dataset.cat; store.set("mcat", mailCat); mailPages = [null]; mailPage = 0; loadThreads(); });
