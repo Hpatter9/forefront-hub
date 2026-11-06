@@ -50,6 +50,6 @@ export async function syncAll(hub: Hub, opts: { mine?: boolean; concurrency?: nu
       }
     }
   };
-  await Promise.all(Array.from({ length: opts.concurrency ?? 4 }, worker));
+  await Promise.all(Array.from({ length: opts.concurrency ?? 3 }, worker));
   return out;
 }

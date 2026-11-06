@@ -77,8 +77,9 @@ export const JobSchema = z.object({
       waiting: z.object({ from: z.string(), subject: z.string(), at: z.string(), threadId: z.string().default("") }).nullable().default(null),
       proposalAmount: z.number().nullable().default(null),
       checkedAt: z.string().default(""),
+      gmailCheckedAt: z.string().default(""),
     })
-    .default({ lastTouchAt: "", lastTouch: "", waiting: null, proposalAmount: null, checkedAt: "" }),
+    .default({ lastTouchAt: "", lastTouch: "", waiting: null, proposalAmount: null, checkedAt: "", gmailCheckedAt: "" }),
 });
 
 export type Job = z.infer<typeof JobSchema>;

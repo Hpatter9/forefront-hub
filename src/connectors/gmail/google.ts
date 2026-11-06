@@ -26,10 +26,18 @@ export class GoogleGmail implements MailClient {
     await this.auth.login();
   }
 
+  /**
+   * Every Gmail request goes through a pacer and a retry: Google allows a limited number of quota units per user
+   * per minute (and per second), and the hub's background checks plus the Gmail tab can add up. Calls wait their
+   * turn instead of failing, and a "slow down" answer is retried after a pause.
+   */
   private gmail(): gmail_v1.Gmail {
-    this.api ??= google.gmail({ version: "v1", auth: this.auth.client() });
+    this.api ??= throttled(google.gmail({ version: "v1", auth: this.auth.client() }));
     return this.api;
   }
+
+  private summaries = new Map<string, { historyId: string; s: ThreadSummary }>();
+  private full = new Map<string, { historyId: string; t: { id: string; messages: Message[] } }>();
 
   /** Hunter's Gmail signature and display name, so drafts look exactly like the ones he types. */
   private async sendAs() {
@@ -80,7 +88,16 @@ export class GoogleGmail implements MailClient {
       pageToken: o.pageToken,
       maxResults: o.max ?? 30,
     });
-    const threads = await Promise.all((data.threads ?? []).map((t) => this.summary(t.id!)));
+    // A thread whose historyId hasn't moved hasn't changed: reuse the summary instead of fetching it again.
+    const threads = await Promise.all(
+      (data.threads ?? []).map(async (t) => {
+        const hit = this.summaries.get(t.id!);
+        if (hit && hit.historyId === t.historyId) return hit.s;
+        const s = await this.summary(t.id!);
+        this.summaries.set(t.id!, { historyId: t.historyId ?? "", s: { ...s, historyId: t.historyId ?? undefined } });
+        return { ...s, historyId: t.historyId ?? undefined };
+      }),
+    );
     return { threads, nextPageToken: data.nextPageToken ?? undefined };
   }
 
@@ -154,7 +171,15 @@ export class GoogleGmail implements MailClient {
     return out;
   }
 
-  async getThread(id: string): Promise<{ id: string; messages: Message[] }> {
+  async getThread(id: string, historyId?: string): Promise<{ id: string; messages: Message[] }> {
+    const hit = this.full.get(id);
+    if (hit && historyId && hit.historyId === historyId) return hit.t;
+    const t = await this.fetchThread(id);
+    if (historyId) this.full.set(id, { historyId, t });
+    return t;
+  }
+
+  private async fetchThread(id: string): Promise<{ id: string; messages: Message[] }> {
     const { data } = await this.gmail().users.threads.get({ userId: "me", id, format: "full" });
     return { id, messages: (data.messages ?? []).map(toMessage) };
   }
@@ -204,3 +229,66 @@ function toMessage(m: gmail_v1.Schema$Message): Message {
   };
 }
 
+
+// ---------------------------------------------------------------- pacing Gmail requests
+
+/** Approximate Gmail quota units per method (Google's published costs). */
+function unitsFor(path: string): number {
+  if (/send$/.test(path)) return 100;
+  if (/attachments\.get$/.test(path)) return 5;
+  if (/threads\.(get|modify|trash)$/.test(path)) return 10;
+  if (/messages\.get$/.test(path)) return 5;
+  if (/drafts\.(create|get)$/.test(path)) return 10;
+  if (/\.list$/.test(path)) return 5;
+  return 5;
+}
+
+const spent: { at: number; units: number }[] = [];
+const PER_MINUTE = 9000; // well under Google's per-user minute limit
+const PER_SECOND = 200;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function budget(units: number) {
+  for (;;) {
+    const now = Date.now();
+    while (spent.length && now - spent[0].at > 60_000) spent.shift();
+    const minute = spent.reduce((t, x) => t + x.units, 0);
+    const second = spent.filter((x) => now - x.at < 1000).reduce((t, x) => t + x.units, 0);
+    if (minute + units <= PER_MINUTE && second + units <= PER_SECOND) {
+      spent.push({ at: now, units });
+      return;
+    }
+    await sleep(second + units > PER_SECOND ? 250 : 2000);
+  }
+}
+
+function isRateLimit(e: any) {
+  const status = e?.code ?? e?.status ?? e?.response?.status;
+  const msg = String(e?.message ?? "");
+  return status === 429 || (status === 403 && /rate ?limit|quota/i.test(msg)) || /quota exceeded|rate limit/i.test(msg);
+}
+
+async function paced<T>(path: string, f: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    await budget(unitsFor(path));
+    try {
+      return await f();
+    } catch (e) {
+      if (!isRateLimit(e) || attempt >= 5) throw e;
+      await sleep(Math.min(60_000, 3000 * 2 ** attempt) + Math.random() * 1000);
+    }
+  }
+}
+
+/** Wraps the Gmail client so every method call (users.threads.get, ...) is paced and retried. */
+function throttled<T extends object>(target: T, path = ""): T {
+  return new Proxy(target, {
+    get(obj, key, recv) {
+      const v = Reflect.get(obj, key, recv);
+      const p = path ? `${path}.${String(key)}` : String(key);
+      if (typeof v === "function") return (...args: unknown[]) => paced(p, () => v.apply(obj, args));
+      if (v && typeof v === "object" && /^(users|threads|messages|drafts|labels|attachments|settings|sendAs|history)$/.test(String(key))) return throttled(v as object, p);
+      return v;
+    },
+  });
+}

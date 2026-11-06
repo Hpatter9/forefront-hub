@@ -113,7 +113,7 @@ export async function autoFile(hub: Hub): Promise<{ filed: { jobNumber: number; 
   const me = hub.cfg.gmail.address.toLowerCase();
   const { threads } = await hub.gmail.listThreads({ q: "newer_than:3d -from:me -in:sent -in:chats", max: 40 });
   for (const th of threads) {
-    const t = await hub.gmail.getThread(th.id).catch(() => null);
+    const t = await hub.gmail.getThread(th.id, th.historyId).catch(() => null);
     for (const m of t?.messages ?? []) {
       if (s.filed[m.id] || s.unfiled.some((u) => u.messageId === m.id)) continue;
       if (new Date(m.date) < new Date(s.since!)) continue;

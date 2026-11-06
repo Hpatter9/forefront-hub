@@ -38,6 +38,8 @@ export interface ThreadSummary {
   starred?: boolean;
   labelIds?: string[];
   hasAttachments?: boolean;
+  /** Changes whenever the thread changes; used to skip refetching unchanged threads. */
+  historyId?: string;
 }
 
 export interface Message {
@@ -68,7 +70,8 @@ export interface MailClient {
   createDraft(d: DraftInput): Promise<DraftRef>;
   draftStatus(ref: DraftRef): Promise<DraftStatus>;
   search(q: string, max?: number): Promise<ThreadSummary[]>;
-  getThread(id: string): Promise<{ id: string; messages: Message[] }>;
+  /** With historyId (from a listing), an unchanged thread can come from cache. */
+  getThread(id: string, historyId?: string): Promise<{ id: string; messages: Message[] }>;
   saveAttachments(messageId: string, destDir: string, filter?: RegExp): Promise<string[]>;
 
   // ---- the Mail tab

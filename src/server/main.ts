@@ -205,6 +205,7 @@ const server = http.createServer(async (req, res) => {
         calendar: hub.calendar.kind,
         calendarConnected: hub.calendar.connected(),
         tasksConnected: hub.tasks.connected(),
+        emailTasks: (await import("../agent/emailTasks.js")).enabled(hub),
         agent: !!cfg.anthropicApiKey,
         me: cfg.homebase.me,
         jobsRoot: cfg.jobsRoot,
@@ -561,6 +562,11 @@ async function runInbox() {
       hub.say(`Filed "${f.subject}" to Homebase #${f.jobNumber}.`);
       bus.emit({ type: "changed", job: f.jobNumber, what: "timeline" });
     }
+    // Claude adds Google Tasks for what new emails ask of you.
+    const { tasksFromInbox } = await import("../agent/emailTasks.js");
+    const added = await tasksFromInbox(hub);
+    for (const t of added) hub.say(`New task from email: ${t.title}`);
+    if (added.length) bus.emit({ type: "changed", what: "calendar" });
   } catch (e) {
     console.error("auto-file:", e);
   } finally {

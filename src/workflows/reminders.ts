@@ -86,11 +86,16 @@ export async function pulse(hub: Hub, j: Job): Promise<Job["pulse"]> {
   }
 
   let waiting: Job["pulse"]["waiting"] = null;
-  if (hub.gmail.kind === "google") {
+  // Gmail is asked about each job at most once an hour (Google limits requests per minute); in between, the last
+  // answer stands.
+  const gmailFresh = j.pulse.gmailCheckedAt && Date.now() - Date.parse(j.pulse.gmailCheckedAt) < 60 * 60_000;
+  if (hub.gmail.kind === "google" && gmailFresh) {
+    waiting = j.pulse.waiting;
+  } else if (hub.gmail.kind === "google") {
     const people = [j.customer.email, j.adjuster.email].filter(Boolean);
     const street = j.address.split(",")[0];
     const q = [...people.map((p) => `from:${p}`), `"${intakeAddress(j.jobNumber)}"`, street ? `"${street}"` : ""].filter(Boolean).join(" OR ");
-    const threads = q ? await hub.gmail.search(`(${q}) newer_than:60d -from:me`, 8).catch(() => []) : [];
+    const threads = q ? await hub.gmail.search(`(${q}) newer_than:60d -from:me`, 5).catch(() => []) : [];
     for (const t of threads) {
       // search() summarises each thread by its newest message: if that one isn't from Hunter, it's waiting on him.
       const at = new Date(t.date).toISOString();
@@ -110,7 +115,9 @@ export async function pulse(hub: Hub, j: Job): Promise<Job["pulse"]> {
     if (after) waiting = null;
   }
   touches.sort((a, b) => b.at.localeCompare(a.at));
-  return { lastTouchAt: touches[0]?.at ?? "", lastTouch: touches[0]?.what ?? "", waiting, proposalAmount: detail?.proposalAmount ?? null, checkedAt: new Date().toISOString() };
+  const gmailCheckedAt = hub.gmail.kind === "google" && !gmailFresh ? new Date().toISOString() : j.pulse.gmailCheckedAt ?? "";
+  if (gmailFresh && j.pulse.lastTouchAt && (!touches[0] || j.pulse.lastTouchAt > touches[0].at)) touches.unshift({ at: j.pulse.lastTouchAt, what: j.pulse.lastTouch });
+  return { lastTouchAt: touches[0]?.at ?? "", lastTouch: touches[0]?.what ?? "", waiting, proposalAmount: detail?.proposalAmount ?? null, checkedAt: new Date().toISOString(), gmailCheckedAt };
 }
 
 /** System notices nobody answers: payment receipts, portals, no-reply senders. */
