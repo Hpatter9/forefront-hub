@@ -5,7 +5,7 @@ that uses the **forefront-estimate** skill for all estimating. This is phase 1: 
 comes next and uses the same code.
 
 ```
-npm run app                                the hub's screen at http://localhost:4317 (job list, job page, Ask Claude)
+npm run app                                the hub's screen at http://localhost:4317: Dashboard, Jobs, Gmail, Calendar (+ Google Tasks)
 hub jobs --mine                            my open recon jobs: stage, days in stage, proposal $, estimator
 hub pull 3226                              Homebase -> C:\Jobs\3226 Augustine\job.json, link CompanyCam + DocuSketch
 hub photos 3226                            CompanyCam photos -> photos\

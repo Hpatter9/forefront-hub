@@ -209,6 +209,40 @@
   .composebox { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 8px; }
   .composebox .hdr { display: grid; grid-template-columns: 56px 1fr; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
 
+  /* calendar */
+  .calwrap { display: grid; grid-template-columns: 210px minmax(0, 1fr); height: 100%; min-height: 0; }
+  .calside { border-right: 1px solid var(--line); padding: 14px 12px; overflow: auto; display: grid; gap: 14px; align-content: start; background: var(--panel); }
+  .calside label { display: flex; gap: 8px; align-items: center; font-size: 14px; cursor: pointer; }
+  .calside .sw { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+  .calmain { display: flex; flex-direction: column; min-height: 0; }
+  .caltool { display: flex; gap: 8px; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .caltool h2 { margin: 0 8px; font-size: 20px; font-weight: 500; flex: 1; min-width: 160px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button { border: 0; background: transparent; padding: 6px 12px; cursor: pointer; color: var(--muted); }
+  .seg button.active { background: var(--panel-2); color: var(--ink); font-weight: 600; }
+  .calbody { flex: 1; min-height: 0; overflow: auto; }
+  .wk { display: grid; grid-template-columns: 54px repeat(var(--days), minmax(0, 1fr)); min-width: 0; }
+  .wk .hd { position: sticky; top: 0; z-index: 3; background: var(--bg); border-bottom: 1px solid var(--line); padding: 6px 4px; text-align: center; font-size: 13px; color: var(--muted); }
+  .wk .hd b { display: block; font-size: 20px; font-weight: 500; color: var(--ink); }
+  .wk .hd.today b { background: var(--ink); color: var(--bg); border-radius: 999px; width: 34px; height: 34px; line-height: 34px; margin: 0 auto; }
+  .wk .allday { border-bottom: 1px solid var(--line); min-height: 24px; padding: 2px; display: grid; gap: 2px; align-content: start; }
+  .wk .gutter { position: relative; }
+  .wk .gutter span { position: absolute; right: 6px; font-size: 11px; color: var(--muted); transform: translateY(-6px); }
+  .wk .col { position: relative; border-left: 1px solid var(--line); cursor: copy; }
+  .wk .col .hr { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); opacity: .55; }
+  .wk .col .now { position: absolute; left: 0; right: 0; border-top: 2px solid var(--bad); z-index: 2; }
+  .ev { position: absolute; border-radius: 5px; padding: 2px 6px; font-size: 12px; line-height: 1.3; overflow: hidden; cursor: pointer; color: #0e1526; border: 1px solid var(--bg); z-index: 1; }
+  .ev b { font-weight: 600; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ev.chip { position: static; white-space: nowrap; text-overflow: ellipsis; }
+  .mo { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .mo .dn { text-align: center; font-size: 12px; color: var(--muted); padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .mo .cell { min-height: 108px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 4px; display: grid; gap: 2px; align-content: start; cursor: copy; min-width: 0; }
+  .mo .cell.out { opacity: .45; }
+  .mo .cell .d { font-size: 12px; color: var(--muted); }
+  .mo .cell.today .d { color: var(--bg); background: var(--ink); border-radius: 999px; width: 22px; text-align: center; }
+  .slots { display: grid; gap: 4px; }
+  @media (max-width: 860px) { .calwrap { grid-template-columns: 1fr; } .calside { display: none; } }
+
   /* bottom: ask Claude + console */
   .askbar { padding: 10px 28px 12px; border-top: 1px solid var(--line); display: grid; gap: 6px; }
   .askbar form { display: flex; gap: 8px; }
@@ -263,6 +297,7 @@
       <button data-tab="today" class="active">Dashboard <span class="count" id="todaycount" hidden></span></button>
       <button data-tab="jobs">Jobs</button>
       <button data-tab="mail">Gmail <span class="count" id="mailcount" hidden></span></button>
+      <button data-tab="cal">Calendar</button>
     </nav>
     <div class="navlabel" style="margin-top:auto">Where you were</div>
     <div class="recent" id="recent" style="margin-top:0"></div>
@@ -314,6 +349,25 @@
         <div class="list" id="threads"></div>
       </div>
       <div class="reader" id="reader"><div class="empty">Pick an email.</div></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-cal" hidden>
+    <div class="calwrap">
+      <div class="calside">
+        <button class="btn primary" id="cal-new" type="button">New event</button>
+        <div><div class="small muted" style="margin-bottom:6px">My calendars</div><div id="cal-list" style="display:grid;gap:6px"></div></div>
+        <div><div class="small muted" style="margin-bottom:6px">Free time (next 5 workdays)</div><div class="row" style="margin-bottom:6px"><select id="cal-dur" style="width:auto"><option value="30">30 min</option><option value="60" selected>1 hour</option><option value="120">2 hours</option></select><button class="btn small" id="cal-free" type="button">Find</button></div><div class="slots" id="cal-slots"></div></div>
+      </div>
+      <div class="calmain">
+        <div class="caltool">
+          <button class="btn small" id="cal-today" type="button">Today</button>
+          <button class="btn small" id="cal-prev" type="button" aria-label="Previous">‹</button><button class="btn small" id="cal-next" type="button" aria-label="Next">›</button>
+          <h2 id="cal-title"></h2>
+          <div class="seg" id="cal-view"><button data-v="day" type="button">Day</button><button data-v="week" type="button" class="active">Week</button><button data-v="month" type="button">Month</button></div>
+        </div>
+        <div class="calbody" id="cal-body"><div class="empty">Loading…</div></div>
+      </div>
     </div>
   </section>
 
@@ -372,6 +426,33 @@
 </div>
 <div class="dropzone" id="dropzone" hidden><div>Drop to add to <span id="dz-target">a job</span></div></div>
 
+<dialog id="evdlg"><form method="dialog" id="evform"><div class="in">
+  <h4 id="ev-h">New event</h4>
+  <input type="text" id="ev-title" placeholder="Title (e.g. Scope walk #3226 Augustine)">
+  <div class="fgrid">
+    <label>Date<input type="date" id="ev-date"></label>
+    <label>Start<input type="time" id="ev-start" step="900"></label>
+    <label>End<input type="time" id="ev-end" step="900"></label>
+    <label style="align-self:end"><span class="row"><input type="checkbox" id="ev-allday" style="width:auto"> All day</span></label>
+    <label>Job<select id="ev-job"><option value="">(none)</option></select></label>
+    <label>Calendar<select id="ev-cal"></select></label>
+    <label class="wide">Location<input type="text" id="ev-loc"></label>
+    <label class="wide">Notes<textarea id="ev-desc" rows="3"></textarea></label>
+    <label>Invite (emails, comma-separated)<input type="text" id="ev-att"></label>
+    <label>Reminder<select id="ev-rem"><option value="">Calendar default</option><option value="10">10 min before</option><option value="30">30 min before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></label>
+  </div>
+  <div class="small muted" id="ev-meta"></div>
+  <input type="hidden" id="ev-id"><input type="hidden" id="ev-calid">
+  </div><div class="foot"><button class="btn" value="delete" id="ev-del" style="margin-right:auto">Delete</button><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="save">Save</button></div></form></dialog>
+
+<dialog id="taskdlg"><form method="dialog"><div class="in">
+  <h4 id="tk-h">Task</h4>
+  <input type="text" id="tk-dtitle" placeholder="Task">
+  <div class="fgrid"><label>Due<input type="date" id="tk-ddue"></label><label>List<select id="tk-lists"></select></label><label style="align-self:end"><span class="row"><input type="checkbox" id="tk-done" style="width:auto"> Done</span></label><label class="wide">Notes<textarea id="tk-notes" rows="3"></textarea></label></div>
+  <div class="small muted" id="tk-meta"></div><span class="small muted">Saved straight to Google Tasks, so it's on your phone too.</span>
+  <input type="hidden" id="tk-id"><input type="hidden" id="tk-list">
+  </div><div class="foot"><button class="btn" value="delete" id="tk-del" style="margin-right:auto">Delete</button><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="save">Save</button></div></form></dialog>
+
 <dialog id="composedlg"><form method="dialog" id="composeform"><div class="in">
   <h4 id="cp-title">New email</h4>
   <div class="composebox" style="border:0;padding:0">
@@ -410,8 +491,9 @@ function log(text, cls = "") { const c = $("#console"); const d = document.creat
 function showTab(t) {
   store.set("tab", t);
   $$("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === t));
-  for (const v of ["today", "jobs", "mail"]) $("#v-" + v).hidden = v !== t;
-  setCrumbs(t === "jobs" && view ? `Jobs / <b>#${view.homebase.jobNumber}</b>` : `<b>${{ today: "Dashboard", jobs: "Jobs", mail: "Gmail" }[t]}</b>`);
+  for (const v of ["today", "jobs", "mail", "cal"]) $("#v-" + v).hidden = v !== t;
+  if (t === "cal") loadCal();
+  setCrumbs(t === "jobs" && view ? `Jobs / <b>#${view.homebase.jobNumber}</b>` : `<b>${{ today: "Dashboard", jobs: "Jobs", mail: "Gmail", cal: "Calendar" }[t]}</b>`);
   if (t === "today") loadToday();
   if (t === "mail" && !mailLoaded) loadMail();
 }
@@ -496,6 +578,10 @@ async function loadToday() {
         ${groups.map((g) => `<div class="group"><h3>${esc(g.label)} <span class="muted">${by[g.kind].length} · ${esc(g.hint)}</span></h3>${by[g.kind].map(remRow).join("")}</div>`).join("") || `<div class="alldone">${d.lastSync || d.folders ? "Nothing is waiting on you." : "The first sync is still running. This fills in when it finishes (about a minute)."}</div>`}
         </div></div>
       <div class="side">
+        <div class="card"><h3>Today <button class="btn small" data-do="gocal">Calendar</button></h3>
+          ${d.calendarConnected ? (d.schedule.length ? `<ul class="items">${d.schedule.map((e) => `<li><span class="sw" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${esc(e.color || "#7aa7ff")}"></span> <b>${e.allDay ? "All day" : hm(e.start)}</b> ${esc(e.title)}${e.location ? `<div class="small muted">${esc(e.location)}</div>` : ""}${e.jobNumber ? ` <a href="#" class="small" data-do="open" data-n="${e.jobNumber}">#${e.jobNumber}</a>` : ""}</li>`).join("")}</ul>` : `<p class="muted" style="margin:0">Nothing on the calendar today.</p>`) : `<p class="muted" style="margin:0">Connect Google Calendar (Connect Gmail) to see today here.</p>`}
+          ${d.tasksDue?.length ? `<div class="small muted" style="margin:12px 0 4px">Tasks due</div>${d.tasksDue.map((k) => `<div class="row" style="gap:6px;padding:3px 0"><button class="btn small" data-do="taskdone" data-list="${esc(k.listId)}" data-task="${esc(k.id)}" title="Mark done">☐</button><span style="flex:1;min-width:0">${esc(k.title)}</span>${k.due < ymd(new Date()) ? `<span class="small" style="color:var(--bad)">${fmtDate(k.due + "T12:00")}</span>` : ""}</div>`).join("")}` : ""}
+        </div>
         <div class="card"><h3><span><span class="muted small" style="font-variant-numeric:tabular-nums">01</span> Stages</span></h3>
           <table class="tbl"><thead><tr><th>Stage</th><th class="num">Proposals</th><th class="num">Jobs</th></tr></thead><tbody>
           ${d.byStage.map((x) => `<tr data-stage="${esc(x.stage)}" data-tip="${esc(x.stage)}: ${x.count} job${x.count === 1 ? "" : "s"}${x.amount ? ` · ${usd(x.amount)}` : ""}"><td>${esc(x.stage)}<div><span class="sbar" style="width:${Math.round((x.count / max) * 100)}%"></span></div></td><td class="num">${x.amount ? usd(x.amount).replace(/\.\d\d$/, "") : ""}</td><td class="num"><b>${x.count}</b></td></tr>`).join("")}
@@ -526,6 +612,8 @@ document.addEventListener("click", async (e) => {
     if (b.dataset.do === "claude") { await askClaude(b.dataset.p, n || undefined); }
     if (b.dataset.do === "logsent") await api(`/api/jobs/${n}/sync`, { method: "POST" });
     if (b.dataset.do === "upload") await api(`/api/jobs/${n}/files-upload`, { method: "POST", body: {} });
+    if (b.dataset.do === "gocal") showTab("cal");
+    if (b.dataset.do === "taskdone") { await api(`/api/tasks/${encodeURIComponent(b.dataset.list)}/${encodeURIComponent(b.dataset.task)}`, { method: "PATCH", body: { completed: true } }); b.closest(".row")?.remove(); log("Task done. It's checked off on your phone too."); }
     if (b.dataset.do === "fileto") { await api("/api/inbox/file", { method: "POST", body: { threadId: b.dataset.thread, messageId: b.dataset.msg, jobNumber: n } }); b.closest(".rem")?.remove(); }
     if (b.dataset.do === "notjob") { await api("/api/inbox/dismiss", { method: "POST", body: { messageId: b.dataset.msg } }); b.closest(".rem")?.remove(); }
     if (b.dataset.do === "filethread") { const sel = $("#fileto-job"); const jn = n || Number(sel?.value); if (!jn) return; await api("/api/inbox/file", { method: "POST", body: { threadId: b.dataset.thread, jobNumber: jn } }); }
@@ -588,6 +676,7 @@ function renderJob() {
         <button class="btn" data-act="compose">Email…</button>
         <button class="btn" data-act="log">Log call…</button>
         <button class="btn" data-act="addfiles">Add files</button>
+        <button class="btn" data-act="schedule">Schedule…</button>
         <button class="btn" data-act="pull">Refresh</button>
         ${status.gmail === "mock" && drafts.some((x) => !x.sentAt) ? `<button class="btn" data-act="mocksend">Pretend I sent them</button>` : ""}
         <a class="btn" href="${esc(h.url)}" target="_blank" rel="noopener">Homebase ↗</a>
@@ -619,6 +708,7 @@ $("#job").addEventListener("click", async (e) => {
     if (act === "note") { const t = $("#tl-note").value.trim(); if (t) { await api(`/api/jobs/${n}/note`, { method: "POST", body: { body: t } }); $("#tl-note").value = ""; } }
     if (act === "embed") { const f = $("#ccembed"); f.hidden = !f.hidden; }
     if (act === "addfiles") { pickTarget = n; $("#filepick").click(); }
+    if (act === "schedule") { const st = new Date(); st.setDate(st.getDate() + 1); st.setHours(9, 0, 0, 0); openEvent({ title: `Scope walk #${n} ${view.homebase.name}`, start: st.toISOString(), end: new Date(st.getTime() + 3600e3).toISOString(), location: view.homebase.address, job: n }); }
   } catch (err) { log(err.message, "t-err"); }
 });
 
@@ -1013,6 +1103,197 @@ $("#pl-audible").addEventListener("click", () => {
   if (!w) log("Your browser blocked the Audible window. Allow pop-ups for the hub, or open audible.com/library.", "t-err");
 });
 (() => { renderSaved(); const now = store.get("spotifyNow", null); if (now && spotifyEmbed(now)) { $("#pl-spotify").src = spotifyEmbed(now); $("#pl-spotify").hidden = false; } if (store.get("playerOpen", false)) $("#player").hidden = false; })();
+
+// ============================================================= Calendar + Google Tasks
+const HOUR_H = 46, H0 = 6, H1 = 21;
+let calView = store.get("calview", "week"), calDate = new Date(), cals = [], taskLists = [], calEvents = [], calTasks = [], openTasks = [];
+let hiddenCals = new Set(store.get("hiddencals", [])), showTasks = store.get("showtasks", true);
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const sameDay = (a, b) => ymd(a) === ymd(b);
+const startOfWeek = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - x.getDay()); return x; };
+const hm = (iso) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+function calRange() {
+  if (calView === "day") { const s = new Date(calDate); s.setHours(0, 0, 0, 0); return { start: s, end: new Date(s.getTime() + 864e5), days: 1 }; }
+  if (calView === "week") { const s = startOfWeek(calDate); return { start: s, end: new Date(s.getTime() + 7 * 864e5), days: 7 }; }
+  const first = new Date(calDate.getFullYear(), calDate.getMonth(), 1); const s = startOfWeek(first); return { start: s, end: new Date(s.getTime() + 42 * 864e5), days: 42 };
+}
+async function loadCal() {
+  if (status.gmail === "google" && !status.calendarConnected) $("#cal-body").innerHTML = `<div class="empty">Google Calendar isn't connected yet. Double-click <b>Connect Gmail</b> in the hub folder: it turns on Calendar and Tasks and asks you to Allow.</div>`;
+  try { cals = await api("/api/cal/calendars"); } catch (e) { cals = []; }
+  try { taskLists = status.tasksConnected === false ? [] : await api("/api/tasks/lists"); } catch { taskLists = []; }
+  $("#ev-cal").innerHTML = cals.filter((c) => c.writable).map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
+  $("#cal-list").innerHTML = cals.map((c) => `<label><input type="checkbox" data-cal="${esc(c.id)}" ${hiddenCals.has(c.id) ? "" : "checked"} style="width:auto"><span class="sw" style="background:${esc(c.color)}"></span>${esc(c.name)}</label>`).join("") +
+    `<label><input type="checkbox" id="cal-showtasks" ${showTasks ? "checked" : ""} style="width:auto"><span class="sw" style="background:var(--ink)"></span>Google Tasks</label>`;
+  renderTaskPanel();
+  renderCal();
+}
+$("#cal-list").addEventListener("change", (e) => {
+  const c = e.target.closest("[data-cal]");
+  if (c) { c.checked ? hiddenCals.delete(c.dataset.cal) : hiddenCals.add(c.dataset.cal); store.set("hiddencals", [...hiddenCals]); }
+  if (e.target.id === "cal-showtasks") { showTasks = e.target.checked; store.set("showtasks", showTasks); }
+  renderCal();
+});
+async function renderCal() {
+  const { start, end } = calRange();
+  const t = calView === "month" ? calDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }) : calView === "day" ? calDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) : `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${new Date(end.getTime() - 864e5).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+  $("#cal-title").textContent = t;
+  $$("#cal-view button").forEach((b) => b.classList.toggle("active", b.dataset.v === calView));
+  const visible = cals.filter((c) => !hiddenCals.has(c.id)).map((c) => c.id);
+  try {
+    [calEvents, calTasks] = await Promise.all([
+      visible.length ? api(`/api/cal/events?${new URLSearchParams({ start: start.toISOString(), end: end.toISOString(), cals: visible.join(",") })}`) : [],
+      showTasks && taskLists.length ? api(`/api/tasks?${new URLSearchParams({ start: ymd(start), end: ymd(new Date(end.getTime() - 864e5)), completed: "1" })}`) : [],
+    ]);
+  } catch (e) { $("#cal-body").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  calView === "month" ? renderMonth(start) : renderWeek(start, calView === "day" ? 1 : 7);
+}
+const taskChip = (k) => `<div class="ev chip" style="background:var(--panel-2);color:var(--ink);border-color:var(--line)" data-task="${esc(k.id)}" data-list="${esc(k.listId)}" title="${esc(k.title)}"><span data-check="1" style="cursor:pointer">${k.completed ? "☑" : "☐"}</span> <span style="${k.completed ? "text-decoration:line-through;opacity:.6" : ""}">${esc(k.title)}</span></div>`;
+const evChip = (e) => `<div class="ev chip" style="background:${esc(e.color || "#7aa7ff")}" data-ev="${esc(e.id)}" data-cal="${esc(e.calendarId)}" title="${esc(e.title)}">${e.allDay ? "" : hm(e.start) + " "}${esc(e.title)}</div>`;
+function renderWeek(start, days) {
+  const today = new Date();
+  const dates = Array.from({ length: days }, (_, i) => new Date(start.getTime() + i * 864e5));
+  const hours = Array.from({ length: H1 - H0 }, (_, i) => H0 + i);
+  let html = `<div class="wk" style="--days:${days}"><div class="hd"></div>${dates.map((d) => `<div class="hd ${sameDay(d, today) ? "today" : ""}">${d.toLocaleDateString("en-US", { weekday: "short" })}<b>${d.getDate()}</b></div>`).join("")}`;
+  html += `<div class="allday small muted" style="text-align:right;padding-right:6px">all day</div>${dates.map((d) => `<div class="allday">${calEvents.filter((e) => e.allDay && e.start <= ymd(d) && e.end > ymd(d)).map(evChip).join("")}${calTasks.filter((k) => k.due === ymd(d)).map(taskChip).join("")}</div>`).join("")}`;
+  html += `<div class="gutter" style="height:${hours.length * HOUR_H}px">${hours.map((h, i) => `<span style="top:${i * HOUR_H}px">${h === 12 ? "12 PM" : h > 12 ? h - 12 + " PM" : h + " AM"}</span>`).join("")}</div>`;
+  for (const d of dates) {
+    const evs = calEvents.filter((e) => !e.allDay && sameDay(new Date(e.start), d)).sort((a, b) => a.start.localeCompare(b.start));
+    const lanes = []; const placed = evs.map((e) => { const s = Date.parse(e.start); let l = lanes.findIndex((end) => end <= s); if (l < 0) { l = lanes.length; lanes.push(0); } lanes[l] = Date.parse(e.end); return { e, l }; });
+    const n = Math.max(1, lanes.length);
+    const pos = (iso) => { const t = new Date(iso); return ((t.getHours() + t.getMinutes() / 60) - H0) * HOUR_H; };
+    html += `<div class="col" data-day="${ymd(d)}" style="height:${hours.length * HOUR_H}px">${hours.map((_, i) => `<div class="hr" style="top:${i * HOUR_H}px"></div>`).join("")}
+      ${sameDay(d, today) ? `<div class="now" style="top:${pos(today.toISOString())}px"></div>` : ""}
+      ${placed.map(({ e, l }) => { const top = Math.max(0, pos(e.start)); const h = Math.max(20, pos(e.end) - top - 2); return `<div class="ev" data-ev="${esc(e.id)}" data-cal="${esc(e.calendarId)}" style="top:${top}px;height:${h}px;left:calc(${(l / n) * 100}% + 2px);width:calc(${100 / n}% - 4px);background:${esc(e.color || "#7aa7ff")}"><b>${esc(e.title)}</b>${hm(e.start)}${e.location ? ` · ${esc(e.location.split(",")[0])}` : ""}</div>`; }).join("")}</div>`;
+  }
+  $("#cal-body").innerHTML = html + "</div>";
+  const nowTop = (Math.max(H0, Math.min(H1 - 2, new Date().getHours() - 1)) - H0) * HOUR_H;
+  $("#cal-body").scrollTop = nowTop;
+}
+function renderMonth(start) {
+  const today = new Date();
+  let html = `<div class="mo">${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => `<div class="dn">${d}</div>`).join("")}`;
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start.getTime() + i * 864e5);
+    const evs = calEvents.filter((e) => (e.allDay ? e.start <= ymd(d) && e.end > ymd(d) : sameDay(new Date(e.start), d)));
+    const tks = calTasks.filter((k) => k.due === ymd(d));
+    const items = [...evs.map(evChip), ...tks.map(taskChip)];
+    html += `<div class="cell ${d.getMonth() !== calDate.getMonth() ? "out" : ""} ${sameDay(d, today) ? "today" : ""}" data-day="${ymd(d)}"><div class="d">${d.getDate()}</div>${items.slice(0, 4).join("")}${items.length > 4 ? `<div class="small muted">+${items.length - 4} more</div>` : ""}</div>`;
+  }
+  $("#cal-body").innerHTML = html + "</div>";
+}
+$("#cal-view").addEventListener("click", (e) => { const b = e.target.closest("[data-v]"); if (!b) return; calView = b.dataset.v; store.set("calview", calView); renderCal(); });
+$("#cal-today").addEventListener("click", () => { calDate = new Date(); renderCal(); });
+const shift = (dir) => { const d = new Date(calDate); if (calView === "day") d.setDate(d.getDate() + dir); else if (calView === "week") d.setDate(d.getDate() + 7 * dir); else d.setMonth(d.getMonth() + dir); calDate = d; renderCal(); };
+$("#cal-prev").addEventListener("click", () => shift(-1));
+$("#cal-next").addEventListener("click", () => shift(1));
+$("#cal-new").addEventListener("click", () => { const s = new Date(); s.setMinutes(s.getMinutes() < 30 ? 30 : 60, 0, 0); openEvent({ start: s.toISOString(), end: new Date(s.getTime() + 3600e3).toISOString() }); });
+$("#cal-body").addEventListener("click", async (e) => {
+  const tk = e.target.closest("[data-task]");
+  if (tk) { const k = calTasks.find((x) => x.id === tk.dataset.task) || openTasks.find((x) => x.id === tk.dataset.task); if (!k) return; if (e.target.closest("[data-check]")) { await toggleTask(k); } else openTask(k); return; }
+  const ev = e.target.closest("[data-ev]");
+  if (ev) { const x = calEvents.find((y) => y.id === ev.dataset.ev && y.calendarId === ev.dataset.cal); if (x) openEvent(x); return; }
+  const col = e.target.closest("[data-day]");
+  if (!col) return;
+  let s;
+  if (col.classList.contains("col")) { const r = col.getBoundingClientRect(); const mins = Math.round((((e.clientY - r.top) / HOUR_H) * 60) / 30) * 30; s = new Date(`${col.dataset.day}T00:00`); s.setMinutes(H0 * 60 + mins); }
+  else { s = new Date(`${col.dataset.day}T09:00`); }
+  openEvent({ start: s.toISOString(), end: new Date(s.getTime() + 3600e3).toISOString() });
+});
+
+// ---- event dialog
+function openEvent(o) {
+  const editing = !!o.id;
+  $("#ev-h").textContent = editing ? "Edit event" : "New event";
+  $("#ev-id").value = o.id || ""; $("#ev-calid").value = o.calendarId || "";
+  $("#ev-title").value = o.title || "";
+  const s = o.allDay ? new Date(`${o.start}T09:00`) : new Date(o.start), en = o.allDay ? new Date(`${o.start}T10:00`) : new Date(o.end);
+  $("#ev-date").value = ymd(s); $("#ev-start").value = s.toTimeString().slice(0, 5); $("#ev-end").value = en.toTimeString().slice(0, 5);
+  $("#ev-allday").checked = !!o.allDay;
+  $("#ev-loc").value = o.location || ""; $("#ev-desc").value = o.description || ""; $("#ev-att").value = (o.attendees || []).map((a) => a.email).join(", "); $("#ev-rem").value = "";
+  $("#ev-job").innerHTML = `<option value="">(none)</option>` + jobs.map((j) => `<option value="${j.jobNumber}" ${(o.job ?? o.jobNumber) === j.jobNumber ? "selected" : ""}>#${j.jobNumber} ${esc(j.name)}</option>`).join("");
+  if (o.calendarId) $("#ev-cal").value = o.calendarId;
+  $("#ev-cal").disabled = editing;
+  $("#ev-del").hidden = !editing;
+  $("#ev-meta").innerHTML = editing ? [o.meet ? `<a href="${esc(o.meet)}" target="_blank" rel="noopener">Join Meet</a>` : "", o.link ? `<a href="${esc(o.link)}" target="_blank" rel="noopener">Open in Google Calendar</a>` : "", o.jobNumber ? `<a href="#" data-do="open" data-n="${o.jobNumber}">Open job #${o.jobNumber}</a>` : ""].filter(Boolean).join(" · ") : "";
+  $("#evdlg").showModal();
+}
+$("#ev-job").addEventListener("change", () => {
+  const j = jobs.find((x) => x.jobNumber === Number($("#ev-job").value)); if (!j) return;
+  if (!$("#ev-title").value.includes(`#${j.jobNumber}`)) $("#ev-title").value = `${$("#ev-title").value || "Scope walk"} #${j.jobNumber} ${j.name}`.trim();
+  if (!$("#ev-loc").value) $("#ev-loc").value = j.address;
+});
+$("#evdlg").addEventListener("close", async () => {
+  const how = $("#evdlg").returnValue, id = $("#ev-id").value, calId = $("#ev-calid").value;
+  try {
+    if (how === "delete" && id) { if (!confirm(`Delete "${$("#ev-title").value}" from your calendar?`)) return; await api(`/api/cal/events/${encodeURIComponent(calId)}/${encodeURIComponent(id)}`, { method: "DELETE" }); log("Deleted the event."); }
+    if (how === "save") {
+      const allDay = $("#ev-allday").checked, date = $("#ev-date").value;
+      const start = allDay ? date : new Date(`${date}T${$("#ev-start").value || "09:00"}`).toISOString();
+      let end = allDay ? ymd(new Date(new Date(`${date}T12:00`).getTime() + 864e5)) : new Date(`${date}T${$("#ev-end").value || "10:00"}`).toISOString();
+      if (!allDay && end <= start) end = new Date(Date.parse(start) + 3600e3).toISOString();
+      const b = { title: $("#ev-title").value.trim() || "(no title)", start, end, allDay, location: $("#ev-loc").value.trim(), description: $("#ev-desc").value.trim(), attendees: $("#ev-att").value.split(/[,;]/).map((x) => x.trim()).filter(Boolean), reminderMinutes: $("#ev-rem").value ? Number($("#ev-rem").value) : undefined, calendarId: $("#ev-cal").value || undefined, jobNumber: $("#ev-job").value ? Number($("#ev-job").value) : undefined };
+      if (id) await api(`/api/cal/events/${encodeURIComponent(calId)}/${encodeURIComponent(id)}`, { method: "PATCH", body: b });
+      else await api("/api/cal/events", { method: "POST", body: b });
+      log(`${id ? "Updated" : "Added"} "${b.title}".`);
+    }
+    if (store.get("tab", "today") === "cal") renderCal(); else loadToday();
+  } catch (e) { log(e.message, "t-err"); }
+});
+
+// ---- Google Tasks: side panel, dialog, check off
+async function renderTaskPanel() {
+  if (!$("#cal-tasks")) $(".calside").insertAdjacentHTML("beforeend", `<div><div class="small muted" style="margin-bottom:6px">Google Tasks</div><form id="tk-add" class="row" style="margin-bottom:8px"><input type="text" id="tk-title" placeholder="Add a task" style="flex:1"><input type="date" id="tk-due" style="width:100%"><button class="btn small primary" style="width:100%">Add task</button></form><div id="cal-tasks" style="display:grid;gap:2px"></div></div>`) , $("#tk-add").addEventListener("submit", addTaskFromPanel);
+  if (!taskLists.length) { $("#cal-tasks").innerHTML = `<span class="small muted">${status.gmail === "google" ? "Connect Gmail again to add Google Tasks." : "Test tasks (Google isn't connected here)."}</span>`; if (status.gmail === "google") return; }
+  try { openTasks = await api("/api/tasks"); } catch (e) { $("#cal-tasks").innerHTML = `<span class="small muted">${esc(e.message)}</span>`; return; }
+  const today = ymd(new Date());
+  const groups = [["Overdue", (k) => k.due && k.due < today], ["Today", (k) => k.due === today], ["Upcoming", (k) => k.due && k.due > today], ["No date", (k) => !k.due]];
+  $("#cal-tasks").innerHTML = groups.map(([label, f]) => { const ks = openTasks.filter(f).sort((a, b) => (a.due ?? "").localeCompare(b.due ?? "")); return ks.length ? `<div class="small muted" style="margin-top:6px">${label}</div>${ks.map((k) => `<div class="ev chip" style="background:transparent;color:var(--ink);border:0;padding:2px 0;white-space:normal" data-task="${esc(k.id)}" data-list="${esc(k.listId)}"><span data-check="1" style="cursor:pointer">☐</span> ${esc(k.title)}${k.due && label !== "Today" ? ` <span class="small ${label === "Overdue" ? "" : "muted"}" style="${label === "Overdue" ? "color:var(--bad)" : ""}">${fmtDate(k.due + "T12:00")}</span>` : ""}</div>`).join("")}` : ""; }).join("") || `<span class="small muted">No open tasks.</span>`;
+}
+async function addTaskFromPanel(e) {
+  e.preventDefault();
+  const title = $("#tk-title").value.trim(); if (!title) return;
+  try { await api("/api/tasks", { method: "POST", body: { title, due: $("#tk-due").value || undefined, jobNumber: title.match(/#(\d{4})/)?.[1] } }); $("#tk-title").value = ""; log(`Added the task "${title}". It's on your phone too.`); renderTaskPanel(); renderCal(); } catch (err) { log(err.message, "t-err"); }
+}
+$(".calside").addEventListener("click", async (e) => {
+  const tk = e.target.closest("[data-task]"); if (!tk) return;
+  const k = openTasks.find((x) => x.id === tk.dataset.task); if (!k) return;
+  if (e.target.closest("[data-check]")) await toggleTask(k); else openTask(k);
+});
+async function toggleTask(k) {
+  try { await api(`/api/tasks/${encodeURIComponent(k.listId)}/${encodeURIComponent(k.id)}`, { method: "PATCH", body: { completed: !k.completed } }); log(`${k.completed ? "Reopened" : "Done"}: ${k.title}`); renderTaskPanel(); if (store.get("tab", "today") === "cal") renderCal(); else loadToday(); } catch (e) { log(e.message, "t-err"); }
+}
+function openTask(k) {
+  $("#tk-h").textContent = k.id ? "Task" : "New task";
+  $("#tk-id").value = k.id || ""; $("#tk-list").value = k.listId || "";
+  $("#tk-dtitle").value = k.title || ""; $("#tk-ddue").value = k.due || ""; $("#tk-notes").value = k.notes || ""; $("#tk-done").checked = !!k.completed;
+  $("#tk-lists").innerHTML = taskLists.map((l) => `<option value="${esc(l.id)}" ${l.id === k.listId ? "selected" : ""}>${esc(l.title)}</option>`).join("");
+  $("#tk-lists").disabled = !!k.id; $("#tk-del").hidden = !k.id;
+  $("#tk-meta").innerHTML = k.jobNumber ? `<a href="#" data-do="open" data-n="${k.jobNumber}">Open job #${k.jobNumber}</a>` : "";
+  $("#taskdlg").showModal();
+}
+$("#taskdlg").addEventListener("close", async () => {
+  const how = $("#taskdlg").returnValue, id = $("#tk-id").value, list = $("#tk-list").value || $("#tk-lists").value;
+  try {
+    if (how === "delete" && id) { if (!confirm("Delete this task?")) return; await api(`/api/tasks/${encodeURIComponent(list)}/${encodeURIComponent(id)}`, { method: "DELETE" }); }
+    if (how === "save") {
+      const b = { title: $("#tk-dtitle").value.trim() || "(no title)", due: $("#tk-ddue").value || null, notes: $("#tk-notes").value, completed: $("#tk-done").checked };
+      if (id) await api(`/api/tasks/${encodeURIComponent(list)}/${encodeURIComponent(id)}`, { method: "PATCH", body: b });
+      else await api("/api/tasks", { method: "POST", body: { ...b, listId: list, due: b.due || undefined } });
+    }
+    renderTaskPanel(); if (store.get("tab", "today") === "cal") renderCal(); else loadToday();
+  } catch (e) { log(e.message, "t-err"); }
+});
+
+// Free time
+$("#cal-free").addEventListener("click", async () => {
+  try {
+    const slots = await api(`/api/cal/free?days=5&minutes=${$("#cal-dur").value}`);
+    $("#cal-slots").innerHTML = slots.slice(0, 10).map((s) => `<button class="btn small" type="button" data-slot="${esc(s.start)}" style="text-align:left">${new Date(s.start).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} ${hm(s.start)}–${hm(s.end)}</button>`).join("") || `<span class="small muted">No open time that long.</span>`;
+  } catch (e) { log(e.message, "t-err"); }
+});
+$("#cal-slots").addEventListener("click", (e) => { const b = e.target.closest("[data-slot]"); if (!b) return; const s = new Date(b.dataset.slot); openEvent({ start: s.toISOString(), end: new Date(s.getTime() + Number($("#cal-dur").value) * 60000).toISOString() }); });
+// Keep the calendar and tasks current (things added on the phone show up here).
+setInterval(() => { if (store.get("tab", "today") === "cal" && !$("#evdlg").open && !$("#taskdlg").open) { renderCal(); renderTaskPanel(); } }, 60000);
 
 // ============================================================= Claude
 async function askClaude(prompt, job) {

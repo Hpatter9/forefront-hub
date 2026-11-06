@@ -1,69 +1,33 @@
-import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import http from "node:http";
-import type { AddressInfo } from "node:net";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { google, type gmail_v1 } from "googleapis";
+import { GoogleAuth, openBrowser, SCOPES, type GoogleOpts } from "../google/auth.js";
 import { buildMime, htmlToText, newMessageId } from "./mime.js";
 import type { DraftInput, DraftRef, DraftStatus, Label, MailClient, Message, ThreadSummary } from "./types.js";
 
 // modify = read, label (archive / mark read / star / trash) and send; compose = drafts. Claude and the workflows only
-// create drafts; sending happens only from the Mail tab's Send button after Hunter confirms.
-const SCOPES = ["https://www.googleapis.com/auth/gmail.modify", "https://www.googleapis.com/auth/gmail.compose"];
-const MODIFY = "https://www.googleapis.com/auth/gmail.modify";
-
-export interface GoogleOpts {
-  clientId: string;
-  clientSecret: string;
-  tokenFile: string;
-  address: string;
-}
+// create drafts; sending happens from the Gmail tab's Send button after Hunter confirms, and auto-filing forwards
+// to Forefront's own office+<job#> addresses.
+export { openBrowser, type GoogleOpts };
 
 export class GoogleGmail implements MailClient {
   readonly kind = "google" as const;
   private api?: gmail_v1.Gmail;
   private signature?: { html: string; from: string };
 
-  constructor(private opts: GoogleOpts) {}
-
-  private client(redirectUri?: string) {
-    return new google.auth.OAuth2(this.opts.clientId, this.opts.clientSecret, redirectUri);
+  constructor(private opts: GoogleOpts) {
+    this.auth = new GoogleAuth(opts);
   }
 
-  /** One-time: opens Google's consent page in your browser and saves the token to auth/google-token.json. */
+  private auth: GoogleAuth;
+
+  /** One-time: opens Google's consent page (Gmail + Calendar) and saves the token. */
   async login(): Promise<void> {
-    const server = http.createServer();
-    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
-    const redirect = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-    const oauth = this.client(redirect);
-    const url = oauth.generateAuthUrl({ access_type: "offline", prompt: "consent", scope: SCOPES, login_hint: this.opts.address });
-    const code = await new Promise<string>((resolve, reject) => {
-      server.on("request", (req, res) => {
-        const u = new URL(req.url ?? "/", redirect);
-        const c = u.searchParams.get("code");
-        res.end(c ? "Gmail is connected to the Forefront hub. You can close this tab." : `Error: ${u.searchParams.get("error")}`);
-        c ? resolve(c) : reject(new Error(u.searchParams.get("error") ?? "no code"));
-      });
-      console.log(`Opening Google sign-in. If it doesn't open, paste this into your browser:\n${url}\n`);
-      openBrowser(url);
-    });
-    server.close();
-    const { tokens } = await oauth.getToken(code);
-    mkdirSync(path.dirname(this.opts.tokenFile), { recursive: true });
-    writeFileSync(this.opts.tokenFile, JSON.stringify(tokens, null, 2));
-    console.log(`Saved Gmail token to ${this.opts.tokenFile}`);
+    await this.auth.login();
   }
 
   private gmail(): gmail_v1.Gmail {
-    if (this.api) return this.api;
-    if (!existsSync(this.opts.tokenFile)) throw new Error("Gmail isn't connected yet. Run: npm run hub -- gmail login");
-    const oauth = this.client();
-    oauth.setCredentials(JSON.parse(readFileSync(this.opts.tokenFile, "utf8")));
-    oauth.on("tokens", (t) => {
-      const old = JSON.parse(readFileSync(this.opts.tokenFile, "utf8"));
-      writeFileSync(this.opts.tokenFile, JSON.stringify({ ...old, ...t }, null, 2));
-    });
-    this.api = google.gmail({ version: "v1", auth: oauth });
+    this.api ??= google.gmail({ version: "v1", auth: this.auth.client() });
     return this.api;
   }
 
@@ -105,9 +69,7 @@ export class GoogleGmail implements MailClient {
   }
 
   fullAccess(): boolean {
-    if (!existsSync(this.opts.tokenFile)) return false;
-    const scope: string = JSON.parse(readFileSync(this.opts.tokenFile, "utf8")).scope ?? "";
-    return scope.split(/\s+/).includes(MODIFY);
+    return this.auth.hasScope(SCOPES.gmailModify);
   }
 
   async listThreads(o: { label?: string; q?: string; pageToken?: string; max?: number } = {}) {
@@ -242,11 +204,3 @@ function toMessage(m: gmail_v1.Schema$Message): Message {
   };
 }
 
-export function openBrowser(url: string) {
-  const cmd = process.platform === "win32" ? ["cmd", ["/c", "start", '""', `"${url}"`]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
-  try {
-    spawn(cmd[0] as string, cmd[1] as string[], { stdio: "ignore", detached: true, shell: process.platform === "win32" }).unref();
-  } catch {
-    /* the URL is printed too */
-  }
-}

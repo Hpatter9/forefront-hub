@@ -5,6 +5,8 @@ import { JobStore } from "./core/job.js";
 import { makeCompanyCam, type PhotoClient } from "./connectors/companycam/index.js";
 import { DocuSketch, type SketchSource } from "./connectors/docusketch/index.js";
 import { makeGmail, type MailClient } from "./connectors/gmail/index.js";
+import { makeCalendar, type CalendarClient } from "./connectors/calendar/index.js";
+import { makeTasks, type TasksClient } from "./connectors/tasks/index.js";
 import { makeHomebase, type HomebaseClient } from "./connectors/homebase/index.js";
 import { EstimateSkill } from "./connectors/skill/index.js";
 
@@ -14,6 +16,8 @@ export interface Hub {
   jobs: JobStore;
   homebase: HomebaseClient;
   gmail: MailClient;
+  calendar: CalendarClient;
+  tasks: TasksClient;
   photos: PhotoClient;
   sketches: SketchSource;
   skill: EstimateSkill;
@@ -28,6 +32,8 @@ export function makeHub(cfg: Config = loadConfig(), approver: Approver = new Cli
     jobs: new JobStore(cfg.jobsRoot),
     homebase: makeHomebase(cfg),
     gmail,
+    calendar: makeCalendar(cfg),
+    tasks: makeTasks(cfg),
     photos: makeCompanyCam(cfg),
     sketches: new DocuSketch(gmail, cfg.docusketch.downloadsDir),
     skill: new EstimateSkill(cfg.skillDir, cfg.python),
@@ -47,6 +53,8 @@ export function describe(hub: Hub): string[] {
     `homebase    ${hub.homebase.kind}${hub.homebase.kind === "browser" ? `  login: ${path.relative(c.hubRoot, c.homebase.authFile)}` : ""}`,
     `gmail       ${hub.gmail.kind}${hub.gmail.kind === "mock" ? `  (drafts go to ${path.join(c.stateDir, "outbox")})` : ` ${c.gmail.address}`}`,
     `companycam  ${hub.photos.kind}`,
+    `calendar    ${hub.calendar.kind}${hub.calendar.kind === "google" && !hub.calendar.connected() ? "  (!) reconnect Google to add Calendar" : ""}`,
+    `tasks       ${hub.tasks.kind}${hub.tasks.kind === "google" && !hub.tasks.connected() ? "  (!) reconnect Google to add Tasks" : ""}`,
     `docusketch  gmail delivery emails + ESX from ${c.docusketch.downloadsDir}`,
   ];
 }

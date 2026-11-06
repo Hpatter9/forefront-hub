@@ -84,12 +84,34 @@ export async function connectGmail() {
     setEnv({ GOOGLE_CLIENT_ID: creds.id, GOOGLE_CLIENT_SECRET: creds.secret });
   }
 
-  step(5, "Sign in to Google in the browser window that opens and click Allow.");
+  // Calendar and Tasks are APIs of their own: each needs one Enable click in the same Google project.
+  step(5, "Turn on the Google Calendar API and the Google Tasks API: click Enable on each page that opens (check Forefront Hub is the project at the top).");
+  openBrowser("https://console.cloud.google.com/apis/library/calendar-json.googleapis.com");
+  openBrowser("https://console.cloud.google.com/apis/library/tasks.googleapis.com");
+  await ask("   Press Enter when both say API enabled (or Manage)... ");
+
+  step(6, "Sign in to Google in the browser window that opens and click Allow (Gmail, Calendar and Tasks).");
   const c = loadConfig();
   const gmail = new GoogleGmail({ clientId: c.gmail.clientId, clientSecret: c.gmail.clientSecret, tokenFile: c.gmail.tokenFile, address: c.gmail.address });
   await gmail.login();
   const sent = await gmail.search("in:sent", 1);
   console.log(`\nGmail is connected. Latest sent email: "${sent[0]?.subject ?? "(none)"}".`);
+  const { GoogleCalendar } = await import("../connectors/calendar/index.js");
+  const { GoogleTasks } = await import("../connectors/tasks/index.js");
+  const { GoogleAuth } = await import("../connectors/google/auth.js");
+  const auth = new GoogleAuth({ clientId: c.gmail.clientId, clientSecret: c.gmail.clientSecret, tokenFile: c.gmail.tokenFile, address: c.gmail.address });
+  try {
+    const cals = await new GoogleCalendar(auth).calendars();
+    console.log(`Google Calendar is connected (${cals.length} calendar${cals.length === 1 ? "" : "s"}).`);
+  } catch (e) {
+    console.log(`Google Calendar didn't answer: ${(e as Error).message}\n  If it says the API isn't enabled, enable it (step 5) and run Connect Gmail again.`);
+  }
+  try {
+    const lists = await new GoogleTasks(auth).lists();
+    console.log(`Google Tasks is connected (${lists.map((l) => l.title).join(", ")}).`);
+  } catch (e) {
+    console.log(`Google Tasks didn't answer: ${(e as Error).message}\n  If it says the API isn't enabled, enable it (step 5) and run Connect Gmail again.`);
+  }
   console.log("Restart the hub (close its window, open the desktop icon) to use it.");
 }
 

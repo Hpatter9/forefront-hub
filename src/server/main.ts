@@ -19,6 +19,7 @@ import { STAGES } from "../core/job.js";
 import { TemplateWriter, type Recipient } from "../workflows/writer.js";
 import { autoFile, dismissUnfiled, fileMessage, inboxState } from "../workflows/inbox.js";
 import { addFile } from "../workflows/uploads.js";
+import { freeSlots } from "../connectors/calendar/index.js";
 import { EventBus, WebApprover } from "./events.js";
 
 /**
@@ -201,6 +202,9 @@ const server = http.createServer(async (req, res) => {
         gmail: hub.gmail.kind,
         gmailFull: hub.gmail.fullAccess?.() ?? false,
         companycam: hub.photos.kind,
+        calendar: hub.calendar.kind,
+        calendarConnected: hub.calendar.connected(),
+        tasksConnected: hub.tasks.connected(),
         agent: !!cfg.anthropicApiKey,
         me: cfg.homebase.me,
         jobsRoot: cfg.jobsRoot,
@@ -240,6 +244,12 @@ const server = http.createServer(async (req, res) => {
         .sort((a, b) => b.at.localeCompare(a.at))
         .slice(0, 15);
       const count = (k: string) => rem.filter((r) => r.kind === k).length;
+      const dayStart = new Date();
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart.getTime() + 864e5);
+      const schedule = hub.calendar.connected() ? await hub.calendar.events({ start: dayStart.toISOString(), end: dayEnd.toISOString() }).catch(() => []) : [];
+      const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Denver" });
+      const tasksDue = hub.tasks.connected() ? (await hub.tasks.tasks().catch(() => [])).filter((t) => !t.completed && t.due && t.due <= todayStr).sort((a, b) => (a.due ?? "").localeCompare(b.due ?? "")) : [];
       return send(res, 200, {
         totals: {
           open: open.length,
@@ -252,6 +262,10 @@ const server = http.createServer(async (req, res) => {
         },
         byStage,
         proposals: proposals.slice(0, 12),
+        schedule,
+        tasksDue,
+        tasksConnected: hub.tasks.connected(),
+        calendarConnected: hub.calendar.connected(),
         activity,
         reminders: rem,
         groups: REMINDER_GROUPS,
@@ -264,7 +278,7 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/plan" && req.method === "POST") {
       if (!cfg.anthropicApiKey) return send(res, 400, { error: "Claude is off on this machine (no Anthropic API key)." });
       const list = reminders(hub, { needsUpload: new Set((lastSync?.needsUpload ?? []).map((x) => x.jobNumber)) });
-      const prompt = `Plan my day. Here is everything the hub thinks needs me, as JSON (kind, job, title, detail, days waiting):\n${JSON.stringify(list.slice(0, 60))}\n\nPut it in the order I should work it, most urgent first (an adjuster or homeowner waiting on me beats a stale job; money-heavy proposals before small ones). Give me a short numbered list, one line each: job #, name, what to do. For the top replies and follow-ups, read the thread or the job (hub tools) and draft the email in Gmail for me (drafts only; I'll send). Say which drafts you made.`;
+      const prompt = `Plan my day. Here is everything the hub thinks needs me, as JSON (kind, job, title, detail, days waiting):\n${JSON.stringify(list.slice(0, 60))}\n\nCheck my Google Calendar and my Google Tasks (due today and overdue) for today and the next few days (hub tools) so the plan fits around what's already booked. Put it in the order I should work it, most urgent first (an adjuster or homeowner waiting on me beats a stale job; money-heavy proposals before small ones). Give me a short numbered list, one line each: job #, name, what to do. For the top replies and follow-ups, read the thread or the job (hub tools) and draft the email in Gmail for me (drafts only; I'll send). Say which drafts you made.`;
       return send(res, 202, task("Plan my day", undefined, async () => (await import("../agent/run.js")).ask(hub, prompt)));
     }
 
@@ -412,6 +426,54 @@ const server = http.createServer(async (req, res) => {
         }
       }, "mail"));
     }
+    // ---- calendar
+    if (p === "/api/cal/calendars") return send(res, 200, await hub.calendar.calendars());
+    if (p === "/api/cal/events" && req.method === "GET") {
+      const ids = q("cals") ? q("cals").split(",") : undefined;
+      return send(res, 200, await hub.calendar.events({ start: q("start"), end: q("end"), calendarIds: ids, q: q("q") || undefined }));
+    }
+    if (p === "/api/cal/free") {
+      const days = Number(q("days") || 5), minutes = Number(q("minutes") || 60);
+      const from = new Date();
+      const to = new Date(from.getTime() + (days + 2) * 864e5);
+      const busy = await hub.calendar.busy({ start: from.toISOString(), end: to.toISOString() });
+      return send(res, 200, freeSlots(busy, { from, days, minutes }));
+    }
+    if (p === "/api/cal/events" && req.method === "POST") {
+      const b = await body(req);
+      const ev = await hub.calendar.create(b);
+      if (b.jobNumber && hub.jobs.exists(Number(b.jobNumber))) hub.jobs.log(Number(b.jobNumber), `Calendar: ${b.title} on ${new Date(b.start).toLocaleString("en-US", { timeZone: "America/Denver" })}`);
+      bus.emit({ type: "changed", what: "calendar" });
+      return send(res, 200, ev);
+    }
+    const ce = p.match(/^\/api\/cal\/events\/([^/]+)\/([^/]+)$/);
+    if (ce && req.method === "PATCH") {
+      const b = await body(req);
+      return send(res, 200, await hub.calendar.update(decodeURIComponent(ce[1]), decodeURIComponent(ce[2]), b));
+    }
+    if (ce && req.method === "DELETE") {
+      await hub.calendar.remove(decodeURIComponent(ce[1]), decodeURIComponent(ce[2]));
+      return send(res, 200, { ok: true });
+    }
+
+    // ---- Google Tasks (the real lists: what's made here shows on the phone, and the other way round)
+    if (p === "/api/tasks/lists") return send(res, 200, await hub.tasks.lists());
+    if (p === "/api/tasks" && req.method === "GET") {
+      return send(res, 200, await hub.tasks.tasks({ showCompleted: q("completed") === "1", dueMin: q("start") || undefined, dueMax: q("end") || undefined }));
+    }
+    if (p === "/api/tasks" && req.method === "POST") {
+      const b = await body(req);
+      const t = await hub.tasks.create({ listId: b.listId || undefined, title: String(b.title ?? "").trim() || "(no title)", notes: b.notes || undefined, due: b.due || undefined });
+      if (b.jobNumber && hub.jobs.exists(Number(b.jobNumber))) hub.jobs.log(Number(b.jobNumber), `Task: ${t.title}${t.due ? ` (due ${t.due})` : ""}`);
+      return send(res, 200, t);
+    }
+    const tk = p.match(/^\/api\/tasks\/([^/]+)\/([^/]+)$/);
+    if (tk && req.method === "PATCH") return send(res, 200, await hub.tasks.update(decodeURIComponent(tk[1]), decodeURIComponent(tk[2]), await body(req)));
+    if (tk && req.method === "DELETE") {
+      await hub.tasks.remove(decodeURIComponent(tk[1]), decodeURIComponent(tk[2]));
+      return send(res, 200, { ok: true });
+    }
+
     // ---- filing emails to jobs (automatic in the background; these are the by-hand doors)
     if (p === "/api/inbox/file" && req.method === "POST") {
       const b = await body(req);

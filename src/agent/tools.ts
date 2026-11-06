@@ -218,6 +218,84 @@ export function hubTools(hub: Hub) {
       }),
     ),
 
+    // ---------------------------------------------------------------- Google Calendar
+    tool(
+      "calendar_events",
+      "Hunter's Google Calendar events between two times (ISO), all calendars unless calendarIds is given. Events that mention a job (#3226) carry jobNumber.",
+      { start: z.string(), end: z.string(), q: z.string().optional() },
+      wrap(async ({ start, end, q }) => hub.calendar.events({ start, end, q })),
+    ),
+    tool(
+      "calendar_free_time",
+      "Open weekday time (7am-5pm Denver) of at least `minutes` over the next `days` days, from Hunter's calendar.",
+      { days: z.number().int().min(1).max(21).default(5), minutes: z.number().int().min(15).default(60) },
+      wrap(async ({ days, minutes }) => {
+        const { freeSlots } = await import("../connectors/calendar/index.js");
+        const from = new Date();
+        const busy = await hub.calendar.busy({ start: from.toISOString(), end: new Date(from.getTime() + (days + 2) * 864e5).toISOString() });
+        return freeSlots(busy, { from, days, minutes });
+      }),
+    ),
+    tool(
+      "calendar_create_event",
+      "Put an event on Hunter's Google Calendar (asks him first). Times are ISO with the -06:00/-07:00 Denver offset. For a job visit, put the job number and name in the title (\"Scope walk #3226 Augustine\") and the loss address in location. attendees get an invite.",
+      { title: z.string(), start: z.string(), end: z.string(), allDay: z.boolean().optional(), location: z.string().optional(), description: z.string().optional(), attendees: z.array(z.string()).optional(), reminderMinutes: z.number().int().optional(), calendarId: z.string().optional(), jobNumber: jobNumber.optional() },
+      wrap(async (a) => {
+        const when = a.allDay ? a.start.slice(0, 10) : new Date(a.start).toLocaleString("en-US", { timeZone: "America/Denver", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+        if (!(await hub.approver.confirm(`Add "${a.title}" to your calendar?`, [when, a.location ?? "", a.attendees?.length ? `Invites: ${a.attendees.join(", ")}` : ""].filter(Boolean)))) return "Hunter declined; nothing added.";
+        const ev = await hub.calendar.create(a);
+        if (a.jobNumber && hub.jobs.exists(a.jobNumber)) hub.jobs.log(a.jobNumber, `Calendar: ${a.title} ${when}`);
+        return ev;
+      }),
+    ),
+    tool(
+      "calendar_update_event",
+      "Move or change an event on Hunter's calendar (asks him first).",
+      { calendarId: z.string(), eventId: z.string(), title: z.string().optional(), start: z.string().optional(), end: z.string().optional(), location: z.string().optional(), description: z.string().optional() },
+      wrap(async ({ calendarId, eventId, ...e }) => {
+        if (!(await hub.approver.confirm(`Change this calendar event?`, Object.entries(e).filter(([, v]) => v !== undefined).map(([k, v]) => `${k}: ${v}`)))) return "Hunter declined; nothing changed.";
+        return hub.calendar.update(calendarId, eventId, e);
+      }),
+    ),
+    tool(
+      "calendar_delete_event",
+      "Delete an event from Hunter's calendar (asks him first).",
+      { calendarId: z.string(), eventId: z.string(), title: z.string().describe("the event's title, shown to Hunter") },
+      wrap(async ({ calendarId, eventId, title }) => {
+        if (!(await hub.approver.confirm(`Delete "${title}" from your calendar?`))) return "Hunter declined; nothing deleted.";
+        await hub.calendar.remove(calendarId, eventId);
+        return "Deleted.";
+      }),
+    ),
+
+    // ---------------------------------------------------------------- Google Tasks
+    tool(
+      "tasks_list",
+      "Hunter's Google Tasks (open ones; completed too if asked), optionally only those due between two dates (YYYY-MM-DD). Tasks that mention a job (#3226) carry jobNumber.",
+      { dueMin: z.string().optional(), dueMax: z.string().optional(), showCompleted: z.boolean().default(false) },
+      wrap(async ({ dueMin, dueMax, showCompleted }) => hub.tasks.tasks({ dueMin, dueMax, showCompleted })),
+    ),
+    tool(
+      "tasks_create",
+      "Add a Google Task for Hunter (asks him first); it shows on his phone right away. Put the job number in the title for job tasks (\"Call Eileen re #3226\"). due is a date, YYYY-MM-DD.",
+      { title: z.string(), due: z.string().optional(), notes: z.string().optional(), listId: z.string().optional(), jobNumber: jobNumber.optional() },
+      wrap(async (a) => {
+        if (!(await hub.approver.confirm(`Add this task?`, [a.title, a.due ? `Due ${a.due}` : "No due date", a.notes ?? ""].filter(Boolean)))) return "Hunter declined; nothing added.";
+        const t = await hub.tasks.create(a);
+        if (a.jobNumber && hub.jobs.exists(a.jobNumber)) hub.jobs.log(a.jobNumber, `Task: ${a.title}`);
+        return t;
+      }),
+    ),
+    tool(
+      "tasks_update",
+      "Change a Google Task: retitle, move its due date, or mark it done / not done (asks Hunter first).",
+      { listId: z.string(), taskId: z.string(), title: z.string().optional(), due: z.string().nullable().optional(), notes: z.string().optional(), completed: z.boolean().optional() },
+      wrap(async ({ listId, taskId, ...t }) => {
+        if (!(await hub.approver.confirm(`Change this task?`, Object.entries(t).filter(([, v]) => v !== undefined).map(([k, v]) => `${k}: ${v}`)))) return "Hunter declined; nothing changed.";
+        return hub.tasks.update(listId, taskId, t);
+      }),
+    ),
+
     // ---------------------------------------------------------------- CompanyCam / DocuSketch
     tool("companycam_find_project", "Find CompanyCam projects by job number, name or street address.", { query: z.string() }, wrap(async ({ query }) => hub.photos.findProjects(query))),
     tool(
