@@ -70,6 +70,26 @@ export class GoogleGmail implements MailClient {
     return { id: data.id!, messageId, threadId: data.message?.threadId ?? undefined };
   }
 
+  async sendDraft(draftId: string) {
+    await this.gmail().users.drafts.send({ userId: "me", requestBody: { id: draftId } });
+  }
+
+  async deleteDraft(draftId: string) {
+    await this.gmail().users.drafts.delete({ userId: "me", id: draftId });
+  }
+
+  async draftIdFor(messageId: string): Promise<string | null> {
+    let pageToken: string | undefined;
+    for (let i = 0; i < 5; i++) {
+      const { data } = await this.gmail().users.drafts.list({ userId: "me", maxResults: 500, pageToken });
+      const hit = data.drafts?.find((d) => d.message?.id === messageId);
+      if (hit?.id) return hit.id;
+      if (!data.nextPageToken) return null;
+      pageToken = data.nextPageToken;
+    }
+    return null;
+  }
+
   async draftStatus(ref: DraftRef): Promise<DraftStatus> {
     try {
       await this.gmail().users.drafts.get({ userId: "me", id: ref.id, format: "minimal" });

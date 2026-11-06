@@ -624,6 +624,18 @@
   .snack { position: fixed; left: 24px; bottom: 24px; z-index: 60; background: #303134; color: #e8eaed; border-radius: 6px; padding: 12px 16px; display: flex; gap: 24px; align-items: center; box-shadow: 0 4px 16px #0008; font-size: 14px; }
   .snack[hidden] { display: none; }
   .snack button { background: none; border: 0; color: #8ab4f8; font: 600 14px var(--sans); cursor: pointer; padding: 0; }
+
+  /* ---- drafts never look like sent mail */
+  .gm-msg.draft { margin: 8px 16px; border: 2px dashed #f2b600; border-radius: 10px; background: #fffbea; padding: 12px 18px 14px 14px; }
+  .gm-msg.draft + .gm-msg { border-top: 0; }
+  .gm-draftbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .gm-draftbar .tagd { display: inline-flex; gap: 4px; align-items: center; background: #f2b600; color: #3d2e00; font-weight: 700; font-size: 12px; padding: 2px 10px 2px 7px; border-radius: 999px; }
+  .gm-draftbar .tagd .ms { font-size: 15px; }
+  .gm-draftbar .nots { color: #7a5c00; font-size: 12.5px; font-weight: 600; }
+  .gm-draftacts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  #reader .gm-pill.send { background: #0b57d0; color: #fff; border-color: #0b57d0; }
+  .drafttag { color: #d93025; font-weight: 600; }
+  .gm .gr .drafttag { color: #f28b82; }
 </style>
 </head>
 <body>
@@ -1427,7 +1439,7 @@ async function loadThreads() {
   $("#threads").innerHTML = mailRows.map((t) => `<div class="gr ${t.unread ? "unread" : ""} ${mailSel.has(t.id) ? "sel" : ""}" data-t="${esc(t.id)}" ${t.generated ? "" : 'draggable="true"'}>
       <input type="checkbox" class="gm-cb" ${mailSel.has(t.id) ? "checked" : ""} aria-label="Select">
       <button class="star ${t.starred ? "on" : ""}" type="button" title="${t.starred ? "Starred" : "Not starred"}">${msI("star", t.starred)}</button>
-      <div class="who">${t.generated ? `<span class="gsrc">${esc(t.generated.source)}</span>${esc(t.to?.map(nameOf).join(", ") || "")}` : draftView ? `<span style="color:#f28b82">Draft</span>` : esc(sentView ? "Me" : nameOf(t.from))}${t.messageCount > 1 ? ` <small>${t.messageCount}</small>` : ""}</div>
+      <div class="who">${t.generated ? `<span class="gsrc">${esc(t.generated.source)}</span>${esc(t.to?.map(nameOf).join(", ") || "")}` : draftView ? `<span class="drafttag">Draft</span>` : esc(sentView ? "Me" : nameOf(t.from))}${t.messageCount > 1 ? ` <small>${t.messageCount}</small>` : ""}${!draftView && !t.generated && t.hasDraft ? `, <span class="drafttag">${t.claudeDraft ? "Claude draft" : "Draft"}</span>` : ""}</div>
       <div class="ln">${(t.labelIds || []).includes("IMPORTANT") && mailLabel !== "IMPORTANT" ? "" : ""}${t.generated?.jobNumber ? `<span class="chip">#${t.generated.jobNumber}</span>` : ""}<span class="sj">${esc(t.subject || "(no subject)")}</span><span class="sn"> - ${esc(t.snippet)}</span></div>
       <div class="dt">${t.hasAttachments ? `<span class="ms" style="font-size:16px;vertical-align:-3px;margin-right:6px">attach_file</span>` : ""}${gDate(t.date)}</div>
       <div class="acts"><button class="gm-ib" data-act1="archive" title="Archive">${msI("archive")}</button><button class="gm-ib" data-act1="trash" title="Delete">${msI("delete")}</button><button class="gm-ib" data-act1="${t.unread ? "read" : "unread"}" title="${t.unread ? "Mark as read" : "Mark as unread"}">${msI(t.unread ? "drafts" : "mark_email_unread")}</button></div>
@@ -1549,11 +1561,13 @@ async function openThread(id) {
       <h1>${esc(t.messages[0]?.subject || "(no subject)")}${labelsOn.map((l) => `<span class="chip">${esc(GLABELS.find((g) => g[0] === l)?.[1] || l)}</span>`).join("")}${t.jobs.map((j) => `<a href="#" class="chip" data-do="open" data-n="${j.jobNumber}" title="${esc(j.stage)}">#${j.jobNumber} ${esc(j.name)}</a>`).join("")}</h1>
       <div class="gm-filebar">${t.jobs.length ? t.jobs.map((j) => `<button class="gm-pill" data-do="filethread" data-thread="${esc(t.id)}" data-n="${j.jobNumber}" type="button">${msI("drive_file_move")}File to #${j.jobNumber}</button>`).join("") : `<span>Not matched to a job.</span>`}
         <select id="fileto-job" aria-label="File to another job"><option value="">File to another job…</option>${jobs.map((j) => `<option value="${j.jobNumber}">#${j.jobNumber} ${esc(j.name)}</option>`).join("")}</select><button class="gm-pill" data-do="filethread" data-thread="${esc(t.id)}" type="button">File</button></div>
-      ${t.messages.map((m, i) => `<div class="gm-msg ${i < t.messages.length - 1 && t.messages.length > 2 ? "col" : ""}" data-mi="${i}">${avatar(m.from)}<div style="min-width:0">
-          <div class="gm-mh"><b>${esc(nameOf(m.from))}</b><span class="em">&lt;${esc(addrOf(m.from))}&gt;</span><span class="when">${new Date(m.date).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span></div>
+      ${t.messages.map((m, i) => `<div class="gm-msg ${m.draft ? "draft" : ""} ${i < t.messages.length - 1 && t.messages.length > 2 && !m.draft ? "col" : ""}" data-mi="${i}">${avatar(m.from)}<div style="min-width:0">
+          ${m.draft ? `<div class="gm-draftbar"><span class="tagd">${m.draft.generated ? `${msI("auto_awesome")} Claude draft${m.draft.source && m.draft.source !== "Claude" ? ` · ${esc(m.draft.source)}` : ""}` : `${msI("draft")} Draft`}</span><span class="nots">Not sent. Nothing goes out until you press Send and confirm.</span></div>` : ""}
+          <div class="gm-mh"><b>${esc(nameOf(m.from))}</b><span class="em">&lt;${esc(addrOf(m.from))}&gt;</span><span class="when">${m.draft ? (m.date && !isNaN(Date.parse(m.date)) ? `Draft saved ${new Date(m.date).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Draft") : new Date(m.date).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span></div>
           <div class="snip">${esc(m.body.slice(0, 160))}</div>
           <div class="gm-to">to ${esc(m.to.map((x) => (addrOf(x).toLowerCase() === "hunter@forefrontteam.com" ? "me" : nameOf(x))).join(", "))}${m.cc.length ? `, cc ${esc(m.cc.map(nameOf).join(", "))}` : ""}</div>
           <div class="gm-body">${m.html ? `<iframe sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" data-i="${i}" title="Message" scrolling="no"></iframe>` : textMail(m.body)}</div>
+          ${m.draft ? `<div class="gm-draftacts"><button class="gm-pill send" type="button" data-dsend="${esc(m.id)}">${msI("send")}Send…</button>${m.attachments.length ? `<a class="gm-pill" href="https://mail.google.com/mail/u/0/#drafts?compose=${encodeURIComponent(m.id)}" target="_blank" rel="noopener" title="It has attachments, so edit it in Gmail to keep them">${msI("edit")}Edit in Gmail ↗</a>` : `<button class="gm-pill" type="button" data-dedit="${i}">${msI("edit")}Edit</button>`}<button class="gm-pill" type="button" data-ddel="${esc(m.id)}">${msI("delete")}Delete draft</button></div>` : ""}
           ${m.attachments.length ? `<div class="gm-atts">${m.attachments.map((a) => `<a class="gm-att" href="/api/mail/attachment/${esc(m.id)}/${esc(a.id)}?name=${encodeURIComponent(a.filename)}" target="_blank">${msI(/\.pdf$/i.test(a.filename) ? "picture_as_pdf" : /\.(jpe?g|png|gif|heic)$/i.test(a.filename) ? "image" : "attach_file")}<span>${esc(a.filename)}</span></a>`).join("")}</div>` : ""}
         </div></div>`).join("")}
       <div class="gm-replies"><button class="gm-pill" id="replybtn" type="button">${msI("reply")}Reply</button><button class="gm-pill" id="replyall" type="button">${msI("reply_all")}Reply all</button><button class="gm-pill" id="fwd" type="button">${msI("forward")}Forward</button>${status.agent ? `<button class="gm-pill ai" id="claudereply" type="button">${msI("auto_awesome")}Draft reply with Claude</button>` : ""}</div>
@@ -1591,6 +1605,10 @@ async function openThread(id) {
   $("#claudereply") && ($("#claudereply").onclick = () => askClaude(`Read Gmail thread ${t.id}${job ? ` (job #${job.jobNumber})` : ""} and draft my reply in Gmail as a draft in that thread, in my voice. Don't send it.`, job?.jobNumber));
 }
 $("#reader").addEventListener("click", async (e) => {
+  const ds = e.target.closest("[data-dsend]"), dd = e.target.closest("[data-ddel]"), de = e.target.closest("[data-dedit]");
+  if (ds) { try { await api(`/api/mail/drafts/${encodeURIComponent(ds.dataset.dsend)}/send?thread=${encodeURIComponent(mailThread)}`, { method: "POST", body: {} }); } catch (err) { log(err.message, "t-err"); } return; }
+  if (dd) { if (!confirm("Delete this draft?")) return; try { await api(`/api/mail/drafts/${encodeURIComponent(dd.dataset.ddel)}/delete?thread=${encodeURIComponent(mailThread)}`, { method: "POST", body: {} }); snack("Draft deleted."); openThread(mailThread); } catch (err) { log(err.message, "t-err"); } return; }
+  if (de) { const m = threadView.messages[Number(de.dataset.dedit)]; openCompose({ reply: !!threadView.messages.find((x) => !x.draft), to: m.to.join(", "), cc: m.cc.join(", "), subject: m.subject, body: m.body, threadId: threadView.id, inReplyTo: threadView.messages.filter((x) => !x.draft).at(-1)?.messageIdHeader, job: threadView.jobs[0]?.jobNumber, replaceDraft: m.id }); return; }
   const b = e.target.closest("[data-m]"); if (!b || !mailThread) return;
   const starred = threadView?.messages.some((m) => m.labelIds?.includes("STARRED"));
   const change = { archive: { remove: ["INBOX"] }, spam: { add: ["SPAM"], remove: ["INBOX"] }, unread: { add: ["UNREAD"] }, trash: { trash: true }, star: starred ? { remove: ["STARRED"] } : { add: ["STARRED"] } }[b.dataset.m];
@@ -1599,12 +1617,14 @@ $("#reader").addEventListener("click", async (e) => {
 
 // ---- compose (send only on your click + confirm)
 let composeFiles = [];
+let composeReplace = "";
 function openCompose(o) {
   $("#cp-title").textContent = o.reply ? (o.subject || "Reply") : o.subject?.startsWith("Fwd:") ? o.subject : "New Message";
   $("#composedlg").classList.remove("min");
   $("#cp-job").innerHTML = `<option value="">(none)</option>` + jobs.map((j) => `<option value="${j.jobNumber}" ${o.job === j.jobNumber ? "selected" : ""}>#${j.jobNumber} ${esc(j.name)}</option>`).join("");
   $("#cp-to").value = o.to || ""; $("#cp-cc").value = o.cc || ""; $("#cp-subject").value = o.subject || ""; $("#cp-body").value = o.body || "";
   $("#cp-thread").value = o.threadId || ""; $("#cp-reply").value = o.inReplyTo || "";
+  composeReplace = o.replaceDraft || "";
   $("#cp-bcc").value = o.job ? `office+${o.job}@forefrontteam.com` : "";
   composeFiles = [];
   renderComposeFiles();
@@ -1630,7 +1650,7 @@ $("#composedlg").addEventListener("close", async () => {
   const how = $("#composedlg").returnValue;
   if (how !== "send" && how !== "draft") return;
   const n = $("#cp-job").value ? Number($("#cp-job").value) : undefined;
-  const body = { to: $("#cp-to").value, cc: $("#cp-cc").value, bcc: $("#cp-bcc").value, subject: $("#cp-subject").value, body: $("#cp-body").value, threadId: $("#cp-thread").value || undefined, inReplyTo: $("#cp-reply").value || undefined, jobNumber: n, attachments: composeFiles.map((p) => ({ job: n, path: p })) };
+  const body = { to: $("#cp-to").value, cc: $("#cp-cc").value, bcc: $("#cp-bcc").value, subject: $("#cp-subject").value, body: $("#cp-body").value, threadId: $("#cp-thread").value || undefined, inReplyTo: $("#cp-reply").value || undefined, jobNumber: n, attachments: composeFiles.map((p) => ({ job: n, path: p })), replaceDraft: composeReplace || undefined };
   try {
     if (how === "send") await api("/api/mail/send", { method: "POST", body });
     else { await api("/api/mail/draft", { method: "POST", body }); log("Saved as a Gmail draft."); }

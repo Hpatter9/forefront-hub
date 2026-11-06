@@ -25,3 +25,23 @@ describe("Claude drafts folder", () => {
     expect(await openGeneratedDrafts(hub)).toEqual([]);
   });
 });
+
+describe("drafts are never sent on their own", () => {
+  it("Claude's tools can make drafts but have no way to send", async () => {
+    const { readFileSync } = await import("node:fs");
+    const tools = readFileSync(new URL("../src/agent/tools.ts", import.meta.url), "utf8");
+    expect(tools).not.toMatch(/gmail\.send\b|sendDraft|drafts\.send/);
+    const generated = readFileSync(new URL("../src/workflows/generated.ts", import.meta.url), "utf8");
+    expect(generated).not.toMatch(/\.send\(|sendDraft/);
+  });
+
+  it("a Claude draft stays a draft until it's sent by hand", async () => {
+    const { hub } = testHub();
+    const ref = await createGeneratedDraft(hub, { to: ["a@b.example"], bcc: [], subject: "Follow-up", body: "Hi", attachments: [] });
+    expect((await hub.gmail.draftStatus(ref)).state).toBe("draft");
+    const t = await hub.gmail.getThread(ref.id);
+    expect(t.messages[0].labelIds).toContain("DRAFT");
+    await hub.gmail.sendDraft!(ref.id);
+    expect((await hub.gmail.draftStatus(ref)).state).toBe("sent");
+  });
+});

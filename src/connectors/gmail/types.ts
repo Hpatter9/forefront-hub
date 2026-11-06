@@ -85,6 +85,11 @@ export interface MailClient {
    * emails only to Forefront's own office+<job#> log addresses.
    */
   send?(d: DraftInput): Promise<{ id: string; threadId: string; messageId: string }>;
+  /** Sends an existing draft as it is (attachments included). Only the Mail tab's Send button calls it, after Hunter confirms. */
+  sendDraft?(draftId: string): Promise<void>;
+  deleteDraft?(draftId: string): Promise<void>;
+  /** The draft id for a draft message in a thread (Gmail keeps the two apart). */
+  draftIdFor?(messageId: string): Promise<string | null>;
   /** Archive (remove INBOX), mark read (remove UNREAD), star, trash. */
   modifyThread?(id: string, change: { add?: string[]; remove?: string[]; trash?: boolean; untrash?: boolean }): Promise<void>;
   attachment?(messageId: string, attachmentId: string): Promise<Buffer>;

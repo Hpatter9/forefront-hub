@@ -176,7 +176,15 @@ async function mailThread(id: string) {
   const numbers = [...new Set([...text.matchAll(/(?:#|job\s*)(\d{4})\b/gi)].map((x) => x[1]))];
   const streets = [...new Set([...text.matchAll(/\b\d{2,6}\s+(?:[NSEW]\.?\s+)?[A-Z][a-z]+(?:\s[A-Z][a-z]+)?\s(?:St|Street|Ave|Avenue|Ct|Court|Dr|Drive|Rd|Road|Ln|Lane|Way|Blvd|Cir|Circle|Pl|Place|Pkwy|Trl|Ter)\b/g)].map((x) => x[0]))].slice(0, 10);
   const jobs = (await hub.homebase.suggestJobs?.({ addresses: addresses.slice(0, 50), numbers, streets }).catch(() => [])) ?? [];
-  return { ...t, jobs: jobs.slice(0, 3).map((j) => ({ jobNumber: j.jobNumber, name: j.name, address: j.address, stage: j.stage })) };
+  // Drafts in the thread are marked (and Claude's say what made them), so they can't be mistaken for sent mail.
+  const { generatedDrafts } = await import("../workflows/generated.js");
+  const gen = generatedDrafts(hub);
+  const messages = t.messages.map((m) => {
+    if (!m.labelIds?.includes("DRAFT")) return m;
+    const g = gen.find((x) => (m.messageIdHeader && x.messageId === m.messageIdHeader) || x.draftId === m.id);
+    return { ...m, draft: { generated: !!g, source: g?.source, jobNumber: g?.jobNumber } };
+  });
+  return { ...t, messages, jobs: jobs.slice(0, 3).map((j) => ({ jobNumber: j.jobNumber, name: j.name, address: j.address, stage: j.stage })) };
 }
 
 function resolveAttachments(list: { job: number; path: string }[] = []) {
@@ -437,7 +445,10 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === "/api/mail/threads" && req.method === "GET") {
       if (!hub.gmail.listThreads) return send(res, 400, { error: "This Gmail connection can't list mail." });
-      return send(res, 200, await hub.gmail.listThreads({ label: q("label") || undefined, q: q("q") || undefined, pageToken: q("page") || undefined }));
+      const list = await hub.gmail.listThreads({ label: q("label") || undefined, q: q("q") || undefined, pageToken: q("page") || undefined });
+      const { generatedDrafts } = await import("../workflows/generated.js");
+      const claude = new Set(generatedDrafts(hub).filter((g) => g.state === "draft" && g.threadId).map((g) => g.threadId!));
+      return send(res, 200, { ...list, threads: list.threads.map((t) => ({ ...t, hasDraft: !!t.labelIds?.includes("DRAFT"), claudeDraft: claude.has(t.id) })) });
     }
     const t = p.match(/^\/api\/mail\/threads\/([\w-]+)(?:\/(modify))?$/);
     if (t && req.method === "GET") return send(res, 200, await mailThread(t[1]));
@@ -445,6 +456,29 @@ const server = http.createServer(async (req, res) => {
       const b = await body(req);
       await hub.gmail.modifyThread?.(t[1], b);
       return send(res, 200, { ok: true });
+    }
+    // A draft in a thread: Send (only after Hunter confirms, with the recipients in front of him) or Delete.
+    const dr = p.match(/^\/api\/mail\/drafts\/([\w-]+)\/(send|delete)$/);
+    if (dr && req.method === "POST") {
+      const msgId = dr[1];
+      if (!hub.gmail.draftIdFor || !hub.gmail.sendDraft || !hub.gmail.deleteDraft) return send(res, 400, { error: "This Gmail connection can't do that." });
+      const draftId = await hub.gmail.draftIdFor(msgId);
+      if (!draftId) return send(res, 404, { error: "That draft isn't in Gmail any more (sent or deleted?)." });
+      const th = q("thread") ? await hub.gmail.getThread(q("thread")).catch(() => null) : null;
+      const m = th?.messages.find((x) => x.id === msgId);
+      if (dr[2] === "delete") {
+        await hub.gmail.deleteDraft(draftId);
+        bus.emit({ type: "changed", what: "mail" });
+        return send(res, 200, { ok: true });
+      }
+      if (hub.gmail.fullAccess && !hub.gmail.fullAccess()) return send(res, 400, { error: "Gmail needs to be reconnected once to send from the hub: double-click Connect Gmail." });
+      return send(res, 202, task(`Send draft "${m?.subject ?? ""}"`, undefined, async () => {
+        const lines = m ? [`To: ${m.to.join(", ")}`, m.cc.length ? `Cc: ${m.cc.join(", ")}` : "", `Subject: ${m.subject}`, m.attachments.length ? `Attached: ${m.attachments.map((a) => a.filename).join(", ")}` : ""].filter(Boolean) : [];
+        if (!(await approver.confirm("Send this draft now?", lines))) return hub.say("Not sent. It's still a draft.");
+        await hub.gmail.sendDraft!(draftId);
+        hub.say(`Sent "${m?.subject ?? "the draft"}"${m ? ` to ${m.to.join(", ")}` : ""}.`);
+        bus.emit({ type: "changed", what: "mail" });
+      }, "mail"));
     }
     const att = p.match(/^\/api\/mail\/attachment\/([\w-]+)\/([\w-]+)$/);
     if (att) {
@@ -466,6 +500,7 @@ const server = http.createServer(async (req, res) => {
         const lines = [`To: ${d.to.join(", ")}`, d.cc.length ? `Cc: ${d.cc.join(", ")}` : "", d.bcc.length ? `Bcc: ${d.bcc.join(", ")}` : "", `Subject: ${d.subject}`, d.attachments.length ? `Attached: ${d.attachments.map((f) => path.basename(f)).join(", ")}` : ""].filter(Boolean);
         if (!(await approver.confirm("Send this email now?", lines))) return hub.say("Not sent. It's still in the compose box.");
         await hub.gmail.send!(d);
+        if (b.replaceDraft) await replaceDraft(String(b.replaceDraft));
         hub.say(`Sent "${d.subject}" to ${d.to.join(", ")}.`);
         bus.emit({ type: "changed", what: "mail" });
         if (job) {
@@ -569,6 +604,8 @@ const server = http.createServer(async (req, res) => {
       const b = await body(req);
       const split = (s: unknown) => String(s ?? "").split(/[,;]/).map((x) => x.trim()).filter(Boolean);
       const ref = await hub.gmail.createDraft({ to: split(b.to), cc: split(b.cc), bcc: split(b.bcc), subject: String(b.subject ?? ""), body: String(b.body ?? ""), attachments: resolveAttachments(b.attachments), threadId: b.threadId || undefined, inReplyTo: b.inReplyTo || undefined });
+      if (b.replaceDraft) await replaceDraft(String(b.replaceDraft));
+      bus.emit({ type: "changed", what: "mail" });
       return send(res, 200, { ok: true, id: ref.id });
     }
 
@@ -795,4 +832,10 @@ async function travelNote(): Promise<string> {
 async function myCalendars(): Promise<Set<string>> {
   const cals = await hub.calendar.calendars().catch(() => []);
   return new Set(["primary", ...cals.filter((c) => c.primary).map((c) => c.id)]);
+}
+
+/** After an edited draft is sent or saved again, the old version is removed so it isn't left behind. */
+async function replaceDraft(messageId: string) {
+  const id = await hub.gmail.draftIdFor?.(messageId).catch(() => null);
+  if (id) await hub.gmail.deleteDraft?.(id).catch(() => {});
 }
