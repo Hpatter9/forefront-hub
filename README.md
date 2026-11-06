@@ -97,6 +97,10 @@ C:\Jobs\3226 Augustine\
   the same Claude session. Files dropped into the chat go into the job folder; the job's documents are listed
   beside the chat with a preview.
 
+- **Morning brief**: Plan my day runs on its own at 7:00 AM Denver time on weekdays and shows as Today's brief on
+  the dashboard (`src/workflows/brief.ts`). If the hub opens later, it runs then (until 5 PM). Change it in `.env`:
+  `HUB_BRIEF_TIME=08:00`, `HUB_BRIEF_DAYS=0-6` (every day), or `HUB_BRIEF_TIME=off`.
+
 `npm test` runs everything on mocks, including the skill's real Python scripts (it expects the estimator repo
 next to this one, or `ESTIMATOR_DIR`). `npm run typecheck` checks types.
 

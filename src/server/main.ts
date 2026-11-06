@@ -23,6 +23,7 @@ import { addFile } from "../workflows/uploads.js";
 import { freeSlots } from "../connectors/calendar/index.js";
 import { EventBus, WebApprover } from "./events.js";
 import { Studio } from "../agent/studio.js";
+import { BRIEF, briefDue } from "../workflows/brief.js";
 
 /**
  * The hub's screen: a local web app on 127.0.0.1 (the desktop window will load the same thing). Every action runs the
@@ -291,34 +292,10 @@ const server = http.createServer(async (req, res) => {
         folders: all.length,
       });
     }
-    if (p === "/api/plan" && req.method === "GET") return send(res, 200, readPlan());
+    if (p === "/api/plan" && req.method === "GET") return send(res, 200, { ...readPlan(), schedule: BRIEF });
     if (p === "/api/plan" && req.method === "POST") {
-      if (!cfg.anthropicApiKey) return send(res, 400, { error: "Claude is off on this machine (no Anthropic API key)." });
-      if (readPlan().state === "running") return send(res, 409, { error: "Claude is already planning your day." });
-      const list = reminders(hub, { needsUpload: new Set((lastSync?.needsUpload ?? []).map((x) => x.jobNumber)) });
-      const prompt = `Plan my day. Here is everything the hub thinks needs me, as JSON (kind, job, title, detail, days waiting):\n${JSON.stringify(list.slice(0, 60))}\n\nCheck my Google Calendar and my Google Tasks (due today and overdue) for today and the next few days (hub tools) so the plan fits around what's already booked. For the top replies and follow-ups, read the thread or the job (hub tools) and draft the email in Gmail for me (drafts only; I'll send).\n\nYour final reply is my brief for the day, shown at the top of my dashboard. Write it in this shape, in markdown, and nothing else:\n**Today at a glance:** one or two sentences (what's booked, how many things are waiting, the one thing that matters most).\n\n**Do in this order**\n1. #<job> <Name>: what to do (one line each, most urgent first: an adjuster or homeowner waiting on me beats a stale job; money-heavy proposals before small ones).\n\n**On the calendar:** the day's appointments, one line each (skip if none).\n\n**Drafts ready in Gmail:** one line per draft you made (skip if none).`;
-      const plan: Plan = { state: "running", startedAt: new Date().toISOString(), text: "", steps: [] };
-      savePlan(plan);
-      return send(res, 202, task("Plan my day", undefined, async () => {
-        const { describeTool } = await import("../agent/studio.js");
-        try {
-          plan.text = await (await import("../agent/run.js")).ask(hub, prompt, {
-            onMessage: (m) => {
-              if (m.type !== "assistant") return;
-              for (const b of m.message.content) if (b.type === "tool_use") { plan.steps.push(describeTool(b.name, b.input as Record<string, unknown>)); savePlan(plan); bus.emit({ type: "changed", what: "plan" }); }
-            },
-          });
-          plan.state = "done";
-        } catch (e) {
-          plan.state = "error";
-          plan.error = (e as Error).message;
-          throw e;
-        } finally {
-          plan.finishedAt = new Date().toISOString();
-          savePlan(plan);
-          bus.emit({ type: "changed", what: "plan" });
-        }
-      }));
+      const r = startPlan("button");
+      return "error" in r ? send(res, r.code, { error: r.error }) : send(res, 202, r);
     }
 
     // ---- job list
@@ -702,7 +679,50 @@ function teamPeople() {
 }
 
 // ---- Plan my day: the last brief Claude wrote, shown on the dashboard
-interface Plan { state: "running" | "done" | "error"; startedAt: string; finishedAt?: string; text: string; steps: string[]; error?: string }
+interface Plan { state: "running" | "done" | "error"; startedAt: string; finishedAt?: string; text: string; steps: string[]; error?: string; trigger?: "button" | "morning" }
+
+function startPlan(trigger: "button" | "morning"): { taskId: string } | { error: string; code: number } {
+  if (!cfg.anthropicApiKey) return { error: "Claude is off on this machine (no Anthropic API key).", code: 400 };
+  if (readPlan().state === "running") return { error: "Claude is already planning your day.", code: 409 };
+  const list = reminders(hub, { needsUpload: new Set((lastSync?.needsUpload ?? []).map((x) => x.jobNumber)) });
+  const prompt = `Plan my day. Here is everything the hub thinks needs me, as JSON (kind, job, title, detail, days waiting):\n${JSON.stringify(list.slice(0, 60))}\n\nCheck my Google Calendar and my Google Tasks (due today and overdue) for today and the next few days (hub tools) so the plan fits around what's already booked. For the top replies and follow-ups, read the thread or the job (hub tools) and draft the email in Gmail for me (drafts only; I'll send).\n\nYour final reply is my brief for the day, shown at the top of my dashboard. Write it in this shape, in markdown, and nothing else:\n**Today at a glance:** one or two sentences (what's booked, how many things are waiting, the one thing that matters most).\n\n**Do in this order**\n1. #<job> <Name>: what to do (one line each, most urgent first: an adjuster or homeowner waiting on me beats a stale job; money-heavy proposals before small ones).\n\n**On the calendar:** the day's appointments, one line each (skip if none).\n\n**Drafts ready in Gmail:** one line per draft you made (skip if none).`;
+  const plan: Plan = { state: "running", startedAt: new Date().toISOString(), text: "", steps: [], trigger };
+  savePlan(plan);
+  bus.emit({ type: "changed", what: "plan" });
+  return task(trigger === "morning" ? "Morning brief" : "Plan my day", undefined, async () => {
+    const { describeTool } = await import("../agent/studio.js");
+    try {
+      plan.text = await (await import("../agent/run.js")).ask(hub, prompt, {
+        onMessage: (m) => {
+          if (m.type !== "assistant") return;
+          for (const b of m.message.content) if (b.type === "tool_use") { plan.steps.push(describeTool(b.name, b.input as Record<string, unknown>)); savePlan(plan); bus.emit({ type: "changed", what: "plan" }); }
+        },
+      });
+      plan.state = "done";
+    } catch (e) {
+      plan.state = "error";
+      plan.error = (e as Error).message;
+      throw e;
+    } finally {
+      plan.finishedAt = new Date().toISOString();
+      savePlan(plan);
+      bus.emit({ type: "changed", what: "plan" });
+    }
+  });
+}
+
+// ---- the morning brief: on its own at 7:00 AM Denver time on weekdays (HUB_BRIEF_TIME=off stops it,
+// HUB_BRIEF_DAYS=0-6 for every day). If the hub wasn't open at 7, it runs as soon as it opens, until 5 PM.
+function checkBrief() {
+  const last = readPlan();
+  if (!cfg.anthropicApiKey || last.state === "running" || !briefDue(new Date(), "startedAt" in last ? last : null)) return;
+  const r = startPlan("morning");
+  if (!("error" in r)) hub.say("Making this morning's brief…");
+}
+if (BRIEF.at !== "off") {
+  setTimeout(checkBrief, 60_000);
+  setInterval(checkBrief, 60_000);
+}
 const planFile = () => path.join(cfg.stateDir, "plan.json");
 function readPlan(): Plan | { state: "none" } {
   try {

@@ -2306,12 +2306,13 @@ async function renderBrief() {
   const today = new Date().toDateString() === new Date(p.startedAt).toDateString();
   if (p.state !== "running" && !today && store.get("briefHidden", "") === p.startedAt) { el.innerHTML = ""; return; }
   const when = new Date(p.finishedAt || p.startedAt);
-  const stamp = `${today ? "Today" : when.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}, ${when.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+  const stamp = `${p.trigger === "morning" ? "Made on its own · " : ""}${today ? "Today" : when.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}, ${when.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+  const sch = p.schedule && /^\d/.test(p.schedule.at) ? `Runs on its own at ${new Date(`2000-01-01T${p.schedule.at.padStart(5, "0")}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${p.schedule.days === "1-5" ? " on weekdays" : p.schedule.days === "0-6" ? " every day" : ""}` : "";
   const body = p.state === "running"
     ? `<div class="bwork"><span class="spin"></span>Claude is going through your jobs, inbox, calendar and tasks…</div>${p.steps.length ? `<div class="bsteps">${p.steps.slice(-4).map((x) => `<div>${esc(x)}</div>`).join("")}</div>` : ""}`
     : p.state === "error" ? `<div class="small" style="color:var(--bad)">${esc(p.error || "Claude couldn't finish the plan.")}</div>`
     : `<div class="btext">${md(p.text).replace(/(^|[\s(>])#(\d{4})\b/g, '$1<a href="#" data-do="open" data-n="$2">#$2</a>')}</div>`;
-  el.innerHTML = `<div class="card brief ${p.state}"><h3><span>Today's brief <span class="small muted" style="font-weight:400">${p.state === "running" ? "working…" : esc(stamp)}</span></span>${p.state === "running" ? "" : `<span class="row" style="gap:6px">${!today ? `<span class="small muted">from an earlier day</span>` : ""}<button class="btn small" data-do="briefhide" data-at="${esc(p.startedAt)}">Hide</button></span>`}</h3>${body}</div>`;
+  el.innerHTML = `<div class="card brief ${p.state}"><h3><span>Today's brief <span class="small muted" style="font-weight:400">${p.state === "running" ? "working…" : esc(stamp)}</span></span>${p.state === "running" ? "" : `<span class="row" style="gap:6px">${!today ? `<span class="small muted">from an earlier day</span>` : sch ? `<span class="small muted">${esc(sch)}</span>` : ""}<button class="btn small" data-do="briefhide" data-at="${esc(p.startedAt)}">Hide</button></span>`}</h3>${body}</div>`;
 }
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-do=briefhide]"); if (!b) return; store.set("briefHidden", b.dataset.at); $("#brief").innerHTML = ""; });
 const es = new EventSource("/api/events");
