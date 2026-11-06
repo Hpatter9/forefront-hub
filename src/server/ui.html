@@ -36,7 +36,7 @@
   button, input, select, textarea { font: inherit; color: inherit; }
   a { color: var(--link); }
   [hidden] { display: none !important; }
-  .app { display: grid; grid-template-columns: 232px minmax(0, 1fr); height: 100%; }
+  .app { display: grid; grid-template-columns: var(--w-nav, 232px) minmax(0, 1fr); height: 100%; }
 
   /* ---- left nav (Homebase's sidebar, flipped light) */
   .side-nav { background: var(--side-bg); color: var(--side-ink); display: flex; flex-direction: column; min-height: 0; padding: 22px 0 14px; }
@@ -45,7 +45,9 @@
   .logo b { font-size: 21px; letter-spacing: 1.5px; font-weight: 700; }
   .logo span { font-size: 8px; letter-spacing: 5px; color: var(--side-muted); }
   nav.tabs { display: grid; gap: 2px; padding: 0 8px; }
-  nav.tabs button { background: transparent; border: 0; color: var(--side-ink); text-align: left; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
+  nav.tabs button { background: transparent; border: 0; color: var(--side-ink); text-align: left; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 15px; display: flex; gap: 12px; align-items: center; position: relative; white-space: nowrap; }
+  nav.tabs button .ms { font-size: 21px; flex: none; }
+  nav.tabs button .count { margin-left: auto; }
   nav.tabs button:hover { background: var(--side-active); }
   nav.tabs button.active { background: var(--side-active); font-weight: 600; }
   nav.tabs .count { font-size: 11px; background: var(--side-ink); color: var(--side-bg); border-radius: 999px; padding: 0 7px; }
@@ -59,7 +61,7 @@
   .side-foot button { background: transparent; border: 0; color: var(--side-muted); font-size: 12px; cursor: pointer; padding: 2px 0; text-decoration: underline; }
 
   .mainc { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-  .topbar { display: flex; align-items: center; gap: 12px; padding: 0 28px; min-height: 54px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .topbar { display: flex; align-items: center; gap: 12px; padding: 0 28px 0 14px; min-height: 54px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
   .crumbs { color: var(--muted); font-size: 14px; }
   .crumbs b { color: var(--ink); font-weight: 500; }
   .topright { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 0; }
@@ -69,7 +71,7 @@
   .topbtn:hover { border-color: var(--muted); }
 
   .view { flex: 1; min-height: 0; overflow: hidden; }
-  .split { display: grid; grid-template-columns: 330px 1fr; height: 100%; min-height: 0; }
+  .split { display: grid; grid-template-columns: var(--w-jobs, 330px) minmax(0, 1fr); height: 100%; min-height: 0; position: relative; }
   aside { border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
   .pad { padding: 12px; display: grid; gap: 8px; border-bottom: 1px solid var(--line); }
   .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -193,11 +195,11 @@
   .gm { /* Gmail's layout in the hub's own colors (follows the theme switch) */
     --g-bg: var(--bg); --g-panel: var(--panel); --g-row: var(--panel); --g-unread: var(--panel-2); --g-hover: var(--soft); --g-line: var(--line); --g-tx: var(--ink); --g-sub: color-mix(in srgb, var(--ink) 78%, var(--muted)); --g-mut: var(--muted);
     --g-compose: var(--accent); --g-compose-tx: var(--accent-ink); --g-sel: var(--panel-2); --g-sel-tx: var(--ink); --g-blue: var(--link); --g-star: #e8b931; --g-field: var(--panel-2); --g-chip: var(--soft);
-    background: var(--g-bg); color: var(--g-tx); height: 100%; display: grid; grid-template-columns: 256px minmax(0, 1fr); grid-template-rows: 64px minmax(0, 1fr); font: 14px/1.4 var(--sans); }
-  .gm .ms, .gcomp .ms { font-family: "Material Symbols Outlined"; font-weight: normal; font-style: normal; font-size: 20px; line-height: 1; letter-spacing: normal; text-transform: none; white-space: nowrap; direction: ltr; -webkit-font-feature-settings: "liga"; font-feature-settings: "liga"; -webkit-font-smoothing: antialiased; font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 20; }
+    background: var(--g-bg); color: var(--g-tx); height: 100%; display: grid; grid-template-columns: var(--w-gm, 256px) minmax(0, 1fr); grid-template-rows: 64px minmax(0, 1fr); font: 14px/1.4 var(--sans); }
+  .ms { font-family: "Material Symbols Outlined"; font-weight: normal; font-style: normal; font-size: 20px; line-height: 1; letter-spacing: normal; text-transform: none; white-space: nowrap; direction: ltr; -webkit-font-feature-settings: "liga"; font-feature-settings: "liga"; -webkit-font-smoothing: antialiased; font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 20; }
   .gm .ms.fill { font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 20; }
   .gm-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 8px 16px 8px 24px; }
-  .gm-brand { width: 232px; display: flex; align-items: center; gap: 10px; font-size: 22px; color: var(--g-sub); }
+  .gm-brand { width: 190px; display: flex; align-items: center; gap: 10px; font-size: 22px; color: var(--g-sub); }
   .gm-brand .ms { font-size: 28px; color: var(--g-tx); }
   .gm-search { flex: 1; max-width: 720px; display: flex; align-items: center; gap: 8px; background: var(--g-field); border: 1px solid var(--g-line); border-radius: 24px; padding: 0 8px 0 16px; height: 48px; }
   .gm-search:focus-within { background: var(--g-panel); border-color: var(--g-mut); }
@@ -297,7 +299,7 @@
   .gcomp.min form > :not(.gc-h) { display: none; }
   @media (max-width: 980px) { .gm { grid-template-columns: 1fr; grid-template-rows: auto auto minmax(0, 1fr); } .gm-brand { display: none; } .gm-rail { display: flex; overflow-x: auto; padding: 0 8px 8px; } .gm-compose { margin: 0 8px 0 0; height: 40px; flex: none; } .gm-lab { border-radius: 16px; flex: none; padding: 0 12px; } .gm-labh { display: none; } .gm-main { margin: 0 8px 8px; } .gr { grid-template-columns: 28px 28px minmax(80px, 120px) minmax(0, 1fr) 64px; } .gm-th h1, .gm-filebar { margin-left: 16px; margin-right: 16px; } .gm-replies { padding-left: 16px; } }
   /* calendar */
-  .calwrap { display: grid; grid-template-columns: 210px minmax(0, 1fr); height: 100%; min-height: 0; }
+  .calwrap { display: grid; grid-template-columns: var(--w-cal, 210px) minmax(0, 1fr); height: 100%; min-height: 0; position: relative; }
   .calside { border-right: 1px solid var(--line); padding: 14px 12px; overflow: auto; display: grid; gap: 14px; align-content: start; background: var(--panel); }
   .calside label { display: flex; gap: 8px; align-items: center; font-size: 14px; cursor: pointer; }
   .calside .sw { width: 12px; height: 12px; border-radius: 3px; flex: none; }
@@ -443,8 +445,8 @@
   }
 
   /* ---- Estimator tab: chat with Claude + the job's documents */
-  .est { display: grid; grid-template-columns: 270px minmax(0, 1fr) minmax(0, 0.9fr); height: 100%; min-height: 0; }
-  .est.noprev { grid-template-columns: 270px minmax(0, 1fr) 0; }
+  .est { display: grid; grid-template-columns: var(--w-est, 270px) minmax(0, 1fr) var(--w-prev, minmax(0, 0.9fr)); height: 100%; min-height: 0; position: relative; }
+  .est.noprev { grid-template-columns: var(--w-est, 270px) minmax(0, 1fr) 0; }
   .est-side { border-right: 1px solid var(--line); background: var(--panel); overflow: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
   .est-side h5 { margin: 0 0 6px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
   .est-job { font-size: 13px; line-height: 1.45; }
@@ -498,6 +500,35 @@
   .est-prev iframe { flex: 1; border: 0; width: 100%; background: #525659; }
   @media (max-width: 1100px) { .est, .est.noprev { grid-template-columns: 230px minmax(0, 1fr); } .est-prev { position: fixed; inset: 60px 12px 12px auto; width: min(640px, 90vw); z-index: 20; box-shadow: 0 10px 40px #0008; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; } }
   @media (max-width: 700px) { .est, .est.noprev { grid-template-columns: 1fr; } .est-side { display: none; } .est-log, .est-comp, .est-quick { padding-left: 16px; padding-right: 16px; } }
+
+  /* ---- zones: drag a panel's edge to resize it, the menu buttons (or a double-click on the edge) to fold it */
+  .side-nav, .split > aside, .gm-rail, .calside, .est-side, .est-prev { position: relative; }
+  .zgrip { position: absolute; top: 0; bottom: 0; right: -4px; width: 8px; cursor: col-resize; z-index: 6; }
+  .zgrip.left { right: auto; left: -4px; }
+  .zgrip::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background .15s; }
+  .zgrip:hover::after, .zgrip.drag::after { background: var(--link); }
+  body.zdragging, body.zdragging * { cursor: col-resize !important; user-select: none !important; }
+  body.zdragging iframe { pointer-events: none; }
+  .zopen { position: absolute; left: 0; top: 50%; transform: translateY(-50%); z-index: 7; width: 18px; height: 56px; border: 1px solid var(--line); border-left: 0; border-radius: 0 8px 8px 0; background: var(--panel); color: var(--muted); cursor: pointer; display: grid; place-items: center; padding: 0; }
+  .zopen:hover { color: var(--ink); background: var(--panel-2); }
+  .zmenu { background: transparent; border: 0; color: var(--muted); width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; padding: 0; flex: none; }
+  .zmenu:hover { background: var(--soft); color: var(--ink); }
+  .zmenu .ms { font-size: 22px; }
+  /* folded hub menu: an icon rail */
+  .app.z-nav .logo b, .app.z-nav .logo span, .app.z-nav .navlabel, .app.z-nav .recent, .app.z-nav .side-search, .app.z-nav .side-foot, .app.z-nav nav.tabs .nm, .app.z-nav .mini div, .app.z-nav .mini button { display: none; }
+  .app.z-nav .logo { padding: 0 0 18px; }
+  .app.z-nav nav.tabs button { justify-content: center; padding: 10px 0; }
+  .app.z-nav nav.tabs .count { position: absolute; top: 2px; right: 6px; margin: 0; font-size: 10px; padding: 0 5px; }
+  .app.z-nav .mini { grid-template-columns: 40px; margin: 8px; justify-content: center; }
+  /* folded Gmail folders: icons only, like Gmail */
+  .gm.z-gm .gm-lab .nm, .gm.z-gm .gm-lab b, .gm.z-gm .gm-labh, .gm.z-gm .gm-compose .nm { display: none; }
+  .gm.z-gm .gm-rail { padding-right: 8px; }
+  .gm.z-gm .gm-lab { width: 56px; padding: 0; justify-content: center; border-radius: 16px; margin-left: 12px; position: relative; }
+  .gm.z-gm .gm-lab.on b { display: block; position: absolute; top: -2px; right: 2px; font-size: 10px; }
+  .gm.z-gm .gm-compose { padding: 0; width: 56px; justify-content: center; margin-left: 12px; }
+  /* folded side panels */
+  .split.z-jobs > aside, .calwrap.z-cal .calside, .est.z-est .est-side { visibility: hidden; overflow: hidden; padding: 0; border: 0; min-width: 0; }
+  @media (max-width: 980px) { .zgrip, .zopen { display: none; } }
 </style>
 </head>
 <body>
@@ -505,12 +536,12 @@
   <nav class="side-nav" aria-label="Hub">
     <a class="logo" href="#" id="logo"><svg viewBox="0 0 44 40" aria-hidden="true"><path d="M22 3 3 19h5v18h28V19h5L22 3zm0 5.5L33 18v15H11V18l11-9.5z" fill="currentColor"/></svg><b>HUB</b><span>BY FOREFRONT</span></a>
     <nav class="tabs" id="tabs">
-      <button data-tab="today" class="active">Dashboard <span class="count" id="todaycount" hidden></span></button>
-      <button data-tab="jobs">Jobs</button>
-      <button data-tab="est">Estimator</button>
-      <button data-tab="mail">Gmail <span class="count" id="mailcount" hidden></span></button>
-      <button data-tab="cal">Calendar</button>
-      <button data-tab="music">Music</button>
+      <button data-tab="today" class="active" title="Dashboard"><span class="ms">space_dashboard</span><span class="nm">Dashboard</span> <span class="count" id="todaycount" hidden></span></button>
+      <button data-tab="jobs" title="Jobs"><span class="ms">work</span><span class="nm">Jobs</span></button>
+      <button data-tab="est" title="Estimator"><span class="ms">calculate</span><span class="nm">Estimator</span></button>
+      <button data-tab="mail" title="Gmail"><span class="ms">mail</span><span class="nm">Gmail</span> <span class="count" id="mailcount" hidden></span></button>
+      <button data-tab="cal" title="Calendar"><span class="ms">calendar_month</span><span class="nm">Calendar</span></button>
+      <button data-tab="music" title="Music"><span class="ms">music_note</span><span class="nm">Music</span></button>
     </nav>
     <div class="mini" id="mini" hidden style="margin-top:auto"><img id="mini-art" alt=""><div style="min-width:0"><b id="mini-t"></b><span id="mini-a"></span></div><button type="button" id="mini-pp" aria-label="Play or pause"></button></div>
     <div class="navlabel" id="wherelabel" style="margin-top:auto">Where you were</div>
@@ -520,6 +551,7 @@
   </nav>
   <div class="mainc">
   <div class="topbar">
+    <button class="zmenu" type="button" data-zone-toggle="nav" title="Fold or open the menu"><span class="ms">menu</span></button>
     <div class="crumbs" id="crumbs">Dashboard</div>
     <div class="topright">
       <span id="chips" class="row"></span>
@@ -558,6 +590,7 @@
   <section class="view" id="v-mail" hidden>
     <div class="gm" id="gm">
       <div class="gm-head">
+        <button class="gm-ib" type="button" data-zone-toggle="gm" title="Main menu"><span class="ms">menu</span></button>
         <div class="gm-brand"><span class="ms fill">mail</span>Gmail</div>
         <label class="gm-search"><span class="ms">search</span><input type="search" id="mq" placeholder="Search mail" aria-label="Search mail"><button class="gm-ib" type="button" id="mq-clear" title="Clear search" hidden><span class="ms">close</span></button></label>
         <div class="gm-acct" id="gm-acct" title="hunter@forefrontteam.com">H</div>
@@ -583,6 +616,7 @@
       </div>
       <div class="calmain">
         <div class="caltool">
+          <button class="zmenu" type="button" data-zone-toggle="cal" title="Fold or open the side panel"><span class="ms">menu</span></button>
           <button class="btn small" id="cal-today" type="button">Today</button>
           <button class="btn small" id="cal-prev" type="button" aria-label="Previous">‹</button><button class="btn small" id="cal-next" type="button" aria-label="Next">›</button>
           <h2 id="cal-title"></h2>
@@ -1205,9 +1239,10 @@ async function loadMail() {
   const user = labels.filter((l) => l.type === "user").sort((a, b) => a.name.localeCompare(b.name));
   const inbox = labels.find((l) => l.id === "INBOX");
   $("#mailcount").textContent = inbox?.unread || ""; $("#mailcount").hidden = !inbox?.unread;
-  $("#labels").innerHTML = `<button class="gm-compose" id="compose" type="button">${msI("edit")}Compose</button>` +
+  $("#labels").innerHTML = `<button class="gm-compose" id="compose" type="button">${msI("edit")}<span class="nm">Compose</span></button>` +
     GLABELS.filter(([id]) => labels.some((l) => l.id === id) || ["INBOX", "STARRED", "SENT", "DRAFT"].includes(id)).map(([id, nm, ic]) => `<button class="gm-lab ${id === mailLabel ? "on" : ""}" data-label="${id}" type="button">${msI(ic, id === mailLabel)}<span class="nm">${nm}</span>${id === "INBOX" && inbox?.unread ? `<b>${inbox.unread}</b>` : ""}</button>`).join("") +
     (user.length ? `<div class="gm-labh">Labels</div>` + user.map((l) => `<button class="gm-lab ${l.id === mailLabel ? "on" : ""}" data-label="${esc(l.id)}" type="button">${msI("label")}<span class="nm">${esc(l.name)}</span></button>`).join("") : "");
+  if (typeof zgrips === "function") zgrips(); // the folder list was redrawn: put its resize edge back
   $("#compose").addEventListener("click", () => openCompose({}));
   if (status.gmail === "google" && !status.gmailFull) $("#gm-main").insertAdjacentHTML("afterbegin", `<div class="gm-banner" style="margin-top:12px">Gmail is connected for drafts only. To read, send and archive here, double-click <b>Connect Gmail</b> in the hub folder once more and click Allow.</div>`);
   if (status.gmail === "mock") $("#gm-main").insertAdjacentHTML("afterbegin", `<div class="gm-banner" style="margin-top:12px">This is a test inbox: Gmail isn't connected on this machine.</div>`);
@@ -1250,7 +1285,10 @@ async function loadThreads() {
   $("#gm-cats").innerHTML = inboxTabs ? GCATS.map(([k, nm, ic]) => `<button class="gm-cat ${k === mailCat ? "on" : ""}" data-cat="${k}" type="button">${msI(ic, k === mailCat)}${nm}</button>`).join("") : "";
   $("#gm-cats").style.display = inboxTabs ? "flex" : "none";
   if (!mailRows.length) $("#threads").innerHTML = `<div class="gm-empty">Loading…</div>`;
-  const params = q ? { q } : inboxTabs ? { label: "INBOX", q: `category:${mailCat}` } : { label: mailLabel };
+  // Primary is "everything in the inbox that isn't in another tab": "category:primary" finds nothing on accounts
+  // whose inbox doesn't sort into tabs (common on Google Workspace), even when the inbox is full.
+  const catQ = mailCat === "primary" ? "-category:promotions -category:social -category:updates -category:forums" : `category:${mailCat}`;
+  const params = q ? { q } : inboxTabs ? { label: "INBOX", q: catQ } : { label: mailLabel };
   const tok = mailPages[mailPage];
   let r;
   try { r = await api(`/api/mail/threads?${new URLSearchParams({ ...params, ...(tok ? { page: tok } : {}) })}`); } catch (e) { $("#threads").innerHTML = `<div class="gm-empty">${esc(e.message)}</div>`; return; }
@@ -2035,6 +2073,57 @@ $("#v-est").addEventListener("dragleave", () => { if (--estDrag <= 0) { estDrag 
 $("#v-est").addEventListener("dragover", (e) => { if ([...(e.dataTransfer?.types || [])].includes("Files")) e.preventDefault(); });
 $("#v-est").addEventListener("drop", (e) => { if (!e.dataTransfer?.files?.length) return; e.preventDefault(); estDrag = 0; $("#est-drop").hidden = true; estUpload([...e.dataTransfer.files]); });
 
+
+// ============================================================= zones: resizable, foldable side panels (remembered)
+const ZONES = {
+  nav: { box: ".app", panel: ".side-nav", v: "--w-nav", def: 232, min: 180, max: 360, rail: 72 },
+  jobs: { box: ".split", panel: ".split > aside", v: "--w-jobs", def: 330, min: 240, max: 680 },
+  gm: { box: "#gm", panel: "#labels", v: "--w-gm", def: 256, min: 200, max: 420, rail: 88 },
+  cal: { box: ".calwrap", panel: ".calside", v: "--w-cal", def: 210, min: 180, max: 440 },
+  est: { box: "#est", panel: ".est-side", v: "--w-est", def: 270, min: 220, max: 520 },
+  prev: { box: "#est", panel: ".est-prev", v: "--w-prev", def: 0, min: 320, max: 1400, left: true, noFold: true },
+};
+const zstate = () => store.get("zones", {});
+function zapply(k) {
+  const z = ZONES[k], st = zstate()[k] || {}, box = $(z.box); if (!box) return;
+  const folded = !!st.folded && !z.noFold;
+  box.classList.toggle("z-" + k, folded);
+  if (folded) box.style.setProperty(z.v, (z.rail || 0) + "px");
+  else if (st.w) box.style.setProperty(z.v, st.w + "px");
+  else box.style.removeProperty(z.v);
+  let open = box.querySelector(`:scope > .zopen[data-zone="${k}"]`);
+  if (folded && !z.rail) {
+    if (!open) { open = document.createElement("button"); open.type = "button"; open.className = "zopen"; open.dataset.zone = k; open.title = "Open the side panel"; open.innerHTML = '<span class="ms" style="font-size:18px">chevron_right</span>'; open.onclick = () => zfold(k, false); box.appendChild(open); }
+  } else open?.remove();
+}
+function zset(k, patch) { const all = zstate(); all[k] = { ...(all[k] || {}), ...patch }; store.set("zones", all); zapply(k); }
+function zfold(k, folded) { zset(k, { folded: folded ?? !zstate()[k]?.folded }); }
+function zgrips() {
+  for (const [k, z] of Object.entries(ZONES)) {
+    const panel = $(z.panel); if (!panel || panel.querySelector(":scope > .zgrip")) continue;
+    const g = document.createElement("div"); g.className = "zgrip" + (z.left ? " left" : ""); g.title = z.noFold ? "Drag to resize" : "Drag to resize, double-click to fold";
+    panel.appendChild(g);
+    g.addEventListener("dblclick", () => { if (z.noFold) zset(k, { w: 0 }); else zfold(k, true); });
+    g.addEventListener("pointerdown", (e) => {
+      e.preventDefault(); g.setPointerCapture(e.pointerId); g.classList.add("drag"); document.body.classList.add("zdragging");
+      const r = panel.getBoundingClientRect(), box = $(z.box);
+      const move = (ev) => {
+        let w = z.left ? r.right - ev.clientX : ev.clientX - r.left;
+        if (!z.noFold && w < z.min - 70) { box.classList.add("z-" + k); box.style.setProperty(z.v, (z.rail || 0) + "px"); g.dataset.fold = "1"; return; }
+        delete g.dataset.fold; box.classList.remove("z-" + k);
+        w = Math.max(z.min, Math.min(z.max, w)); g.dataset.w = Math.round(w); box.style.setProperty(z.v, Math.round(w) + "px");
+      };
+      const up = () => {
+        g.removeEventListener("pointermove", move); g.classList.remove("drag"); document.body.classList.remove("zdragging");
+        if (g.dataset.fold) zset(k, { folded: true }); else if (g.dataset.w) zset(k, { w: Number(g.dataset.w), folded: false });
+        delete g.dataset.fold; delete g.dataset.w;
+      };
+      g.addEventListener("pointermove", move); g.addEventListener("pointerup", up, { once: true }); g.addEventListener("pointercancel", up, { once: true });
+    });
+  }
+}
+document.addEventListener("click", (e) => { const t = e.target.closest("[data-zone-toggle]"); if (t) zfold(t.dataset.zoneToggle); });
+zgrips(); for (const k of Object.keys(ZONES)) zapply(k);
 const es = new EventSource("/api/events");
 es.onmessage = (m) => {
   const e = JSON.parse(m.data);
