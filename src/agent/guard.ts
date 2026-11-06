@@ -33,7 +33,9 @@ export function makeGuard(hub: Hub): CanUseTool {
         return deny("That command isn't allowed from the hub agent.");
       }
       const out = cmd.match(/render\.py\b[^\n]*?--out\s+("([^"]+)"|'([^']+)'|(\S+))/);
-      if (out) {
+      // --only selections writes just the sign-off sheet, so it doesn't touch the estimate PDFs.
+      const onlySelections = /--only\s+["']?selections["']?(\s|$)/.test(cmd);
+      if (out && !onlySelections) {
         const dir = out[2] ?? out[3] ?? out[4];
         if (existsSync(dir) && readdirSync(dir).some((f) => / - (Reconstruction Estimate|Reconstruction Agreement|Xactimate Estimate)\.pdf$/.test(f))) {
           return estimateOverwrite(hub, path.join(dir, "estimate.json"), input, `Re-render the estimate PDFs in ${dir}`);

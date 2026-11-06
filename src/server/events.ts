@@ -1,4 +1,5 @@
 import type { ServerResponse } from "node:http";
+import type { StudioEvent } from "../agent/studio.js";
 import type { Approver } from "../core/approval.js";
 
 export type HubEvent =
@@ -6,7 +7,8 @@ export type HubEvent =
   | { type: "approval"; id: string; action: string; details: string[]; text?: string }
   | { type: "approval-done"; id: string; answer: boolean }
   | { type: "task"; id: string; state: "running" | "done" | "error"; label: string; error?: string; job?: number }
-  | { type: "changed"; job?: number; what: "timeline" | "mail" | "job" | "calendar" };
+  | { type: "changed"; job?: number; what: "timeline" | "mail" | "job" | "calendar" }
+  | ({ type: "studio" } & StudioEvent);
 
 /** Server-sent events to every open window. */
 export class EventBus {

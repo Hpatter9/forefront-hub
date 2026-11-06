@@ -5,7 +5,7 @@ that uses the **forefront-estimate** skill for all estimating. This is phase 1: 
 comes next and uses the same code.
 
 ```
-npm run app                                the hub's screen at http://localhost:4317: Dashboard, Jobs, Gmail, Calendar (+ Google Tasks)
+npm run app                                the hub's screen at http://localhost:4317: Dashboard, Jobs, Estimator, Gmail, Calendar (+ Google Tasks), Music
 hub jobs --mine                            my open recon jobs: stage, days in stage, proposal $, estimator
 hub pull 3226                              Homebase -> C:\Jobs\3226 Augustine\job.json, link CompanyCam + DocuSketch
 hub photos 3226                            CompanyCam photos -> photos\
@@ -91,6 +91,12 @@ C:\Jobs\3226 Augustine\
 - `src/agent`: the Claude Agent SDK setup. `tools.ts` holds the hub tools (Homebase writes ask first, and there is
   no send tool). `guard.ts` limits file writes to job folders and asks before an estimate is overwritten.
 
+- The **Estimator** tab (`src/agent/studio.ts`) is a chat with Claude per job, like using the skill in a chat:
+  estimates, agreements with selections, the Material Selection Approval sheet (`render.py --only selections`),
+  photo reports and revisions. Each job keeps its conversation in `notes\estimator-chat.json`, and follow-ups resume
+  the same Claude session. Files dropped into the chat go into the job folder; the job's documents are listed
+  beside the chat with a preview.
+
 `npm test` runs everything on mocks, including the skill's real Python scripts (it expects the estimator repo
 next to this one, or `ESTIMATOR_DIR`). `npm run typecheck` checks types.
 
@@ -106,4 +112,5 @@ next to this one, or `ESTIMATOR_DIR`). `npm run typecheck` checks types.
 | Homebase writes (proposal, stage, call/note) | written to the API reference and tested against a fake; first real write is your first `hub sync` |
 | Agent (`hub ask`, Claude-written send-off emails) | written; needs the API key on your PC |
 | Screen (`npm run app`) | job list, job page (Homebase, emails, activity, notes, estimate files, drafts), send-off / sync / log buttons with approval pop-ups, Ask Claude box |
+| Estimator tab (chat with Claude + skill, document checklist, PDF preview) | done; tested end to end with Claude in the cloud preview |
 | Desktop app wrapper | next: Electron window around the same screen |

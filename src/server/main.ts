@@ -21,6 +21,7 @@ import { autoFile, dismissUnfiled, fileMessage, inboxState } from "../workflows/
 import { addFile } from "../workflows/uploads.js";
 import { freeSlots } from "../connectors/calendar/index.js";
 import { EventBus, WebApprover } from "./events.js";
+import { Studio } from "../agent/studio.js";
 
 /**
  * The hub's screen: a local web app on 127.0.0.1 (the desktop window will load the same thing). Every action runs the
@@ -31,6 +32,7 @@ const cfg = loadConfig();
 const bus = new EventBus();
 const approver = new WebApprover(bus);
 const hub: Hub = makeHub(cfg, approver);
+const studio = new Studio(hub, (e) => bus.emit({ type: "studio", ...e }));
 let currentJob: number | undefined;
 hub.say = (text) => {
   console.log(text);
@@ -515,6 +517,30 @@ const server = http.createServer(async (req, res) => {
     // ---- sync, ask, approvals
     if (p === "/api/sync-all" && req.method === "POST") return send(res, 202, runSyncAll());
     if (p === "/api/sync-all" && req.method === "GET") return send(res, 200, { running: syncRunning, last: lastSync });
+    // ---- Estimator tab: a chat with Claude per job, using the forefront-estimate skill
+    const st = p.match(/^\/api\/studio\/(\d+)(?:\/(send|stop|reset|upload))?$/);
+    if (st) {
+      const n = Number(st[1]);
+      if (!hub.jobs.exists(n)) await pullJob(hub, n, { quiet: true });
+      const j = hub.jobs.get(n);
+      const job = { jobNumber: n, name: j.name, address: j.address, stage: j.stage, insurance: j.insurance, customer: j.customer.name, carrier: j.carrier, claimNumber: j.claimNumber, estimate: j.estimate };
+      if (!st[2] && req.method === "GET") return send(res, 200, { job, claude: !!cfg.anthropicApiKey, ...studio.view(n) });
+      if (req.method !== "POST") return send(res, 405, { error: "method" });
+      if (st[2] === "upload") {
+        const name = decodeURIComponent(String(req.headers["x-filename"] ?? "file"));
+        const r = await addFile(hub, n, name, await rawBody(req), { toHomebase: false });
+        return send(res, 200, { path: path.relative(hub.jobs.folder(n), r.file).split(path.sep).join("/"), sub: r.sub });
+      }
+      if (st[2] === "stop") return send(res, 200, (await studio.stop(n), { ok: true }));
+      if (st[2] === "reset") return send(res, 200, (studio.reset(n), { ok: true }));
+      const b = await body(req);
+      const text = String(b.text ?? "").trim();
+      if (!text) return send(res, 400, { error: "Say what you want Claude to do." });
+      if (!cfg.anthropicApiKey) return send(res, 400, { error: "Claude is off on this machine (no Anthropic API key). Set ANTHROPIC_API_KEY in .env, or save it in the Estimator app." });
+      if (studio.running(n)) return send(res, 409, { error: "Claude is still working on this job." });
+      studio.send(n, text).then(() => bus.emit({ type: "changed", job: n, what: "job" })).catch((e) => console.error(e));
+      return send(res, 202, { ok: true });
+    }
     if (p === "/api/ask" && req.method === "POST") {
       const b = await body(req);
       if (!cfg.anthropicApiKey) return send(res, 400, { error: "Claude is off on this machine (no Anthropic API key). Set ANTHROPIC_API_KEY in .env, or save it in the Estimator app." });
