@@ -6,6 +6,7 @@
 <title>Forefront Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Figtree:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=block">
 <style>
   /*
    * Layout after Homebase (sidebar nav + breadcrumb bar + white cards, stat strip, stage table), with the colors
@@ -188,27 +189,112 @@
   .tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12px; padding: 4px 8px; border-radius: 6px; z-index: 60; }
   .banner { background: var(--soft); border-left: 3px solid var(--ink); padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: 14px; }
 
-  /* gmail */
-  .mail { display: grid; grid-template-columns: 200px 380px 1fr; height: 100%; min-height: 0; }
-  .labels { border-right: 1px solid var(--line); background: var(--panel); padding: 12px 8px; overflow: auto; display: grid; gap: 2px; align-content: start; }
-  .labels button { text-align: left; border: 0; background: transparent; padding: 7px 10px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; color: var(--ink); }
-  .labels button.active { background: var(--panel-2); font-weight: 600; }
-  .threads { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; background: var(--panel); }
-  .th { padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; }
-  .th:hover { background: var(--soft); } .th.sel { background: var(--panel-2); }
-  .th.unread .who, .th.unread .subj { font-weight: 700; }
-  .th .who, .th .subj, .th .snip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-  .th .snip { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
-  .reader { overflow: auto; min-height: 0; padding: 18px 24px; display: grid; gap: 12px; align-content: start; }
-  .msg { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-  .msg .mh { padding: 10px 14px; border-bottom: 1px solid var(--line); display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; }
-  .msg iframe { width: 100%; border: 0; min-height: 120px; background: #fff; display: block; }
-  .msg pre { margin: 0; padding: 12px 14px; white-space: pre-wrap; font: 14px/1.5 var(--sans); }
-  .msg .atts { padding: 8px 14px; border-top: 1px solid var(--line); display: flex; gap: 8px; flex-wrap: wrap; }
-  .jobchips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-  .composebox { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 8px; }
-  .composebox .hdr { display: grid; grid-template-columns: 56px 1fr; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
-
+  /* ---- Gmail tab: laid out and colored like Gmail (dark), scoped here */
+  .gm { --g-bg: #111111; --g-panel: #1e1f20; --g-row: #1e1f20; --g-unread: #2a2b2d; --g-hover: #2f3133; --g-line: #3c4043; --g-tx: #e3e3e3; --g-sub: #c4c7c5; --g-mut: #8e918f;
+    --g-compose: #c2e7ff; --g-compose-tx: #001d35; --g-sel: #004a77; --g-sel-tx: #c2e7ff; --g-blue: #a8c7fa; --g-star: #fdd663;
+    background: var(--g-bg); color: var(--g-tx); height: 100%; display: grid; grid-template-columns: 256px minmax(0, 1fr); grid-template-rows: 64px minmax(0, 1fr); font: 14px/1.4 Roboto, Arial, sans-serif; }
+  .gm .ms, .gcomp .ms { font-family: "Material Symbols Outlined"; font-weight: normal; font-style: normal; font-size: 20px; line-height: 1; letter-spacing: normal; text-transform: none; white-space: nowrap; direction: ltr; -webkit-font-feature-settings: "liga"; font-feature-settings: "liga"; -webkit-font-smoothing: antialiased; font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 20; }
+  .gm .ms.fill { font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 20; }
+  .gm-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 8px 16px 8px 24px; }
+  .gm-brand { width: 232px; display: flex; align-items: center; gap: 10px; font-size: 22px; color: var(--g-sub); }
+  .gm-brand .ms { font-size: 28px; color: #f28b82; }
+  .gm-search { flex: 1; max-width: 720px; display: flex; align-items: center; gap: 8px; background: #303134; border-radius: 24px; padding: 0 8px 0 16px; height: 48px; }
+  .gm-search:focus-within { background: #e8eaed14; box-shadow: 0 1px 1px rgba(0,0,0,.4); }
+  .gm-search .ms { color: var(--g-sub); }
+  .gm .gm-search input { flex: 1; background: transparent; border: 0; color: var(--g-tx); font-size: 16px; padding: 0; height: 100%; }
+  .gm .gm-search input:focus { outline: none; }
+  .gm-acct { margin-left: auto; width: 32px; height: 32px; border-radius: 50%; background: #8ab4f8; color: #202124; display: grid; place-items: center; font-weight: 500; }
+  .gm-rail { padding: 8px 16px 16px 0; overflow: auto; display: grid; gap: 0; align-content: start; }
+  .gm-compose { margin: 0 0 16px 8px; justify-self: start; display: inline-flex; align-items: center; gap: 12px; background: var(--g-compose); color: var(--g-compose-tx); border: 0; border-radius: 16px; padding: 0 24px 0 20px; height: 56px; font: 500 14px Roboto, sans-serif; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+  .gm-compose:hover { box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+  .gm-compose .ms { font-size: 24px; }
+  .gm-lab { display: flex; align-items: center; gap: 18px; height: 32px; padding: 0 12px 0 26px; border: 0; border-radius: 0 16px 16px 0; background: transparent; color: var(--g-tx); cursor: pointer; font: 14px Roboto, sans-serif; text-align: left; }
+  .gm-lab:hover { background: var(--g-hover); }
+  .gm-lab.on { background: var(--g-sel); color: var(--g-sel-tx); font-weight: 700; }
+  .gm-lab span.nm { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gm-lab b { font-size: 12px; font-weight: 700; }
+  .gm-labh { padding: 16px 12px 6px 26px; font-size: 16px; color: var(--g-tx); }
+  .gm-main { background: var(--g-panel); border-radius: 16px; margin: 0 16px 16px 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .gm-bar { display: flex; align-items: center; gap: 4px; padding: 8px 16px 8px 8px; min-height: 48px; }
+  .gm-ib { width: 40px; height: 40px; border-radius: 50%; border: 0; background: transparent; color: var(--g-sub); cursor: pointer; display: grid; place-items: center; }
+  .gm-ib:hover { background: var(--g-hover); color: var(--g-tx); }
+  .gm-ib:disabled { opacity: .35; cursor: default; background: transparent; }
+  .gm-cb { width: 18px; height: 18px; accent-color: var(--g-blue); cursor: pointer; margin: 0; }
+  .gm-pg { margin-left: auto; color: var(--g-mut); font-size: 12px; display: flex; align-items: center; gap: 4px; }
+  .gm-cats { display: flex; border-bottom: 1px solid var(--g-line); }
+  .gm-cat { flex: 0 1 252px; display: flex; align-items: center; gap: 16px; height: 56px; padding: 0 16px; border: 0; background: transparent; color: var(--g-sub); cursor: pointer; font: 500 14px Roboto, sans-serif; border-bottom: 3px solid transparent; }
+  .gm-cat:hover { background: var(--g-hover); }
+  .gm-cat.on { color: var(--g-blue); border-bottom-color: var(--g-blue); }
+  .gm-list { overflow: auto; flex: 1; min-height: 0; }
+  .gr { display: grid; grid-template-columns: 32px 32px minmax(120px, 200px) minmax(0, 1fr) 96px; align-items: center; gap: 4px; height: 40px; padding: 0 16px 0 12px; border-bottom: 1px solid var(--g-line); cursor: pointer; color: var(--g-sub); background: var(--g-row); position: relative; }
+  .gr.unread { background: var(--g-unread); color: var(--g-tx); }
+  .gr.unread .who, .gr.unread .sj { font-weight: 700; color: var(--g-tx); }
+  .gr:hover { box-shadow: inset 1px 0 0 #dadce0, inset -1px 0 0 #dadce0, 0 1px 2px 0 rgba(0,0,0,.6), 0 1px 3px 1px rgba(0,0,0,.3); z-index: 1; }
+  .gr.sel { background: #3c4a5e; }
+  .gr .star { border: 0; background: transparent; color: var(--g-mut); cursor: pointer; padding: 0; display: grid; place-items: center; }
+  .gr .star.on { color: var(--g-star); }
+  .gr .who { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 12px; }
+  .gr .who small { color: var(--g-mut); font-weight: 400; }
+  .gr .ln { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .gr .sj { color: var(--g-tx); }
+  .gr .sn { color: var(--g-mut); }
+  .gr .dt { text-align: right; font-size: 12px; white-space: nowrap; }
+  .gr.unread .dt { font-weight: 700; color: var(--g-tx); }
+  .gr .acts { display: none; position: absolute; right: 8px; top: 0; bottom: 0; align-items: center; gap: 0; background: inherit; padding-left: 8px; }
+  .gr:hover .acts { display: flex; }
+  .gr:hover .dt { visibility: hidden; }
+  .gr .acts .gm-ib { width: 36px; height: 36px; }
+  .gr .chip { font-size: 12px; padding: 0 6px; border-radius: 4px; background: #444746; color: var(--g-tx); margin-right: 6px; font-weight: 400; }
+  .gm-empty { padding: 48px 24px; text-align: center; color: var(--g-mut); }
+  .gm-th { overflow: auto; flex: 1; min-height: 0; padding: 0 0 24px; }
+  .gm-th h1 { font: 400 22px Roboto, sans-serif; margin: 12px 72px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; color: var(--g-tx); }
+  .gm-th h1 .chip { font-size: 12px; padding: 2px 8px; border-radius: 4px; background: #444746; color: var(--g-tx); }
+  .gm-th h1 a.chip { text-decoration: none; background: #0b57d0; color: #fff; }
+  .gm-msg { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 0 16px; padding: 12px 24px 12px 16px; }
+  .gm-msg + .gm-msg { border-top: 1px solid var(--g-line); }
+  .gm-av { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 18px; font-weight: 500; }
+  .gm-mh { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .gm-mh b { font-weight: 700; color: var(--g-tx); } .gm-mh .em { color: var(--g-mut); font-size: 12px; }
+  .gm-mh .when { margin-left: auto; color: var(--g-mut); font-size: 12px; white-space: nowrap; }
+  .gm-to { color: var(--g-mut); font-size: 12px; margin-bottom: 8px; }
+  .gm-body { color: var(--g-tx); }
+  .gm-body pre { margin: 0; white-space: pre-wrap; font: 14px/1.5 Roboto, Arial, sans-serif; }
+  .gm-body iframe { width: 100%; border: 0; border-radius: 8px; background: #fff; min-height: 80px; display: block; }
+  .gm-msg.col { cursor: pointer; } .gm-msg.col .gm-to, .gm-msg.col .gm-body, .gm-msg.col .gm-atts { display: none; }
+  .gm-msg.col .snip { display: block; color: var(--g-mut); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .gm-msg .snip { display: none; }
+  .gm-atts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .gm-att { display: flex; align-items: center; gap: 8px; border: 1px solid var(--g-line); border-radius: 8px; padding: 8px 12px; color: var(--g-tx); text-decoration: none; font-size: 13px; max-width: 240px; }
+  .gm-att:hover { background: var(--g-hover); } .gm-att .ms { color: #f28b82; }
+  .gm-att span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gm-replies { display: flex; gap: 12px; padding: 16px 24px 0 72px; flex-wrap: wrap; }
+  .gm-pill { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 24px 0 16px; border: 1px solid #8e918f; border-radius: 20px; background: transparent; color: var(--g-sub); cursor: pointer; font: 500 14px Roboto, sans-serif; }
+  .gm-pill:hover { background: var(--g-hover); color: var(--g-tx); }
+  .gm-pill.ai { border-color: var(--g-blue); color: var(--g-blue); }
+  .gm-banner { margin: 0 16px 8px; padding: 10px 16px; border-radius: 8px; background: #3c4043; color: var(--g-tx); font-size: 13px; }
+  .gm-filebar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: -6px 72px 12px; font-size: 13px; color: var(--g-mut); }
+  .gm-filebar select { width: auto; background: #303134; color: var(--g-tx); border: 1px solid var(--g-line); border-radius: 6px; padding: 4px 8px; }
+  .gm-filebar .gm-pill { height: 30px; padding: 0 14px; font-size: 13px; }
+  /* compose window: bottom-right, like Gmail's */
+  dialog.gcomp { position: fixed; inset: auto 24px 0 auto; margin: 0; width: min(560px, calc(100vw - 24px)); padding: 0; border: 0; border-radius: 16px 16px 0 0; background: #2d2e30; color: #e3e3e3; box-shadow: 0 8px 10px 1px rgba(0,0,0,.4), 0 3px 14px 2px rgba(0,0,0,.3); font: 14px Roboto, Arial, sans-serif; z-index: 30; }
+  dialog.gcomp form { display: flex; flex-direction: column; max-height: min(640px, 85vh); }
+  .gcomp .gc-h { display: flex; align-items: center; gap: 4px; background: #404144; padding: 10px 12px 10px 16px; border-radius: 16px 16px 0 0; font-weight: 500; }
+  .gcomp .gc-h span:first-child { flex: 1; }
+  .gcomp .gc-h button { background: transparent; border: 0; color: #c4c7c5; cursor: pointer; padding: 2px; display: grid; place-items: center; }
+  .gcomp .gc-f { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #444746; margin: 0 16px; padding: 4px 0; }
+  .gcomp .gc-f > span { color: #8e918f; min-width: 52px; }
+  .gcomp .gc-f input, .gcomp .gc-f select { flex: 1; background: transparent; border: 0; color: #e3e3e3; padding: 6px 0; font: inherit; }
+  .gcomp .gc-f select option { background: #2d2e30; }
+  .gcomp .gc-f input:focus, .gcomp .gc-f select:focus, .gcomp textarea:focus { outline: none; }
+  .gcomp textarea { flex: 1; min-height: 260px; background: transparent; border: 0; color: #e3e3e3; padding: 12px 16px; font: 14px/1.5 Roboto, Arial, sans-serif; resize: none; }
+  .gcomp .gc-files { padding: 0 16px 8px; font-size: 12px; color: #8e918f; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .gcomp .gc-files label { display: inline-flex; gap: 4px; align-items: center; background: #3c4043; border-radius: 6px; padding: 3px 8px; color: #e3e3e3; cursor: pointer; }
+  .gcomp .gc-foot { display: flex; align-items: center; gap: 8px; padding: 10px 16px 14px; }
+  .gcomp .gc-send { background: #a8c7fa; color: #062e6f; border: 0; border-radius: 18px; height: 36px; padding: 0 22px; font: 500 14px Roboto, sans-serif; cursor: pointer; }
+  .gcomp .gc-send:hover { box-shadow: 0 1px 3px rgba(0,0,0,.4); background: #b9d3fb; }
+  .gcomp .gc-ghost { background: transparent; border: 0; color: #c4c7c5; cursor: pointer; padding: 6px 10px; border-radius: 18px; font: 14px Roboto, sans-serif; }
+  .gcomp .gc-ghost:hover { background: #3c4043; }
+  .gcomp.min form > :not(.gc-h) { display: none; }
+  @media (max-width: 980px) { .gm { grid-template-columns: 1fr; grid-template-rows: auto auto minmax(0, 1fr); } .gm-brand { display: none; } .gm-rail { display: flex; overflow-x: auto; padding: 0 8px 8px; } .gm-compose { margin: 0 8px 0 0; height: 40px; flex: none; } .gm-lab { border-radius: 16px; flex: none; padding: 0 12px; } .gm-labh { display: none; } .gm-main { margin: 0 8px 8px; } .gr { grid-template-columns: 28px 28px minmax(80px, 120px) minmax(0, 1fr) 64px; } .gm-th h1, .gm-filebar { margin-left: 16px; margin-right: 16px; } .gm-replies { padding-left: 16px; } }
   /* calendar */
   .calwrap { display: grid; grid-template-columns: 210px minmax(0, 1fr); height: 100%; min-height: 0; }
   .calside { border-right: 1px solid var(--line); padding: 14px 12px; overflow: auto; display: grid; gap: 14px; align-content: start; background: var(--panel); }
@@ -411,13 +497,21 @@
 
   <!-- MAIL -->
   <section class="view" id="v-mail" hidden>
-    <div class="mail">
-      <div class="labels" id="labels"><button class="btn primary" id="compose" style="justify-content:center;margin-bottom:8px">Compose</button></div>
-      <div class="threads">
-        <div class="pad"><input type="search" id="mq" placeholder="Search mail (Gmail search works: from:, has:attachment …)"></div>
-        <div class="list" id="threads"></div>
+    <div class="gm" id="gm">
+      <div class="gm-head">
+        <div class="gm-brand"><span class="ms fill">mail</span>Gmail</div>
+        <label class="gm-search"><span class="ms">search</span><input type="search" id="mq" placeholder="Search mail" aria-label="Search mail"><button class="gm-ib" type="button" id="mq-clear" title="Clear search" hidden><span class="ms">close</span></button></label>
+        <div class="gm-acct" id="gm-acct" title="hunter@forefrontteam.com">H</div>
       </div>
-      <div class="reader" id="reader"><div class="empty">Pick an email.</div></div>
+      <nav class="gm-rail" id="labels" aria-label="Mail folders"></nav>
+      <div class="gm-main" id="gm-main">
+        <div id="gm-listview" style="display:flex;flex-direction:column;min-height:0;flex:1">
+          <div class="gm-bar" id="gm-bar"></div>
+          <div class="gm-cats" id="gm-cats"></div>
+          <div class="gm-list" id="threads"></div>
+        </div>
+        <div id="reader" hidden style="display:flex;flex-direction:column;min-height:0;flex:1"></div>
+      </div>
     </div>
   </section>
 
@@ -526,19 +620,18 @@
   <input type="hidden" id="tk-id"><input type="hidden" id="tk-list">
   </div><div class="foot"><button class="btn" value="delete" id="tk-del" style="margin-right:auto">Delete</button><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="save">Save</button></div></form></dialog>
 
-<dialog id="composedlg"><form method="dialog" id="composeform"><div class="in">
-  <h4 id="cp-title">New email</h4>
-  <div class="composebox" style="border:0;padding:0">
-    <div class="hdr"><span>Job</span><select id="cp-job"><option value="">(none)</option></select></div>
-    <div class="hdr"><span>To</span><input type="text" id="cp-to"></div>
-    <div class="hdr"><span>Cc</span><input type="text" id="cp-cc"></div>
-    <div class="hdr"><span>Bcc</span><input type="text" id="cp-bcc"></div>
-    <div class="hdr"><span>Subject</span><input type="text" id="cp-subject"></div>
-    <textarea id="cp-body" rows="9" placeholder="Your Gmail signature is added when it sends."></textarea>
-    <div id="cp-files" class="small"></div>
-  </div>
+<dialog id="composedlg" class="gcomp"><form method="dialog" id="composeform">
+  <div class="gc-h"><span id="cp-title">New Message</span><button type="button" id="cp-min" title="Minimize"><span class="ms">minimize</span></button><button value="cancel" title="Save &amp; close"><span class="ms">close</span></button></div>
+  <div class="gc-f"><span>Job</span><select id="cp-job"><option value="">(none)</option></select></div>
+  <div class="gc-f"><span>To</span><input type="text" id="cp-to" autocomplete="off"></div>
+  <div class="gc-f"><span>Cc</span><input type="text" id="cp-cc" autocomplete="off"></div>
+  <div class="gc-f"><span>Bcc</span><input type="text" id="cp-bcc" autocomplete="off"></div>
+  <div class="gc-f"><input type="text" id="cp-subject" placeholder="Subject"></div>
+  <textarea id="cp-body" placeholder="Your Gmail signature is added when it sends."></textarea>
+  <div class="gc-files" id="cp-files"></div>
+  <div class="gc-foot"><button class="gc-send" value="send">Send</button><button class="gc-ghost" value="draft">Save draft</button><span style="flex:1"></span><button class="gc-ghost" value="cancel" title="Discard"><span class="ms">delete</span></button></div>
   <input type="hidden" id="cp-thread"><input type="hidden" id="cp-reply">
-  </div><div class="foot"><button class="btn" value="cancel">Cancel</button><button class="btn" value="draft">Save draft</button><button class="btn primary" value="send">Send</button></div></form></dialog>
+</form></dialog>
 
 <script>
 const $ = (s, el = document) => el.querySelector(s);
@@ -997,87 +1090,160 @@ $("#logdlg").addEventListener("close", async () => {
   try { await api(`/api/jobs/${view.homebase.jobNumber}/log`, { method: "POST", body: { kind: "call", body: $("#lg-body").value.trim(), who: $("#lg-who").value.trim(), direction: $("#lg-dir").value } }); $("#lg-body").value = ""; } catch (e) { log(e.message, "t-err"); }
 });
 
-// ============================================================= MAIL
-let mailLoaded = false, mailLabel = store.get("mlabel", "INBOX"), mailThread = null, mailNext = null;
-const LABEL_NAMES = { INBOX: "Inbox", STARRED: "Starred", SENT: "Sent", DRAFT: "Drafts", IMPORTANT: "Important", SPAM: "Spam", TRASH: "Trash" };
+// ============================================================= MAIL (Gmail-style)
+let mailLoaded = false, mailLabel = store.get("mlabel", "INBOX"), mailCat = store.get("mcat", "primary"), mailThread = null;
+let mailPages = [null], mailPage = 0, mailNext = null, mailRows = [], mailSel = new Set(), threadView = null;
+const GLABELS = [["INBOX", "Inbox", "inbox"], ["STARRED", "Starred", "star"], ["SENT", "Sent", "send"], ["DRAFT", "Drafts", "draft"], ["IMPORTANT", "Important", "label_important"], ["SPAM", "Spam", "report"], ["TRASH", "Trash", "delete"]];
+const GCATS = [["primary", "Primary", "inbox"], ["promotions", "Promotions", "sell"], ["social", "Social", "group"], ["updates", "Updates", "info"]];
+const AVC = ["#e8710a", "#1a73e8", "#d93025", "#188038", "#9334e6", "#e52592", "#12b5cb", "#f9ab00", "#5f6368"];
+const nameOf = (from) => (from || "").replace(/<.*>/, "").replace(/"/g, "").trim() || (from || "").replace(/[<>]/g, "");
+const addrOf = (s) => ((s || "").match(/[\w.+-]+@[\w.-]+/) || [s || ""])[0];
+const avatar = (from) => { const n = nameOf(from) || "?"; let h = 0; for (const c of n) h = (h * 31 + c.charCodeAt(0)) >>> 0; return `<div class="gm-av" style="background:${AVC[h % AVC.length]}">${esc(n[0].toUpperCase())}</div>`; };
+const gDate = (d) => { if (!d) return ""; const t = new Date(d), now = new Date(); if (t.toDateString() === now.toDateString()) return t.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); if (t.getFullYear() === now.getFullYear()) return t.toLocaleDateString("en-US", { month: "short", day: "numeric" }); return t.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }); };
+const msI = (n, fill) => `<span class="ms${fill ? " fill" : ""}">${n}</span>`;
+
 async function loadMail() {
   mailLoaded = true;
-  if (status.gmail === "google" && !status.gmailFull) $("#reader").innerHTML = `<div class="banner">Gmail is connected for drafts only. To read, send and archive from here, double-click <b>Connect Gmail</b> in the hub folder once more and click Allow.</div>`;
   const labels = await api("/api/mail/labels").catch(() => []);
-  const sys = ["INBOX", "STARRED", "SENT", "DRAFT", "IMPORTANT", "SPAM", "TRASH"].map((id) => labels.find((l) => l.id === id)).filter(Boolean);
   const user = labels.filter((l) => l.type === "user").sort((a, b) => a.name.localeCompare(b.name));
   const inbox = labels.find((l) => l.id === "INBOX");
   $("#mailcount").textContent = inbox?.unread || ""; $("#mailcount").hidden = !inbox?.unread;
-  $("#labels").innerHTML = `<button class="btn primary" id="compose" style="justify-content:center;margin-bottom:8px">Compose</button>` +
-    [...sys, ...user].map((l) => `<button data-label="${esc(l.id)}" class="${l.id === mailLabel ? "active" : ""}"><span>${esc(LABEL_NAMES[l.id] ?? l.name)}</span>${l.unread ? `<span class="small">${l.unread}</span>` : ""}</button>`).join("");
+  $("#labels").innerHTML = `<button class="gm-compose" id="compose" type="button">${msI("edit")}Compose</button>` +
+    GLABELS.filter(([id]) => labels.some((l) => l.id === id) || ["INBOX", "STARRED", "SENT", "DRAFT"].includes(id)).map(([id, nm, ic]) => `<button class="gm-lab ${id === mailLabel ? "on" : ""}" data-label="${id}" type="button">${msI(ic, id === mailLabel)}<span class="nm">${nm}</span>${id === "INBOX" && inbox?.unread ? `<b>${inbox.unread}</b>` : ""}</button>`).join("") +
+    (user.length ? `<div class="gm-labh">Labels</div>` + user.map((l) => `<button class="gm-lab ${l.id === mailLabel ? "on" : ""}" data-label="${esc(l.id)}" type="button">${msI("label")}<span class="nm">${esc(l.name)}</span></button>`).join("") : "");
   $("#compose").addEventListener("click", () => openCompose({}));
+  if (status.gmail === "google" && !status.gmailFull) $("#gm-main").insertAdjacentHTML("afterbegin", `<div class="gm-banner" style="margin-top:12px">Gmail is connected for drafts only. To read, send and archive here, double-click <b>Connect Gmail</b> in the hub folder once more and click Allow.</div>`);
+  if (status.gmail === "mock") $("#gm-main").insertAdjacentHTML("afterbegin", `<div class="gm-banner" style="margin-top:12px">This is a test inbox: Gmail isn't connected on this machine.</div>`);
+  showList();
   loadThreads();
 }
-$("#labels").addEventListener("click", (e) => { const b = e.target.closest("[data-label]"); if (!b) return; mailLabel = b.dataset.label; store.set("mlabel", mailLabel); $$("#labels [data-label]").forEach((x) => x.classList.toggle("active", x === b)); $("#mq").value = ""; loadThreads(); });
-let mqTimer; $("#mq").addEventListener("input", () => { clearTimeout(mqTimer); mqTimer = setTimeout(loadThreads, 350); });
-async function loadThreads(more = false) {
-  const q = $("#mq").value.trim();
-  if (!more) $("#threads").innerHTML = `<div class="empty">Loading…</div>`;
-  let r;
-  try { r = await api(`/api/mail/threads?${new URLSearchParams({ ...(q ? { q } : { label: mailLabel }), ...(more && mailNext ? { page: mailNext } : {}) })}`); } catch (e) { $("#threads").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
-  mailNext = r.nextPageToken || null;
-  const html = r.threads.map((t) => `<div class="th ${t.unread ? "unread" : ""} ${t.id === mailThread ? "sel" : ""}" data-t="${esc(t.id)}"><div class="who">${esc(t.from.replace(/<.*>/, "").trim() || t.from)}${t.messageCount > 1 ? ` <span class="muted small">${t.messageCount}</span>` : ""}</div><div class="small muted">${fmtWhen(t.date)}</div><div class="subj">${t.starred ? "★ " : ""}${esc(t.subject || "(no subject)")}</div><div></div><div class="snip">${esc(t.snippet)}</div></div>`).join("");
-  if (more) { $("#more")?.remove(); $("#threads").insertAdjacentHTML("beforeend", html); } else $("#threads").innerHTML = html || `<div class="empty">No mail here.</div>`;
-  if (mailNext) $("#threads").insertAdjacentHTML("beforeend", `<div class="pad" id="more"><button class="btn small" id="morebtn">More</button></div>`);
-  $("#morebtn")?.addEventListener("click", () => loadThreads(true));
+$("#labels").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-label]"); if (!b) return;
+  mailLabel = b.dataset.label; store.set("mlabel", mailLabel);
+  $$("#labels [data-label]").forEach((x) => { const on = x === b; x.classList.toggle("on", on); const ic = x.querySelector(".ms"); ic?.classList.toggle("fill", on); });
+  $("#mq").value = ""; $("#mq-clear").hidden = true; mailPages = [null]; mailPage = 0; showList(); loadThreads();
+});
+let mqTimer;
+$("#mq").addEventListener("input", () => { $("#mq-clear").hidden = !$("#mq").value; clearTimeout(mqTimer); mqTimer = setTimeout(() => { mailPages = [null]; mailPage = 0; showList(); loadThreads(); }, 400); });
+$("#mq-clear").addEventListener("click", () => { $("#mq").value = ""; $("#mq-clear").hidden = true; mailPages = [null]; mailPage = 0; loadThreads(); });
+
+function showList() { $("#gm-listview").style.display = "flex"; $("#reader").hidden = true; mailThread = null; }
+function renderMailBar() {
+  const any = mailSel.size > 0, all = mailRows.length && mailSel.size === mailRows.length;
+  $("#gm-bar").innerHTML = `<input type="checkbox" class="gm-cb" id="gm-all" ${all ? "checked" : ""} aria-label="Select all" style="margin:0 11px">
+    ${any ? `<button class="gm-ib" data-bulk="archive" title="Archive">${msI("archive")}</button><button class="gm-ib" data-bulk="spam" title="Report spam">${msI("report")}</button><button class="gm-ib" data-bulk="trash" title="Delete">${msI("delete")}</button><button class="gm-ib" data-bulk="read" title="Mark as read">${msI("drafts")}</button><button class="gm-ib" data-bulk="unread" title="Mark as unread">${msI("mark_email_unread")}</button>`
+      : `<button class="gm-ib" id="gm-refresh" title="Refresh">${msI("refresh")}</button>`}
+    <div class="gm-pg"><span>${mailRows.length ? `${mailPage * 30 + 1}–${mailPage * 30 + mailRows.length}` : "0"}${mailNext ? " of many" : ""}</span><button class="gm-ib" id="gm-prev" title="Newer" ${mailPage ? "" : "disabled"}>${msI("chevron_left")}</button><button class="gm-ib" id="gm-next" title="Older" ${mailNext ? "" : "disabled"}>${msI("chevron_right")}</button></div>`;
+  $("#gm-all").onchange = (e) => { mailSel = e.target.checked ? new Set(mailRows.map((t) => t.id)) : new Set(); $$("#threads .gr").forEach((r) => { r.classList.toggle("sel", mailSel.has(r.dataset.t)); r.querySelector(".gm-cb").checked = mailSel.has(r.dataset.t); }); renderMailBar(); };
+  $("#gm-refresh") && ($("#gm-refresh").onclick = () => loadThreads());
+  $("#gm-prev").onclick = () => { if (mailPage) { mailPage--; loadThreads(); } };
+  $("#gm-next").onclick = () => { if (mailNext) { mailPage++; mailPages[mailPage] = mailNext; loadThreads(); } };
 }
-$("#threads").addEventListener("click", (e) => { const t = e.target.closest("[data-t]"); if (t) openThread(t.dataset.t); });
-let threadView = null;
+$("#gm-bar").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-bulk]"); if (!b) return;
+  const change = { archive: { remove: ["INBOX"] }, spam: { add: ["SPAM"], remove: ["INBOX"] }, trash: { trash: true }, read: { remove: ["UNREAD"] }, unread: { add: ["UNREAD"] } }[b.dataset.bulk];
+  const ids = [...mailSel];
+  await Promise.all(ids.map((id) => api(`/api/mail/threads/${id}/modify`, { method: "POST", body: change }).catch(() => {})));
+  mailSel = new Set(); loadThreads(); loadMailCounts();
+});
+async function loadMailCounts() { const labels = await api("/api/mail/labels").catch(() => []); const inbox = labels.find((l) => l.id === "INBOX"); $("#mailcount").textContent = inbox?.unread || ""; $("#mailcount").hidden = !inbox?.unread; const b = $('#labels [data-label="INBOX"] b'); if (b) b.textContent = inbox?.unread || ""; }
+async function loadThreads() {
+  const q = $("#mq").value.trim();
+  const inboxTabs = !q && mailLabel === "INBOX";
+  $("#gm-cats").innerHTML = inboxTabs ? GCATS.map(([k, nm, ic]) => `<button class="gm-cat ${k === mailCat ? "on" : ""}" data-cat="${k}" type="button">${msI(ic, k === mailCat)}${nm}</button>`).join("") : "";
+  $("#gm-cats").style.display = inboxTabs ? "flex" : "none";
+  if (!mailRows.length) $("#threads").innerHTML = `<div class="gm-empty">Loading…</div>`;
+  const params = q ? { q } : inboxTabs ? { label: "INBOX", q: `category:${mailCat}` } : { label: mailLabel };
+  const tok = mailPages[mailPage];
+  let r;
+  try { r = await api(`/api/mail/threads?${new URLSearchParams({ ...params, ...(tok ? { page: tok } : {}) })}`); } catch (e) { $("#threads").innerHTML = `<div class="gm-empty">${esc(e.message)}</div>`; return; }
+  mailRows = r.threads; mailNext = r.nextPageToken || null;
+  mailSel = new Set([...mailSel].filter((id) => mailRows.some((t) => t.id === id)));
+  const sentView = mailLabel === "SENT" && !q, draftView = mailLabel === "DRAFT" && !q;
+  $("#threads").innerHTML = mailRows.map((t) => `<div class="gr ${t.unread ? "unread" : ""} ${mailSel.has(t.id) ? "sel" : ""}" data-t="${esc(t.id)}">
+      <input type="checkbox" class="gm-cb" ${mailSel.has(t.id) ? "checked" : ""} aria-label="Select">
+      <button class="star ${t.starred ? "on" : ""}" type="button" title="${t.starred ? "Starred" : "Not starred"}">${msI("star", t.starred)}</button>
+      <div class="who">${draftView ? `<span style="color:#f28b82">Draft</span>` : esc(sentView ? "Me" : nameOf(t.from))}${t.messageCount > 1 ? ` <small>${t.messageCount}</small>` : ""}</div>
+      <div class="ln">${(t.labelIds || []).includes("IMPORTANT") && mailLabel !== "IMPORTANT" ? "" : ""}<span class="sj">${esc(t.subject || "(no subject)")}</span><span class="sn"> - ${esc(t.snippet)}</span></div>
+      <div class="dt">${t.hasAttachments ? `<span class="ms" style="font-size:16px;vertical-align:-3px;margin-right:6px">attach_file</span>` : ""}${gDate(t.date)}</div>
+      <div class="acts"><button class="gm-ib" data-act1="archive" title="Archive">${msI("archive")}</button><button class="gm-ib" data-act1="trash" title="Delete">${msI("delete")}</button><button class="gm-ib" data-act1="${t.unread ? "read" : "unread"}" title="${t.unread ? "Mark as read" : "Mark as unread"}">${msI(t.unread ? "drafts" : "mark_email_unread")}</button></div>
+    </div>`).join("") || `<div class="gm-empty">${q ? "No messages matched your search." : mailLabel === "INBOX" ? "Your inbox is empty." : "No conversations here."}</div>`;
+  renderMailBar();
+}
+$("#gm-cats").addEventListener("click", (e) => { const b = e.target.closest("[data-cat]"); if (!b) return; mailCat = b.dataset.cat; store.set("mcat", mailCat); mailPages = [null]; mailPage = 0; loadThreads(); });
+$("#threads").addEventListener("click", async (e) => {
+  const row = e.target.closest(".gr"); if (!row) return;
+  const id = row.dataset.t, t = mailRows.find((x) => x.id === id);
+  if (e.target.closest(".gm-cb")) { e.target.checked ? mailSel.add(id) : mailSel.delete(id); row.classList.toggle("sel", e.target.checked); renderMailBar(); return; }
+  if (e.target.closest(".star")) { const on = !t.starred; t.starred = on; e.target.closest(".star").classList.toggle("on", on); e.target.closest(".star").innerHTML = msI("star", on); api(`/api/mail/threads/${id}/modify`, { method: "POST", body: on ? { add: ["STARRED"] } : { remove: ["STARRED"] } }).catch(() => {}); return; }
+  const a = e.target.closest("[data-act1]");
+  if (a) { const change = { archive: { remove: ["INBOX"] }, trash: { trash: true }, read: { remove: ["UNREAD"] }, unread: { add: ["UNREAD"] } }[a.dataset.act1]; await api(`/api/mail/threads/${id}/modify`, { method: "POST", body: change }).catch(() => {}); if (["archive", "trash"].includes(a.dataset.act1)) row.remove(); else loadThreads(); loadMailCounts(); return; }
+  openThread(id);
+});
+
 async function openThread(id) {
+  if (!mailLoaded) await loadMail();
   mailThread = id;
-  $$("#threads .th").forEach((x) => x.classList.toggle("sel", x.dataset.t === id));
-  $("#reader").innerHTML = `<div class="empty">Loading…</div>`;
+  $("#gm-listview").style.display = "none"; const rd = $("#reader"); rd.hidden = false;
+  rd.innerHTML = `<div class="gm-bar"><button class="gm-ib" id="gm-back" title="Back">${msI("arrow_back")}</button></div><div class="gm-empty">Loading…</div>`;
+  $("#gm-back").onclick = () => { showList(); loadThreads(); };
   let t;
-  try { t = await api(`/api/mail/threads/${id}`); } catch (e) { $("#reader").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  try { t = await api(`/api/mail/threads/${id}`); } catch (e) { rd.querySelector(".gm-empty").textContent = e.message; return; }
   threadView = t;
-  const last = t.messages.at(-1);
-  if (last?.labelIds?.includes("UNREAD") || t.messages.some((m) => m.labelIds?.includes("UNREAD"))) { api(`/api/mail/threads/${id}/modify`, { method: "POST", body: { remove: ["UNREAD"] } }).then(() => $(`#threads [data-t="${id}"]`)?.classList.remove("unread")).catch(() => {}); }
-  const job = t.jobs[0];
-  $("#reader").innerHTML = `
-    <div class="row"><h3 style="margin:0;flex:1;min-width:200px">${esc(t.messages[0]?.subject || "(no subject)")}</h3>
-      <button class="btn small" data-m="archive">Archive</button><button class="btn small" data-m="star">${t.messages.some((m) => m.labelIds?.includes("STARRED")) ? "Unstar" : "Star"}</button><button class="btn small" data-m="unread">Mark unread</button><button class="btn small" data-m="trash">Delete</button></div>
-    <div class="jobchips">${t.jobs.length ? `<span class="small muted">Job:</span>${t.jobs.map((j) => `<a href="#" class="tag" data-do="open" data-n="${j.jobNumber}">#${j.jobNumber} ${esc(j.name)} · ${esc(j.stage)}</a> <button class="btn small" data-do="filethread" data-thread="${esc(t.id)}" data-n="${j.jobNumber}">File to #${j.jobNumber}</button>`).join("")}` : `<span class="small muted">Not matched to a job.</span>`}
-      <select id="fileto-job" style="width:auto"><option value="">File to another job…</option>${jobs.map((j) => `<option value="${j.jobNumber}">#${j.jobNumber} ${esc(j.name)}</option>`).join("")}</select><button class="btn small" data-do="filethread" data-thread="${esc(t.id)}">File</button></div>
-    ${t.messages.map((m, i) => `<div class="msg"><div class="mh"><div><b>${esc(m.from)}</b><div class="small muted">to ${esc(m.to.join(", "))}${m.cc.length ? ` · cc ${esc(m.cc.join(", "))}` : ""}</div></div><div class="small muted">${new Date(m.date).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div></div>
-      ${m.html ? `<iframe sandbox="allow-popups allow-popups-to-escape-sandbox" data-i="${i}" title="Email"></iframe>` : `<pre>${esc(m.body)}</pre>`}
-      ${m.attachments.length ? `<div class="atts">${m.attachments.map((a) => `<a class="tag" href="/api/mail/attachment/${esc(m.id)}/${esc(a.id)}?name=${encodeURIComponent(a.filename)}" target="_blank">📎 ${esc(a.filename)}</a>`).join("")}</div>` : ""}</div>`).join("")}
-    <div class="row"><button class="btn primary" id="replybtn">Reply</button><button class="btn" id="replyall">Reply all</button><button class="btn" id="fwd">Forward</button>${status.agent ? `<button class="btn" id="claudereply">Draft reply with Claude</button>` : ""}</div>`;
+  if (t.messages.some((m) => m.labelIds?.includes("UNREAD"))) api(`/api/mail/threads/${id}/modify`, { method: "POST", body: { remove: ["UNREAD"] } }).then(loadMailCounts).catch(() => {});
+  const last = t.messages.at(-1), job = t.jobs[0], starred = t.messages.some((m) => m.labelIds?.includes("STARRED"));
+  const labelsOn = [...new Set(t.messages.flatMap((m) => m.labelIds || []))].filter((l) => ["INBOX", "SENT", "IMPORTANT"].includes(l));
+  rd.innerHTML = `<div class="gm-bar"><button class="gm-ib" id="gm-back" title="Back to ${esc(GLABELS.find((g) => g[0] === mailLabel)?.[1] || "list")}">${msI("arrow_back")}</button>
+      <button class="gm-ib" data-m="archive" title="Archive">${msI("archive")}</button><button class="gm-ib" data-m="spam" title="Report spam">${msI("report")}</button><button class="gm-ib" data-m="trash" title="Delete">${msI("delete")}</button>
+      <span style="width:12px"></span><button class="gm-ib" data-m="unread" title="Mark as unread">${msI("mark_email_unread")}</button><button class="gm-ib" data-m="star" title="${starred ? "Unstar" : "Star"}">${msI("star", starred)}</button></div>
+    <div class="gm-th">
+      <h1>${esc(t.messages[0]?.subject || "(no subject)")}${labelsOn.map((l) => `<span class="chip">${esc(GLABELS.find((g) => g[0] === l)?.[1] || l)}</span>`).join("")}${t.jobs.map((j) => `<a href="#" class="chip" data-do="open" data-n="${j.jobNumber}" title="${esc(j.stage)}">#${j.jobNumber} ${esc(j.name)}</a>`).join("")}</h1>
+      <div class="gm-filebar">${t.jobs.length ? t.jobs.map((j) => `<button class="gm-pill" data-do="filethread" data-thread="${esc(t.id)}" data-n="${j.jobNumber}" type="button">${msI("drive_file_move")}File to #${j.jobNumber}</button>`).join("") : `<span>Not matched to a job.</span>`}
+        <select id="fileto-job" aria-label="File to another job"><option value="">File to another job…</option>${jobs.map((j) => `<option value="${j.jobNumber}">#${j.jobNumber} ${esc(j.name)}</option>`).join("")}</select><button class="gm-pill" data-do="filethread" data-thread="${esc(t.id)}" type="button">File</button></div>
+      ${t.messages.map((m, i) => `<div class="gm-msg ${i < t.messages.length - 1 && t.messages.length > 2 ? "col" : ""}" data-mi="${i}">${avatar(m.from)}<div style="min-width:0">
+          <div class="gm-mh"><b>${esc(nameOf(m.from))}</b><span class="em">&lt;${esc(addrOf(m.from))}&gt;</span><span class="when">${new Date(m.date).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span></div>
+          <div class="snip">${esc(m.body.slice(0, 160))}</div>
+          <div class="gm-to">to ${esc(m.to.map((x) => (addrOf(x).toLowerCase() === "hunter@forefrontteam.com" ? "me" : nameOf(x))).join(", "))}${m.cc.length ? `, cc ${esc(m.cc.map(nameOf).join(", "))}` : ""}</div>
+          <div class="gm-body">${m.html ? `<iframe sandbox="allow-popups allow-popups-to-escape-sandbox" data-i="${i}" title="Message"></iframe>` : `<pre>${esc(m.body)}</pre>`}</div>
+          ${m.attachments.length ? `<div class="gm-atts">${m.attachments.map((a) => `<a class="gm-att" href="/api/mail/attachment/${esc(m.id)}/${esc(a.id)}?name=${encodeURIComponent(a.filename)}" target="_blank">${msI(/\.pdf$/i.test(a.filename) ? "picture_as_pdf" : /\.(jpe?g|png|gif|heic)$/i.test(a.filename) ? "image" : "attach_file")}<span>${esc(a.filename)}</span></a>`).join("")}</div>` : ""}
+        </div></div>`).join("")}
+      <div class="gm-replies"><button class="gm-pill" id="replybtn" type="button">${msI("reply")}Reply</button><button class="gm-pill" id="replyall" type="button">${msI("reply_all")}Reply all</button><button class="gm-pill" id="fwd" type="button">${msI("forward")}Forward</button>${status.agent ? `<button class="gm-pill ai" id="claudereply" type="button">${msI("auto_awesome")}Draft reply with Claude</button>` : ""}</div>
+    </div>`;
+  $("#gm-back").onclick = () => { showList(); loadThreads(); };
+  $$("#reader .gm-msg.col").forEach((el) => el.addEventListener("click", () => el.classList.remove("col"), { once: true }));
   $$("#reader iframe").forEach((f) => {
     const m = t.messages[Number(f.dataset.i)];
-    f.srcdoc = `<base target="_blank"><style>body{font:14px/1.5 system-ui,sans-serif;margin:12px;color:#1c2733;overflow-wrap:anywhere}img{max-width:100%;height:auto}</style>${m.html}`;
-    f.onload = () => { try { f.style.height = Math.min(1600, f.contentDocument.body.scrollHeight + 30) + "px"; } catch {} };
+    f.srcdoc = `<base target="_blank"><style>body{font:14px/1.5 Roboto,Arial,sans-serif;margin:12px;color:#202124;overflow-wrap:anywhere}img{max-width:100%;height:auto}blockquote,.gmail_quote{color:#5f6368}</style>${m.html}`;
+    f.onload = () => { try { f.style.height = Math.min(2400, f.contentDocument.body.scrollHeight + 30) + "px"; } catch {} };
   });
   const me = "hunter@forefrontteam.com";
-  const addr = (s) => (s.match(/[\w.+-]+@[\w.-]+/) || [s])[0];
   const quote = (m) => `\n\nOn ${new Date(m.date).toLocaleString("en-US")}, ${m.from} wrote:\n${m.body.split("\n").map((l) => "> " + l).join("\n")}`;
-  const replyTo = () => { const from = addr(last.from); return from.toLowerCase() === me ? last.to.join(", ") : from; };
-  $("#replybtn").onclick = () => openCompose({ reply: true, to: replyTo(), subject: /^re:/i.test(last.subject) ? last.subject : `Re: ${last.subject}`, body: quote(last), threadId: t.id, inReplyTo: last.messageIdHeader, job: job?.jobNumber });
-  $("#replyall").onclick = () => openCompose({ reply: true, to: [replyTo(), ...last.to].map(addr).filter((a) => a.toLowerCase() !== me).filter((a, i, arr) => arr.indexOf(a) === i).join(", "), cc: last.cc.map(addr).filter((a) => a.toLowerCase() !== me).join(", "), subject: /^re:/i.test(last.subject) ? last.subject : `Re: ${last.subject}`, body: quote(last), threadId: t.id, inReplyTo: last.messageIdHeader, job: job?.jobNumber });
-  $("#fwd").onclick = () => openCompose({ subject: `Fwd: ${last.subject}`, body: `\n\n---------- Forwarded message ----------\nFrom: ${last.from}\nDate: ${last.date}\nSubject: ${last.subject}\n\n${last.body}`, job: job?.jobNumber });
+  const replyTo = () => { const from = addrOf(last.from); return from.toLowerCase() === me ? last.to.join(", ") : from; };
+  const re = /^re:/i.test(last.subject) ? last.subject : `Re: ${last.subject}`;
+  $("#replybtn").onclick = () => openCompose({ reply: true, to: replyTo(), subject: re, body: quote(last), threadId: t.id, inReplyTo: last.messageIdHeader, job: job?.jobNumber });
+  $("#replyall").onclick = () => openCompose({ reply: true, to: [replyTo(), ...last.to].map(addrOf).filter((a) => a.toLowerCase() !== me).filter((a, i, arr) => arr.indexOf(a) === i).join(", "), cc: last.cc.map(addrOf).filter((a) => a.toLowerCase() !== me).join(", "), subject: re, body: quote(last), threadId: t.id, inReplyTo: last.messageIdHeader, job: job?.jobNumber });
+  $("#fwd").onclick = () => openCompose({ subject: `Fwd: ${last.subject}`, body: `\n\n---------- Forwarded message ---------\nFrom: ${last.from}\nDate: ${last.date}\nSubject: ${last.subject}\nTo: ${last.to.join(", ")}\n\n${last.body}`, job: job?.jobNumber });
   $("#claudereply") && ($("#claudereply").onclick = () => askClaude(`Read Gmail thread ${t.id}${job ? ` (job #${job.jobNumber})` : ""} and draft my reply in Gmail as a draft in that thread, in my voice. Don't send it.`, job?.jobNumber));
 }
 $("#reader").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-m]"); if (!b || !mailThread) return;
-  const change = { archive: { remove: ["INBOX"] }, unread: { add: ["UNREAD"] }, trash: { trash: true }, star: threadView?.messages.some((m) => m.labelIds?.includes("STARRED")) ? { remove: ["STARRED"] } : { add: ["STARRED"] } }[b.dataset.m];
-  try { await api(`/api/mail/threads/${mailThread}/modify`, { method: "POST", body: change }); if (b.dataset.m === "star") openThread(mailThread); else { $("#reader").innerHTML = `<div class="empty">Done.</div>`; loadThreads(); } } catch (err) { log(err.message, "t-err"); }
+  const starred = threadView?.messages.some((m) => m.labelIds?.includes("STARRED"));
+  const change = { archive: { remove: ["INBOX"] }, spam: { add: ["SPAM"], remove: ["INBOX"] }, unread: { add: ["UNREAD"] }, trash: { trash: true }, star: starred ? { remove: ["STARRED"] } : { add: ["STARRED"] } }[b.dataset.m];
+  try { await api(`/api/mail/threads/${mailThread}/modify`, { method: "POST", body: change }); if (b.dataset.m === "star") openThread(mailThread); else { showList(); loadThreads(); loadMailCounts(); } } catch (err) { log(err.message, "t-err"); }
 });
 
 // ---- compose (send only on your click + confirm)
 let composeFiles = [];
 function openCompose(o) {
-  $("#cp-title").textContent = o.reply ? "Reply" : "New email";
+  $("#cp-title").textContent = o.reply ? (o.subject || "Reply") : o.subject?.startsWith("Fwd:") ? o.subject : "New Message";
+  $("#composedlg").classList.remove("min");
   $("#cp-job").innerHTML = `<option value="">(none)</option>` + jobs.map((j) => `<option value="${j.jobNumber}" ${o.job === j.jobNumber ? "selected" : ""}>#${j.jobNumber} ${esc(j.name)}</option>`).join("");
   $("#cp-to").value = o.to || ""; $("#cp-cc").value = o.cc || ""; $("#cp-subject").value = o.subject || ""; $("#cp-body").value = o.body || "";
   $("#cp-thread").value = o.threadId || ""; $("#cp-reply").value = o.inReplyTo || "";
   $("#cp-bcc").value = o.job ? `office+${o.job}@forefrontteam.com` : "";
   composeFiles = [];
   renderComposeFiles();
-  $("#composedlg").showModal();
+  if (!$("#composedlg").open) $("#composedlg").show();
   setTimeout(() => { const b = $("#cp-body"); b.focus(); b.setSelectionRange(0, 0); b.scrollTop = 0; }, 50);
 }
 $("#cp-job").addEventListener("change", () => {
@@ -1089,10 +1255,10 @@ $("#cp-job").addEventListener("change", () => {
 });
 async function renderComposeFiles() {
   const n = $("#cp-job").value;
-  if (!n) { $("#cp-files").innerHTML = `<span class="muted">Pick a job to attach its files and log the email to it.</span>`; return; }
+  if (!n) { $("#cp-files").innerHTML = `<span>Pick a job to attach its files and log the email to it.</span>`; return; }
   let v = view && view.homebase.jobNumber === Number(n) ? view : await api(`/api/jobs/${n}`).catch(() => null);
   const list = (v?.files?.estimate || []).map((f) => "estimate/" + f.name);
-  $("#cp-files").innerHTML = list.length ? `<span class="muted">Attach:</span> ` + list.map((p) => `<label class="tag" style="cursor:pointer"><input type="checkbox" data-file="${esc(p)}" ${composeFiles.includes(p) ? "checked" : ""}> ${esc(p.split("/").pop())}</label>`).join(" ") : `<span class="muted">No estimate files in #${n}'s folder to attach.</span>`;
+  $("#cp-files").innerHTML = list.length ? `<span>Attach:</span> ` + list.map((p) => `<label><input type="checkbox" data-file="${esc(p)}" ${composeFiles.includes(p) ? "checked" : ""}> ${esc(p.split("/").pop())}</label>`).join(" ") : `<span>No estimate files in #${n}'s folder to attach.</span>`;
   $$("#cp-files [data-file]").forEach((c) => c.addEventListener("change", () => { composeFiles = $$("#cp-files [data-file]:checked").map((x) => x.dataset.file); }));
 }
 $("#composedlg").addEventListener("close", async () => {
@@ -1103,8 +1269,9 @@ $("#composedlg").addEventListener("close", async () => {
   try {
     if (how === "send") await api("/api/mail/send", { method: "POST", body });
     else { await api("/api/mail/draft", { method: "POST", body }); log("Saved as a Gmail draft."); }
-  } catch (e) { log(e.message, "t-err"); $("#composedlg").showModal(); }
+  } catch (e) { log(e.message, "t-err"); $("#composedlg").show(); }
 });
+$("#cp-min").addEventListener("click", () => $("#composedlg").classList.toggle("min"));
 
 // ============================================================= adding files (drag & drop anywhere, or Add files)
 let pickTarget = null, pendingFiles = [], dragDepth = 0, recentFiles = [];
