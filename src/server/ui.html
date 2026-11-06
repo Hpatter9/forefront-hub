@@ -193,7 +193,7 @@
 
   /* ---- Gmail tab: laid out and colored like Gmail (dark), scoped here */
   .gm { /* Gmail's layout in the hub's own colors (follows the theme switch) */
-    --g-bg: var(--bg); --g-panel: var(--panel); --g-row: var(--panel); --g-unread: var(--panel-2); --g-hover: var(--soft); --g-line: var(--line); --g-tx: var(--ink); --g-sub: color-mix(in srgb, var(--ink) 78%, var(--muted)); --g-mut: var(--muted);
+    --g-bg: var(--bg); --g-panel: var(--panel); --g-row: color-mix(in srgb, var(--panel) 55%, var(--bg)); --g-unread: color-mix(in srgb, var(--link) 14%, var(--panel-2)); --g-new: var(--link); --g-hover: var(--soft); --g-line: var(--line); --g-tx: var(--ink); --g-sub: color-mix(in srgb, var(--ink) 78%, var(--muted)); --g-mut: var(--muted);
     --g-compose: var(--accent); --g-compose-tx: var(--accent-ink); --g-sel: var(--panel-2); --g-sel-tx: var(--ink); --g-blue: var(--link); --g-star: #e8b931; --g-field: var(--panel-2); --g-chip: var(--soft);
     background: var(--g-bg); color: var(--g-tx); height: 100%; display: grid; grid-template-columns: var(--w-gm, 256px) minmax(0, 1fr); grid-template-rows: 64px minmax(0, 1fr); font: 14px/1.4 var(--sans); }
   .ms { font-family: "Material Symbols Outlined"; font-weight: normal; font-style: normal; font-size: 20px; line-height: 1; letter-spacing: normal; text-transform: none; white-space: nowrap; direction: ltr; -webkit-font-feature-settings: "liga"; font-feature-settings: "liga"; -webkit-font-smoothing: antialiased; font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 20; }
@@ -230,8 +230,11 @@
   .gm-cat.on { color: var(--g-blue); border-bottom-color: var(--g-blue); }
   .gm-list { overflow: auto; flex: 1; min-height: 0; }
   .gr { display: grid; grid-template-columns: 32px 32px minmax(120px, 200px) minmax(0, 1fr) 96px; align-items: center; gap: 4px; height: 40px; padding: 0 16px 0 12px; border-bottom: 1px solid var(--g-line); cursor: pointer; color: var(--g-sub); background: var(--g-row); position: relative; }
-  .gr.unread { background: var(--g-unread); color: var(--g-tx); }
+  .gr.unread { background: var(--g-unread); color: var(--g-tx); box-shadow: inset 4px 0 0 var(--g-new); }
+  .gr:not(.unread) .who, .gr:not(.unread) .sj { color: var(--g-mut); font-weight: 400; }
+  .gr.unread .who::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--g-new); margin-right: 8px; vertical-align: 1px; }
   .gr.unread .who, .gr.unread .sj { font-weight: 700; color: var(--g-tx); }
+  .gr.unread .sn { color: var(--g-sub); }
   .gr:hover { background: var(--g-hover); box-shadow: inset 3px 0 0 var(--g-tx); z-index: 1; }
   .gr.sel { background: color-mix(in srgb, var(--g-blue) 18%, var(--g-panel)); }
   .gr .star { border: 0; background: transparent; color: var(--g-mut); cursor: pointer; padding: 0; display: grid; place-items: center; }
@@ -242,7 +245,9 @@
   .gr .sj { color: var(--g-tx); }
   .gr .sn { color: var(--g-mut); }
   .gr .dt { text-align: right; font-size: 12px; white-space: nowrap; }
-  .gr.unread .dt { font-weight: 700; color: var(--g-tx); }
+  .gr.unread .dt { font-weight: 700; color: var(--g-new); }
+  .gm-cat .newc { background: var(--g-new); color: var(--bg); border-radius: 999px; font-size: 11px; font-weight: 700; padding: 1px 7px; margin-left: -6px; }
+  .gm-lab b { background: var(--g-new); color: var(--bg); border-radius: 999px; padding: 1px 7px; }
   .gr .acts { display: none; position: absolute; right: 8px; top: 0; bottom: 0; align-items: center; gap: 0; background: inherit; padding-left: 8px; }
   .gr:hover .acts { display: flex; }
   .gr:hover .dt { visibility: hidden; }
@@ -1293,6 +1298,7 @@ async function loadThreads() {
   let r;
   try { r = await api(`/api/mail/threads?${new URLSearchParams({ ...params, ...(tok ? { page: tok } : {}) })}`); } catch (e) { $("#threads").innerHTML = `<div class="gm-empty">${esc(e.message)}</div>`; return; }
   mailRows = r.threads; mailNext = r.nextPageToken || null;
+  if (inboxTabs) { const n = mailRows.filter((t) => t.unread).length, on = $("#gm-cats .gm-cat.on"); if (on && n) on.insertAdjacentHTML("beforeend", `<span class="newc">${n} new</span>`); }
   mailSel = new Set([...mailSel].filter((id) => mailRows.some((t) => t.id === id)));
   const sentView = mailLabel === "SENT" && !q, draftView = mailLabel === "DRAFT" && !q;
   $("#threads").innerHTML = mailRows.map((t) => `<div class="gr ${t.unread ? "unread" : ""} ${mailSel.has(t.id) ? "sel" : ""}" data-t="${esc(t.id)}">
