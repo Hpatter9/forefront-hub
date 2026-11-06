@@ -1,4 +1,4 @@
-import type { ActivityRow, Contact, DocumentKind, FieldResult, FiledEmail, HbNote, HomebaseClient, HomebaseDocument, JobDetail, JobSummary } from "./types.js";
+import type { ActivityRow, Contact, DocumentKind, FieldResult, FiledEmail, HbNote, HbPerson, HomebaseClient, HomebaseDocument, JobDetail, JobSummary } from "./types.js";
 
 /**
  * Homebase over its real JSON API (https://homebase.forefrontteam.com/api/v1, reference at /api/v1/docs).
@@ -93,6 +93,10 @@ export class ApiHomebase implements HomebaseClient {
       name: c.name ?? "",
       email: c.email ?? "",
       phone: c.phone ?? c.mobile ?? "",
+      id: c.id ?? undefined,
+      title: c.title ?? undefined,
+      company: c.accountName ?? undefined,
+      roles: Array.isArray(c.roles) ? c.roles : undefined,
     }));
     for (const a of [p.brief?.adjuster1, p.brief?.adjuster2]) {
       if (a && typeof a === "object" && !contacts.some((c) => c.email && c.email === a.email)) {
@@ -166,6 +170,19 @@ export class ApiHomebase implements HomebaseClient {
   async activity(jobNumber: number): Promise<ActivityRow[]> {
     const id = await this.projectId(jobNumber);
     return (await this.call<{ activity: ActivityRow[] }>("GET", `/projects/${id}/activity`)).activity;
+  }
+
+  async searchContacts(q: string): Promise<HbPerson[]> {
+    if (q.trim().length < 3) return [];
+    const r = await this.call<{ contacts: any[] }>("GET", `/contacts?${new URLSearchParams({ q: q.trim() })}`);
+    return (r.contacts ?? []).map((c) => ({
+      id: String(c.id),
+      name: c.name ?? "",
+      title: c.title ?? undefined,
+      email: c.email ?? undefined,
+      company: c.accountName ?? undefined,
+      phones: (c.phones?.length ? c.phones : [{ number: c.phone }, { number: c.mobile, label: "mobile" }]).filter((x: any) => x?.number && String(x.number).replace(/\D/g, "").length >= 7).map((x: any) => ({ number: String(x.number), label: x.label ?? undefined })),
+    }));
   }
 
   async rawJob(jobNumber: number): Promise<Record<string, any>> {

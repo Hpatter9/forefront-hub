@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { photoFileName, pickProject } from "../connectors/companycam/index.js";
 import type { HbNote } from "../connectors/homebase/types.js";
+import { noteJobContacts } from "./contacts.js";
 import { lastName, type Job } from "../core/job.js";
 import type { Hub } from "../hub.js";
 
@@ -38,6 +39,9 @@ export async function pullJob(hub: Hub, jobNumber: number, opts: { quiet?: boole
     companycamProjectId: prior?.companycamProjectId || hb.picturesLink?.match(/companycam\.com\/projects\/(\d+)/)?.[1] || undefined,
     insurance: prior?.insurance !== "unknown" && prior?.insurance ? prior.insurance : hb.claimNumber || adjuster ? "claim" : "unknown",
   });
+
+  // Everyone on the job goes into the contacts list, with their role on it.
+  noteJobContacts(hub, jobNumber, job.name, hb.contacts);
 
   // The Notes tab (Forefront's internal conversation), kept in the folder for the dashboard's team-notes card.
   if (hb.noteFeed) saveNotes(hub, jobNumber, hb.noteFeed);

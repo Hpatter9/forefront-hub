@@ -49,6 +49,8 @@ export interface Message {
   from: string;
   to: string[];
   cc: string[];
+  /** Only drafts (and your own sent mail) carry a Bcc line. */
+  bcc?: string[];
   date: string;
   subject: string;
   body: string;
@@ -88,6 +90,8 @@ export interface MailClient {
   /** Sends an existing draft as it is (attachments included). Only the Mail tab's Send button calls it, after Hunter confirms. */
   sendDraft?(draftId: string): Promise<void>;
   deleteDraft?(draftId: string): Promise<void>;
+  /** Replaces a draft's contents in place (same draft, same thread). Returns the new message id. */
+  updateDraft?(draftId: string, d: DraftInput, keepMessageId?: string): Promise<{ messageId: string }>;
   /** The draft id for a draft message in a thread (Gmail keeps the two apart). */
   draftIdFor?(messageId: string): Promise<string | null>;
   /** Archive (remove INBOX), mark read (remove UNREAD), star, trash. */

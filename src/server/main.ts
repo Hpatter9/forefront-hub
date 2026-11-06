@@ -23,6 +23,7 @@ import { addFile } from "../workflows/uploads.js";
 import { freeSlots } from "../connectors/calendar/index.js";
 import { EventBus, WebApprover } from "./events.js";
 import { Studio } from "../agent/studio.js";
+import { allContacts, findContacts, noteAddresses, noteMessages } from "../workflows/contacts.js";
 import { BRIEF, briefDue } from "../workflows/brief.js";
 
 /**
@@ -170,6 +171,7 @@ async function photosView(n: number) {
 
 async function mailThread(id: string) {
   const t = await hub.gmail.getThread(id);
+  noteMessages(hub, t.messages);
   // Which job is this about? Homebase's suggest door, from the addresses, job numbers and streets in it.
   const addresses = [...new Set(t.messages.flatMap((m) => [m.from, ...m.to, ...m.cc]).map((a) => a.match(/[\w.+-]+@[\w.-]+/)?.[0]?.toLowerCase()).filter((a): a is string => !!a && !a.endsWith("@forefrontteam.com")))];
   const text = t.messages.map((m) => `${m.subject} ${m.body}`).join(" ");
@@ -447,6 +449,26 @@ const server = http.createServer(async (req, res) => {
 
     // ---- mail
     if (p === "/api/mail/labels") return send(res, 200, (await hub.gmail.labels?.()) ?? []);
+    // ---- contacts: everyone from email and Homebase, filled out as more turns up
+    if (p === "/api/contacts") {
+      const query = q("q").trim();
+      const list = query ? await findContacts(hub, query, { homebase: q("homebase") !== "0" }) : allContacts(hub).slice(0, 500);
+      return send(res, 200, { total: allContacts(hub).length, contacts: list });
+    }
+    const ct = p.match(/^\/api\/contacts\/(.+)$/);
+    if (ct && req.method === "GET") {
+      const id = decodeURIComponent(ct[1]);
+      let person = allContacts(hub).find((x) => x.id === id);
+      if (person && q("refresh") === "1") {
+        // Look the person up in Homebase by email, then by name, and fold in what it has.
+        for (const term of [person.emails[0], person.name].filter((x): x is string => !!x && x.length >= 3)) {
+          await findContacts(hub, term, { homebase: true, limit: 1 });
+          person = allContacts(hub).find((x) => x.id === id) ?? person;
+          if (person.homebaseId) break;
+        }
+      }
+      return person ? send(res, 200, person) : send(res, 404, { error: "No such contact." });
+    }
     if (p === "/api/mail/summaries" && req.method === "POST") {
       // One-line summaries for the rows on screen: the ones already written now, the rest as they're ready.
       const b = await body(req);
@@ -459,6 +481,7 @@ const server = http.createServer(async (req, res) => {
       if (!hub.gmail.listThreads) return send(res, 400, { error: "This Gmail connection can't list mail." });
       const list = await hub.gmail.listThreads({ label: q("label") || undefined, q: q("q") || undefined, pageToken: q("page") || undefined });
       const { generatedDrafts } = await import("../workflows/generated.js");
+      noteAddresses(hub, list.threads.map((x) => ({ from: x.from, at: x.date })));
       const claude = new Set(generatedDrafts(hub).filter((g) => g.state === "draft" && g.threadId).map((g) => g.threadId!));
       return send(res, 200, { ...list, threads: list.threads.map((t) => ({ ...t, hasDraft: !!t.labelIds?.includes("DRAFT"), claudeDraft: claude.has(t.id) })) });
     }
@@ -470,7 +493,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
     // A draft in a thread: Send (only after Hunter confirms, with the recipients in front of him) or Delete.
-    const dr = p.match(/^\/api\/mail\/drafts\/([\w-]+)\/(send|delete)$/);
+    const dr = p.match(/^\/api\/mail\/drafts\/([\w-]+)\/(send|delete|save)$/);
     if (dr && req.method === "POST") {
       const msgId = dr[1];
       if (!hub.gmail.draftIdFor || !hub.gmail.sendDraft || !hub.gmail.deleteDraft) return send(res, 400, { error: "This Gmail connection can't do that." });
@@ -478,6 +501,29 @@ const server = http.createServer(async (req, res) => {
       if (!draftId) return send(res, 404, { error: "That draft isn't in Gmail any more (sent or deleted?)." });
       const th = q("thread") ? await hub.gmail.getThread(q("thread")).catch(() => null) : null;
       const m = th?.messages.find((x) => x.id === msgId);
+      if (dr[2] === "save") {
+        // Edited right in the conversation: same draft, same thread, attachments and Bcc kept.
+        if (!hub.gmail.updateDraft) return send(res, 400, { error: "This Gmail connection can't edit drafts." });
+        const b = await body(req);
+        const split = (v: unknown) => String(v ?? "").split(/[,;]/).map((x) => x.trim()).filter(Boolean);
+        const files: string[] = [];
+        for (const a of m?.attachments ?? []) {
+          const f = path.join(cfg.stateDir, "draft-attachments", draftId, a.filename.replace(/[<>:"/\\|?*]/g, "_"));
+          if (!existsSync(f) && hub.gmail.attachment) {
+            mkdirSync(path.dirname(f), { recursive: true });
+            writeFileSync(f, await hub.gmail.attachment(m!.id, a.id));
+          }
+          if (existsSync(f)) files.push(f);
+        }
+        const prev = th?.messages.filter((x) => !x.labelIds?.includes("DRAFT")).at(-1);
+        const { generatedDrafts, GENERATED_LABEL } = await import("../workflows/generated.js");
+        const gen = generatedDrafts(hub).some((g) => g.draftId === draftId || (m?.messageIdHeader && g.messageId === m.messageIdHeader));
+        const to = split(b.to);
+        if (!to.length) return send(res, 400, { error: "Add at least one recipient." });
+        const r = await hub.gmail.updateDraft(draftId, { to, cc: split(b.cc), bcc: b.bcc !== undefined ? split(b.bcc) : m?.bcc ?? [], subject: String(b.subject ?? m?.subject ?? ""), body: String(b.body ?? ""), attachments: files, threadId: prev ? q("thread") || undefined : undefined, inReplyTo: prev?.messageIdHeader, labels: gen ? [GENERATED_LABEL] : undefined }, m?.messageIdHeader);
+        bus.emit({ type: "changed", what: "mail" });
+        return send(res, 200, { ok: true, messageId: r.messageId });
+      }
       if (dr[2] === "delete") {
         await hub.gmail.deleteDraft(draftId);
         bus.emit({ type: "changed", what: "mail" });

@@ -4,6 +4,7 @@ import { intakeAddress } from "../connectors/homebase/types.js";
 import type { Message } from "../connectors/gmail/types.js";
 import type { Hub } from "../hub.js";
 import { isAutomated } from "./reminders.js";
+import { noteMessages } from "./contacts.js";
 
 /**
  * Files every incoming job email in Homebase on its own: the hub forwards it to the job's office+<job#> address, the
@@ -114,6 +115,7 @@ export async function autoFile(hub: Hub): Promise<{ filed: { jobNumber: number; 
   const { threads } = await hub.gmail.listThreads({ q: "newer_than:3d -from:me -in:sent -in:chats", max: 40 });
   for (const th of threads) {
     const t = await hub.gmail.getThread(th.id, th.historyId).catch(() => null);
+    if (t) noteMessages(hub, t.messages);
     for (const m of t?.messages ?? []) {
       if (s.filed[m.id] || s.unfiled.some((u) => u.messageId === m.id)) continue;
       if (new Date(m.date) < new Date(s.since!)) continue;

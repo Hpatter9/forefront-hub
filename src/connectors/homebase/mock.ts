@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { HUB_ROOT } from "../../core/config.js";
-import type { DocumentKind, HbNote, HomebaseClient, HomebaseDocument, JobDetail } from "./types.js";
+import type { DocumentKind, HbNote, HbPerson, HomebaseClient, HomebaseDocument, JobDetail } from "./types.js";
 
 export interface MockWrite {
   at: string;
@@ -62,6 +62,11 @@ export class MockHomebase implements HomebaseClient {
     j.notes.push({ at, body: `[${note.kind}] ${note.body}` });
     if (note.kind === "note") (j.noteFeed ??= []).unshift({ id: `note-${Date.now()}`, body: note.body, author: "🧮 Estimating hub — Hunter Patterson", authorId: null, postedAt: at, replies: [] });
     this.record(jobNumber, "addNote", note);
+  }
+
+  async searchContacts(q: string): Promise<HbPerson[]> {
+    const k = q.toLowerCase();
+    return this.jobs.flatMap((j) => j.contacts).filter((c) => k.length >= 3 && `${c.name} ${c.email}`.toLowerCase().includes(k)).map((c, i) => ({ id: `mock-c-${i}-${c.email || c.name}`, name: c.name, email: c.email || undefined, phones: c.phone ? [{ number: c.phone }] : [], title: c.role === "adjuster" ? "Adjuster" : undefined }));
   }
 
   async noteFeed(jobNumber: number): Promise<HbNote[]> {

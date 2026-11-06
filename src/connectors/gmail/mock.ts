@@ -56,6 +56,15 @@ export class MockGmail implements MailClient {
     this.markSent(draftId);
   }
 
+  async updateDraft(draftId: string, d: DraftInput) {
+    const all = this.load();
+    const x = all.find((y) => y.ref.id === draftId);
+    if (!x) throw new Error(`No mock draft ${draftId}`);
+    x.input = d;
+    this.save(all);
+    return { messageId: draftId };
+  }
+
   async deleteDraft(draftId: string) {
     this.save(this.load().filter((x) => x.ref.id !== draftId));
   }
@@ -92,7 +101,7 @@ export class MockGmail implements MailClient {
     if (!d) throw new Error(`No mock thread ${id}`);
     return {
       id,
-      messages: [{ id, from: this.from, to: d.input.to, cc: d.input.cc ?? [], date: d.sentAt ?? "", subject: d.input.subject, body: d.input.body, attachments: [], labelIds: d.sentAt ? ["SENT"] : ["DRAFT"], messageIdHeader: d.ref.messageId }],
+      messages: [{ id, from: this.from, to: d.input.to, cc: d.input.cc ?? [], bcc: d.input.bcc ?? [], date: d.sentAt ?? "", subject: d.input.subject, body: d.input.body, attachments: [], labelIds: d.sentAt ? ["SENT"] : ["DRAFT"], messageIdHeader: d.ref.messageId }],
     };
   }
 

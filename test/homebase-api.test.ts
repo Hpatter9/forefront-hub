@@ -45,7 +45,7 @@ describe("Homebase API driver", () => {
     const hb = new ApiHomebase({ url: "https://hb", token: "hbk_x", actingEmail: "hunter@forefrontteam.com", fetch: fetchFn });
     const j = await hb.getJob(3226);
     expect(j).toMatchObject({ jobNumber: 3226, name: "Augustine", stage: "Estimating", stageSince: "2026-11-05", claimNumber: "5045106171-1", carrier: "Farmers", picturesLink: "https://app.companycam.com/projects/117697136", intakeEmail: "office+3226@forefrontteam.com" });
-    expect(j.contacts).toEqual([
+    expect(j.contacts).toMatchObject([
       { role: "customer", name: "Jeremy Augustine", email: "jeremyaugustine07@gmail.com", phone: "7193960103" },
       { role: "adjuster", name: "Eileen Brandt", email: "eileen@claims.example", phone: "719-418-9596" },
     ]);

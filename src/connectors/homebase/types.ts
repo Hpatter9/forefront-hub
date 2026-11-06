@@ -21,6 +21,11 @@ export interface Contact {
   name: string;
   email: string;
   phone: string;
+  /** Extra detail when the driver has it (for the contacts list). */
+  id?: string;
+  title?: string;
+  company?: string;
+  roles?: string[];
 }
 
 export interface JobDetail extends JobSummary {
@@ -56,6 +61,16 @@ export interface HbNote {
 export function noteAuthor(author: string): { person: string; via: string } {
   const m = (author || "").split(/\s+[—–-]\s+/);
   return m.length > 1 ? { person: m.slice(1).join(" — ").trim(), via: m[0].trim() } : { person: (author || "").trim(), via: "" };
+}
+
+/** A person in Homebase's contacts. */
+export interface HbPerson {
+  id: string;
+  name: string;
+  title?: string;
+  email?: string;
+  phones: { number: string; label?: string }[];
+  company?: string;
 }
 
 export interface HomebaseClient {
@@ -95,6 +110,8 @@ export interface HomebaseClient {
   updateFields?(jobNumber: number, changes: Record<string, unknown>): Promise<Record<string, FieldResult>>;
   createContact?(jobNumber: number, c: { first: string; last: string; email?: string; phone?: string; title?: string }): Promise<{ id: string; adopted?: boolean; ignored?: Record<string, unknown> }>;
   updateContact?(contactId: string, c: { first?: string; last?: string; email?: string; phone?: string; mobile?: string; title?: string }): Promise<Record<string, FieldResult>>;
+  /** Homebase's people search: name, email or the last 7 digits of a phone (3+ characters, up to 8 rows). */
+  searchContacts?(q: string): Promise<HbPerson[]>;
   searchAccounts?(q: string, kind?: string): Promise<{ id: string; name: string; kind: string }[]>;
   vocabulary?(): Promise<Record<string, any>>;
   /** Which jobs an email is probably about, from its addresses, job numbers, streets and claim numbers. */

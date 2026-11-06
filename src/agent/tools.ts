@@ -10,6 +10,7 @@ import type { Hub } from "../hub.js";
 import { downloadPhotos, pullJob } from "../workflows/pull.js";
 import { estimateFiles } from "../workflows/sendoff.js";
 import { sync } from "../workflows/sync.js";
+import { findContacts } from "../workflows/contacts.js";
 
 export const SERVER = "hub";
 
@@ -122,6 +123,15 @@ export function hubTools(hub: Hub) {
     ),
 
     // ---------------------------------------------------------------- Gmail (drafts only)
+    tool(
+      "contacts_find",
+      "Look up people in Hunter's contacts (everyone from his email and from Homebase, with emails, phones, title, company and the jobs they're on with their role). Search by name, email, company, phone, or job (\"#3226\" or the job's name). Homebase is searched too and merged in. Use this whenever Hunter asks for someone's contact info or who to email.",
+      { query: z.string().describe("e.g. \"Tucker\", \"State Farm\", \"#3184\", \"alex@\"") },
+      wrap(async ({ query }) => {
+        const people = await findContacts(hub, query, { homebase: true, limit: 12 });
+        return people.length ? people.map((p) => ({ name: p.name, emails: p.emails, phones: p.phones.map((x) => `${x.number}${x.label ? ` (${x.label})` : ""}`), title: p.title, company: p.company, jobs: p.jobs.map((j) => `#${j.jobNumber} ${j.name}: ${j.role}`), lastEmailAt: p.lastEmailAt })) : { found: 0, note: "Nobody matches in the contacts or in Homebase." };
+      }),
+    ),
     tool("gmail_search", "Search Hunter's Forefront Gmail (Gmail search syntax).", { query: z.string(), max: z.number().int().default(10) }, wrap(async ({ query, max }) => hub.gmail.search(query, max))),
     tool("gmail_read_thread", "Read every message in a Gmail thread.", { threadId: z.string() }, wrap(async ({ threadId }) => hub.gmail.getThread(threadId))),
     tool(

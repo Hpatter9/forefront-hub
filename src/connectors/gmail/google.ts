@@ -74,6 +74,23 @@ export class GoogleGmail implements MailClient {
     await this.gmail().users.drafts.send({ userId: "me", requestBody: { id: draftId } });
   }
 
+  /** keepMessageId: the draft's Message-ID header, kept so the hub still recognizes it once it's sent. */
+  async updateDraft(draftId: string, d: DraftInput, keepMessageId?: string) {
+    for (const f of d.attachments) if (!existsSync(f)) throw new Error(`Attachment not found: ${f}`);
+    const { html, from } = await this.sendAs();
+    const raw = Buffer.from(buildMime({ ...d, from, messageId: keepMessageId || newMessageId(), signatureHtml: html })).toString("base64url");
+    const { data } = await this.gmail().users.drafts.update({ userId: "me", id: draftId, requestBody: { id: draftId, message: { raw, threadId: d.threadId } } });
+    if (d.labels?.length && data.message?.id) {
+      try {
+        const ids = await Promise.all(d.labels.map((l) => this.ensureLabel(l)));
+        await this.gmail().users.messages.modify({ userId: "me", id: data.message.id, requestBody: { addLabelIds: ids } });
+      } catch {
+        // the label is a nice-to-have
+      }
+    }
+    return { messageId: data.message?.id ?? "" };
+  }
+
   async deleteDraft(draftId: string) {
     await this.gmail().users.drafts.delete({ userId: "me", id: draftId });
   }
@@ -250,6 +267,7 @@ function toMessage(m: gmail_v1.Schema$Message): Message {
     from: h("From"),
     to: h("To").split(",").map((s) => s.trim()).filter(Boolean),
     cc: h("Cc").split(",").map((s) => s.trim()).filter(Boolean),
+    bcc: h("Bcc").split(",").map((s) => s.trim()).filter(Boolean),
     date: m.internalDate ? new Date(Number(m.internalDate)).toISOString() : h("Date"),
     subject: h("Subject"),
     body: text ? decode(text) : htmlToText(decode(html)),
