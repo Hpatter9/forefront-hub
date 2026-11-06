@@ -614,6 +614,16 @@
   .gm-quote { color: #5f6368; border-left: 2px solid #e0e0e0; padding-left: 12px; margin-top: 6px; }
   .gm-more { border: 0; background: #e8eaed; color: #444746; border-radius: 6px; padding: 0 8px; height: 16px; line-height: 14px; font-size: 13px; letter-spacing: 1px; cursor: pointer; margin: 4px 0 8px; display: block; }
   .gm-more:hover { background: #dadce0; }
+
+  /* ---- dragging emails onto labels */
+  .gr[draggable="true"] { cursor: grab; }
+  .gr.dragging { opacity: .45; }
+  #labels.dropping .gm-lab:not([data-label="SENT"]):not([data-label="DRAFT"]):not([data-label="HUB_DRAFTS"]) { outline: 1px dashed color-mix(in srgb, var(--g-blue) 40%, transparent); outline-offset: -2px; }
+  #labels .gm-lab.dropon { background: color-mix(in srgb, var(--g-blue) 30%, var(--g-panel)) !important; color: var(--g-tx); outline: 2px solid var(--g-blue) !important; }
+  .gm-ghost { position: fixed; top: -100px; left: 0; background: #0b57d0; color: #fff; font: 600 13px var(--sans); padding: 8px 14px; border-radius: 8px; box-shadow: 0 4px 12px #0006; }
+  .snack { position: fixed; left: 24px; bottom: 24px; z-index: 60; background: #303134; color: #e8eaed; border-radius: 6px; padding: 12px 16px; display: flex; gap: 24px; align-items: center; box-shadow: 0 4px 16px #0008; font-size: 14px; }
+  .snack[hidden] { display: none; }
+  .snack button { background: none; border: 0; color: #8ab4f8; font: 600 14px var(--sans); cursor: pointer; padding: 0; }
 </style>
 </head>
 <body>
@@ -1414,7 +1424,7 @@ async function loadThreads() {
   if (inboxTabs) { const n = mailRows.filter((t) => t.unread).length, on = $("#gm-cats .gm-cat.on"); if (on && n) on.insertAdjacentHTML("beforeend", `<span class="newc">${n} new</span>`); }
   mailSel = new Set([...mailSel].filter((id) => mailRows.some((t) => t.id === id)));
   const sentView = mailLabel === "SENT" && !q, draftView = (mailLabel === "DRAFT" || mailLabel === "HUB_DRAFTS") && !q;
-  $("#threads").innerHTML = mailRows.map((t) => `<div class="gr ${t.unread ? "unread" : ""} ${mailSel.has(t.id) ? "sel" : ""}" data-t="${esc(t.id)}">
+  $("#threads").innerHTML = mailRows.map((t) => `<div class="gr ${t.unread ? "unread" : ""} ${mailSel.has(t.id) ? "sel" : ""}" data-t="${esc(t.id)}" ${t.generated ? "" : 'draggable="true"'}>
       <input type="checkbox" class="gm-cb" ${mailSel.has(t.id) ? "checked" : ""} aria-label="Select">
       <button class="star ${t.starred ? "on" : ""}" type="button" title="${t.starred ? "Starred" : "Not starred"}">${msI("star", t.starred)}</button>
       <div class="who">${t.generated ? `<span class="gsrc">${esc(t.generated.source)}</span>${esc(t.to?.map(nameOf).join(", ") || "")}` : draftView ? `<span style="color:#f28b82">Draft</span>` : esc(sentView ? "Me" : nameOf(t.from))}${t.messageCount > 1 ? ` <small>${t.messageCount}</small>` : ""}</div>
@@ -1460,6 +1470,65 @@ async function applySummaries() {
     ln.dataset.sum = text; ln.title = `${t?.subject || ""}${t?.snippet ? ` — ${t.snippet}` : ""}`;
     ln.querySelector(".sj").textContent = text; ln.querySelector(".sn")?.remove(); row.classList.add("summed");
   }
+}
+
+// ---- drag emails onto a label or folder on the left to sort them (like Gmail): a label files it and takes it out
+// of the Inbox, Inbox brings it back, Starred stars, Spam/Trash do what they say. Ticked emails move together.
+const DROP_NO = new Set(["SENT", "DRAFT", "HUB_DRAFTS"]);
+const labelName = (id) => GLABELS.find((g) => g[0] === id)?.[1] || $(`#labels [data-label="${CSS.escape(id)}"] .nm`)?.textContent || id;
+function moveChange(target) {
+  const from = mailLabel;
+  const fromUser = from && !GLABELS.some((g) => g[0] === from) ? from : null;
+  if (target === "TRASH") return { trash: true };
+  if (target === "SPAM") return { add: ["SPAM"], remove: ["INBOX"] };
+  if (target === "STARRED") return { add: ["STARRED"] };
+  if (target === "IMPORTANT") return { add: ["IMPORTANT"] };
+  if (target === "INBOX") return { add: ["INBOX"], remove: fromUser ? [fromUser] : [] };
+  return { add: [target], remove: from === "INBOX" ? ["INBOX"] : fromUser && fromUser !== target ? [fromUser] : [] };
+}
+const undoOf = (c) => (c.trash ? { untrash: true } : { add: c.remove || [], remove: c.add || [] });
+let dragIds = [];
+$("#threads").addEventListener("dragstart", (e) => {
+  const row = e.target.closest(".gr[data-t]"); if (!row) return;
+  const id = row.dataset.t;
+  dragIds = mailSel.has(id) ? [...mailSel] : [id];
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("application/x-hub-threads", JSON.stringify(dragIds));
+  const ghost = document.createElement("div"); ghost.className = "gm-ghost"; ghost.textContent = dragIds.length === 1 ? "Move 1 conversation" : `Move ${dragIds.length} conversations`;
+  document.body.appendChild(ghost); e.dataTransfer.setDragImage(ghost, 12, 12); setTimeout(() => ghost.remove(), 0);
+  $$("#threads .gr").forEach((r) => r.classList.toggle("dragging", dragIds.includes(r.dataset.t)));
+  $("#labels").classList.add("dropping");
+});
+$("#threads").addEventListener("dragend", () => { $$("#threads .gr.dragging").forEach((r) => r.classList.remove("dragging")); $("#labels").classList.remove("dropping"); $$("#labels .dropon").forEach((x) => x.classList.remove("dropon")); });
+const dropTarget = (e) => { const l = e.target.closest("#labels [data-label]"); return l && !DROP_NO.has(l.dataset.label) && l.dataset.label !== mailLabel ? l : null; };
+$("#labels").addEventListener("dragover", (e) => { if (![...(e.dataTransfer?.types || [])].includes("application/x-hub-threads")) return; const l = dropTarget(e); $$("#labels .dropon").forEach((x) => x !== l && x.classList.remove("dropon")); if (!l) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; l.classList.add("dropon"); });
+$("#labels").addEventListener("dragleave", (e) => { const l = e.target.closest("[data-label]"); if (l && !l.contains(e.relatedTarget)) l.classList.remove("dropon"); });
+$("#labels").addEventListener("drop", async (e) => {
+  const l = dropTarget(e); if (!l) return; e.preventDefault(); l.classList.remove("dropon"); $("#labels").classList.remove("dropping");
+  let ids = dragIds; try { ids = JSON.parse(e.dataTransfer.getData("application/x-hub-threads")) || ids; } catch {}
+  await moveThreads(ids, l.dataset.label);
+});
+async function moveThreads(ids, target) {
+  const change = moveChange(target), name = labelName(target);
+  const leaves = change.trash || (change.remove || []).includes(mailLabel) || (target === "SPAM");
+  if (leaves) ids.forEach((id) => $(`#threads .gr[data-t="${CSS.escape(id)}"]`)?.remove());
+  const results = await Promise.all(ids.map((id) => api(`/api/mail/threads/${id}/modify`, { method: "POST", body: change }).then(() => true).catch((err) => (log(err.message, "t-err"), false))));
+  const ok = ids.filter((_, i) => results[i]);
+  mailSel = new Set([...mailSel].filter((id) => !ok.includes(id)));
+  loadMailCounts();
+  if (!leaves) loadThreads();
+  if (!ok.length) { loadThreads(); return; }
+  const what = target === "TRASH" ? "moved to Trash" : target === "SPAM" ? "marked as spam" : target === "STARRED" ? "starred" : `moved to ${name}`;
+  snack(`${ok.length === 1 ? "Conversation" : `${ok.length} conversations`} ${what}.`, async () => {
+    await Promise.all(ok.map((id) => api(`/api/mail/threads/${id}/modify`, { method: "POST", body: undoOf(change) }).catch(() => {})));
+    loadThreads(); loadMailCounts();
+  });
+}
+function snack(text, undo) {
+  let el = $("#snack"); if (!el) { el = document.createElement("div"); el.id = "snack"; el.className = "snack"; document.body.appendChild(el); }
+  el.innerHTML = `<span>${esc(text)}</span>${undo ? `<button type="button">Undo</button>` : ""}`; el.hidden = false;
+  clearTimeout(el._t); el._t = setTimeout(() => (el.hidden = true), 8000);
+  if (undo) el.querySelector("button").onclick = () => { el.hidden = true; undo(); };
 }
 async function openThread(id) {
   if (!mailLoaded) await loadMail();

@@ -147,10 +147,14 @@ export class GoogleGmail implements MailClient {
     return { id: data.id!, threadId: data.threadId!, messageId };
   }
 
-  async modifyThread(id: string, change: { add?: string[]; remove?: string[]; trash?: boolean }) {
+  async modifyThread(id: string, change: { add?: string[]; remove?: string[]; trash?: boolean; untrash?: boolean }) {
     if (change.trash) {
       await this.gmail().users.threads.trash({ userId: "me", id });
       return;
+    }
+    if (change.untrash) {
+      await this.gmail().users.threads.untrash({ userId: "me", id });
+      if (!change.add?.length && !change.remove?.length) return;
     }
     await this.gmail().users.threads.modify({ userId: "me", id, requestBody: { addLabelIds: change.add ?? [], removeLabelIds: change.remove ?? [] } });
   }

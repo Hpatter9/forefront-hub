@@ -132,6 +132,11 @@ export class MockGmail implements MailClient {
       { id: "STARRED", name: "STARRED", type: "system" },
       { id: "SENT", name: "SENT", type: "system" },
       { id: "DRAFT", name: "DRAFT", type: "system" },
+      { id: "SPAM", name: "SPAM", type: "system" },
+      { id: "TRASH", name: "TRASH", type: "system" },
+      // Two made-up labels of Hunter's own, so sorting by label can be tried without a real account.
+      { id: "Label_1", name: "Adjusters", type: "user" },
+      { id: "Label_2", name: "Receipts", type: "user" },
     ];
   }
 
@@ -151,11 +156,12 @@ export class MockGmail implements MailClient {
     return { id: msg.id, threadId: existing?.id ?? all.at(-1)!.id, messageId };
   }
 
-  async modifyThread(id: string, change: { add?: string[]; remove?: string[]; trash?: boolean }) {
+  async modifyThread(id: string, change: { add?: string[]; remove?: string[]; trash?: boolean; untrash?: boolean }) {
     const all = this.loadThreads();
     const t = all.find((x) => x.id === id);
     if (!t) return;
     if (change.trash) t.labelIds = ["TRASH"];
+    if (change.untrash) t.labelIds = [...t.labelIds.filter((l) => l !== "TRASH"), "INBOX"];
     t.labelIds = [...new Set([...t.labelIds.filter((l) => !(change.remove ?? []).includes(l)), ...(change.add ?? [])])];
     this.saveThreads(all);
   }

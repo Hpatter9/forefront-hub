@@ -86,7 +86,7 @@ export interface MailClient {
    */
   send?(d: DraftInput): Promise<{ id: string; threadId: string; messageId: string }>;
   /** Archive (remove INBOX), mark read (remove UNREAD), star, trash. */
-  modifyThread?(id: string, change: { add?: string[]; remove?: string[]; trash?: boolean }): Promise<void>;
+  modifyThread?(id: string, change: { add?: string[]; remove?: string[]; trash?: boolean; untrash?: boolean }): Promise<void>;
   attachment?(messageId: string, attachmentId: string): Promise<Buffer>;
   /** The id of a user label with this name, created if needed. */
   ensureLabel?(name: string): Promise<string>;
