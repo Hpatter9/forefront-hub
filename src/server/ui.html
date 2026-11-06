@@ -164,6 +164,12 @@
   dialog ul { margin: 0; padding-left: 18px; }
   dialog .foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--line); }
 
+  .player { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: 96px; width: min(380px, calc(100vw - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.18); z-index: 40; display: grid; gap: 8px; padding: 10px; }
+  .player .bar { display: flex; gap: 6px; align-items: center; }
+  .player .bar b { flex: 1; font-size: 13px; }
+  .player iframe { width: 100%; height: 352px; border: 0; border-radius: 12px; }
+  .player.min iframe, .player.min .more { display: none; }
+  .player .more { display: grid; gap: 6px; }
   .dropzone { position: fixed; inset: 0; background: rgba(47, 111, 167, .18); border: 3px dashed var(--accent); display: grid; place-items: center; z-index: 50; pointer-events: none; }
   .dropzone div { background: var(--panel); padding: 16px 22px; border-radius: 12px; font-weight: 600; box-shadow: var(--shadow); }
   .attached { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -194,6 +200,7 @@
       <span id="chips" class="row"></span>
       <span class="small" id="syncstate"></span>
       <button class="topbtn" id="syncnow" type="button" title="Refresh every job folder from Homebase (also runs every 15 minutes)">Sync now</button>
+      <button class="topbtn" id="playerbtn" type="button" title="Spotify and Audible">♪ Player</button>
     </div>
   </header>
 
@@ -275,6 +282,16 @@
   <select id="fd-job"></select>
   <label class="row"><input type="checkbox" id="fd-hb" checked> Also add to the job's Documents in Homebase (you'll OK each one)</label>
   </div><div class="foot"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="go">Add</button></div></form></dialog>
+<div class="player" id="player" hidden>
+  <div class="bar"><b>Player</b><button class="btn small" id="pl-min" type="button">Hide</button><button class="btn small" id="pl-close" type="button" aria-label="Close player">✕</button></div>
+  <iframe id="pl-spotify" title="Spotify" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" hidden></iframe>
+  <div class="more">
+    <div class="row"><input type="text" id="pl-link" placeholder="Paste a Spotify playlist, album, podcast or song link" style="flex:1"><button class="btn small primary" id="pl-play" type="button">Play</button></div>
+    <div class="row small" id="pl-saved"></div>
+    <div class="row"><button class="btn small" id="pl-audible" type="button">Open Audible</button><span class="small muted">Audible plays in its own small window (it can't be shown inside the hub).</span></div>
+    <span class="small muted">Sign in to Spotify in this browser for full songs; otherwise Spotify plays previews.</span>
+  </div>
+</div>
 <div class="dropzone" id="dropzone" hidden><div>Drop to add to <span id="dz-target">a job</span></div></div>
 
 <dialog id="composedlg"><form method="dialog" id="composeform"><div class="in">
@@ -812,6 +829,34 @@ $("#filedlg").addEventListener("close", async () => {
   }
   $("#attached").innerHTML = recentFiles.slice(-6).map((x) => `<span class="tag">📎 #${x.job} ${esc(x.name)}</span>`).join("");
 });
+
+// ============================================================= player: Spotify (embedded) + Audible (its own window)
+function spotifyEmbed(link) {
+  const m = String(link).match(/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(playlist|album|track|episode|show|artist)\/([A-Za-z0-9]+)/) || String(link).match(/^spotify:(playlist|album|track|episode|show|artist):([A-Za-z0-9]+)$/);
+  return m ? `https://open.spotify.com/embed/${m[1]}/${m[2]}?utm_source=generator` : null;
+}
+function playSpotify(link) {
+  const src = spotifyEmbed(link);
+  if (!src) { log("That doesn't look like a Spotify link. In Spotify: Share → Copy link.", "t-err"); return; }
+  const f = $("#pl-spotify"); if (f.src !== src) f.src = src; f.hidden = false;
+  const saved = store.get("spotify", []).filter((x) => x !== link); saved.unshift(link); store.set("spotify", saved.slice(0, 6));
+  store.set("spotifyNow", link); renderSaved();
+}
+function renderSaved() {
+  const saved = store.get("spotify", []);
+  $("#pl-saved").innerHTML = saved.length ? `<span class="muted">Recent:</span> ` + saved.map((l, i) => `<button class="btn small" type="button" data-pl="${i}">${esc((l.match(/(playlist|album|track|episode|show|artist)/) || ["link"])[0])} ${i + 1}</button>`).join("") : "";
+}
+$("#pl-saved").addEventListener("click", (e) => { const b = e.target.closest("[data-pl]"); if (b) playSpotify(store.get("spotify", [])[Number(b.dataset.pl)]); });
+$("#playerbtn").addEventListener("click", () => { const p = $("#player"); p.hidden = !p.hidden; p.classList.remove("min"); store.set("playerOpen", !p.hidden); });
+$("#pl-close").addEventListener("click", () => { $("#player").hidden = true; store.set("playerOpen", false); });
+$("#pl-min").addEventListener("click", () => { const p = $("#player"); p.classList.toggle("min"); $("#pl-min").textContent = p.classList.contains("min") ? "Show" : "Hide"; });
+$("#pl-play").addEventListener("click", () => { const l = $("#pl-link").value.trim(); if (l) { playSpotify(l); $("#pl-link").value = ""; } });
+$("#pl-link").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("#pl-play").click(); } });
+$("#pl-audible").addEventListener("click", () => {
+  const w = window.open("https://www.audible.com/library/titles", "audible", "width=460,height=780");
+  if (!w) log("Your browser blocked the Audible window. Allow pop-ups for the hub, or open audible.com/library.", "t-err");
+});
+(() => { renderSaved(); const now = store.get("spotifyNow", null); if (now && spotifyEmbed(now)) { $("#pl-spotify").src = spotifyEmbed(now); $("#pl-spotify").hidden = false; } if (store.get("playerOpen", false)) $("#player").hidden = false; })();
 
 // ============================================================= Claude
 async function askClaude(prompt, job) {
