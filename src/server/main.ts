@@ -283,6 +283,7 @@ const server = http.createServer(async (req, res) => {
           waiting: count("reply"),
           estimate: count("estimate"),
           followup: count("followup"),
+          adjuster: count("adjuster"),
           proposalsOut: proposals.length,
           proposalsAmount: proposals.reduce((t, x) => t + (x.amount ?? 0), 0),
           stale: count("stale"),

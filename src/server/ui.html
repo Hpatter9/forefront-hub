@@ -1051,6 +1051,7 @@ const ACTIONS = {
   reply: (r) => `${r.threadId ? `<button class="btn small primary" data-do="thread" data-thread="${esc(r.threadId)}">Reply</button>` : ""}<button class="btn small" data-do="claude" data-p="Read the latest email on job #${r.jobNumber} and draft my reply in Gmail (draft only).">Draft reply with Claude</button>`,
   log: (r) => `<button class="btn small primary" data-do="logsent" data-n="${r.jobNumber}">Log in Homebase</button>`,
   estimate: (r) => `<button class="btn small" data-do="claude" data-p="Start the estimate for job #${r.jobNumber}: check what's in the job folder (ESX, photos, notes) and tell me what's missing before you price it.">Start estimate with Claude</button>`,
+  adjuster: (r) => `<button class="btn small primary" data-do="claude" data-p="Draft a short check-in email to the adjuster on job #${r.jobNumber}, in my voice, asking where they are on their review of our estimate and whether they need anything else from us (photos, measurements, a call). Reply in the existing thread with them if there is one. Gmail draft only.">Draft check-in with Claude</button>`,
   followup: (r) => `<button class="btn small" data-do="claude" data-p="Draft a short follow-up email for job #${r.jobNumber}'s proposal in my voice (Gmail draft only), to whoever is waiting on it.">Draft follow-up</button>`,
   draft: () => `<a class="btn small" href="https://mail.google.com/mail/u/0/#drafts" target="_blank" rel="noopener">Open Gmail drafts</a>`,
   upload: (r) => `<button class="btn small primary" data-do="upload" data-n="${r.jobNumber}">Upload</button>`,
@@ -1082,6 +1083,7 @@ async function loadToday() {
     <div class="strip">
       ${tile("reply", t.waiting, "waiting on your reply", true)}
       ${tile("estimate", t.estimate, "need an estimate")}
+      ${tile("adjuster", t.adjuster, "adjusters to check in with", true)}
       ${tile("followup", t.followup, "proposals to follow up")}
       ${tile("proposals", usd(t.proposalsAmount).replace(/\.\d\d$/, ""), `${t.proposalsOut} proposals out`)}
       ${tile("stale", t.stale, "not touched this week")}

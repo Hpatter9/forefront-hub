@@ -78,8 +78,13 @@ export const JobSchema = z.object({
       proposalAmount: z.number().nullable().default(null),
       checkedAt: z.string().default(""),
       gmailCheckedAt: z.string().default(""),
+      /** The last email or call with the job's adjuster (for the weekly review check-in). */
+      adjusterTouchAt: z.string().default(""),
+      adjusterTouch: z.string().default(""),
+      /** Who the adjuster seems to be, from the job's emails, when Homebase doesn't name one. */
+      adjusterGuess: z.object({ name: z.string(), email: z.string(), why: z.string() }).nullable().default(null),
     })
-    .default({ lastTouchAt: "", lastTouch: "", waiting: null, proposalAmount: null, checkedAt: "", gmailCheckedAt: "" }),
+    .default({ lastTouchAt: "", lastTouch: "", waiting: null, proposalAmount: null, checkedAt: "", gmailCheckedAt: "", adjusterTouchAt: "", adjusterTouch: "", adjusterGuess: null }),
 });
 
 export type Job = z.infer<typeof JobSchema>;

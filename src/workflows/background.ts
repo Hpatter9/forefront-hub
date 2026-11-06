@@ -44,7 +44,14 @@ export async function syncAll(hub: Hub, opts: { mine?: boolean; concurrency?: nu
         if (f.toUpload.length) out.needsUpload.push({ jobNumber: n, files: f.toUpload.map((x) => x.name) });
         const s = await sync(hub, n, { checkOnly: true });
         if (s.some((r) => r.note?.startsWith("sent; ready"))) out.readyToLog.push(n);
-        hub.jobs.upsert(n, { syncedAt: new Date().toISOString(), pulse: await pulse(hub, hub.jobs.get(n)) });
+        const pl = await pulse(hub, hub.jobs.get(n));
+        hub.jobs.upsert(n, { syncedAt: new Date().toISOString(), pulse: pl });
+        // Homebase didn't name an adjuster but the emails make it clear: keep it in the job folder (not Homebase).
+        const jj = hub.jobs.get(n);
+        if (pl.adjusterGuess && !jj.adjuster.email) {
+          hub.jobs.upsert(n, { adjuster: { name: pl.adjusterGuess.name, email: pl.adjusterGuess.email, phone: jj.adjuster.phone }, insurance: jj.insurance === "unknown" ? "claim" : jj.insurance });
+          hub.jobs.log(n, `Adjuster from the job's emails: ${pl.adjusterGuess.name || pl.adjusterGuess.email} <${pl.adjusterGuess.email}> (${pl.adjusterGuess.why})`);
+        }
       } catch (e) {
         out.errors.push({ jobNumber: n, error: (e as Error).message });
       }
