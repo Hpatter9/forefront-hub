@@ -1,4 +1,4 @@
-import type { ActivityRow, Contact, DocumentKind, FiledEmail, HomebaseClient, HomebaseDocument, JobDetail, JobSummary } from "./types.js";
+import type { ActivityRow, Contact, DocumentKind, FieldResult, FiledEmail, HomebaseClient, HomebaseDocument, JobDetail, JobSummary } from "./types.js";
 
 /**
  * Homebase over its real JSON API (https://homebase.forefrontteam.com/api/v1, reference at /api/v1/docs).
@@ -155,6 +155,45 @@ export class ApiHomebase implements HomebaseClient {
   async activity(jobNumber: number): Promise<ActivityRow[]> {
     const id = await this.projectId(jobNumber);
     return (await this.call<{ activity: ActivityRow[] }>("GET", `/projects/${id}/activity`)).activity;
+  }
+
+  async rawJob(jobNumber: number): Promise<Record<string, any>> {
+    return this.project(await this.projectId(jobNumber));
+  }
+
+  async updateFields(jobNumber: number, changes: Record<string, unknown>): Promise<Record<string, FieldResult>> {
+    const id = await this.projectId(jobNumber);
+    const r = await this.call<{ results?: Record<string, FieldResult> }>("PATCH", `/projects/${id}`, changes);
+    return r.results ?? {};
+  }
+
+  async createContact(jobNumber: number, c: { first: string; last: string; email?: string; phone?: string; title?: string }) {
+    const projectId = await this.projectId(jobNumber);
+    const r = await this.call<any>("POST", `/contacts`, { ...c, projectId });
+    return { id: r.contact?.id as string, adopted: !!r.adopted, ignored: r.ignored };
+  }
+
+  async updateContact(contactId: string, c: Record<string, string | undefined>): Promise<Record<string, FieldResult>> {
+    const body = Object.fromEntries(Object.entries(c).filter(([, v]) => v !== undefined));
+    const r = await this.call<{ results?: Record<string, FieldResult> }>("PATCH", `/contacts/${contactId}`, body);
+    return r.results ?? {};
+  }
+
+  async searchAccounts(q: string, kind?: string) {
+    const params = new URLSearchParams({ q, limit: "20", ...(kind ? { kind } : {}) });
+    const r = await this.call<{ accounts: any[] }>("GET", `/accounts?${params}`);
+    return r.accounts.map((a) => ({ id: a.id as string, name: a.name as string, kind: a.kind as string }));
+  }
+
+  async suggestJobs(clues: { addresses?: string[]; numbers?: string[]; streets?: string[]; claims?: string[] }) {
+    const r = await this.call<{ projects: any[] }>("POST", "/projects/suggest", clues, `hub:suggest:${crypto.randomUUID()}`);
+    return r.projects.map(toSummary(this.opts.url));
+  }
+
+  private vocab?: Record<string, any>;
+  async vocabulary() {
+    this.vocab ??= await this.call<Record<string, any>>("GET", "/vocabulary");
+    return this.vocab;
   }
 
   async documents(jobNumber: number): Promise<HomebaseDocument[]> {

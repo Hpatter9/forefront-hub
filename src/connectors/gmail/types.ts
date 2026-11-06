@@ -1,4 +1,7 @@
-/** Gmail, drafts only. There is deliberately no send method: Hunter sends every email himself. */
+/**
+ * Gmail. Claude and the workflows only ever make drafts (createDraft). `send` exists for the Mail tab, where Hunter
+ * presses Send himself and confirms; nothing calls it on its own.
+ */
 export interface DraftInput {
   to: string[];
   cc?: string[];
@@ -31,6 +34,10 @@ export interface ThreadSummary {
   date: string;
   snippet: string;
   messageCount: number;
+  unread?: boolean;
+  starred?: boolean;
+  labelIds?: string[];
+  hasAttachments?: boolean;
 }
 
 export interface Message {
@@ -41,7 +48,19 @@ export interface Message {
   date: string;
   subject: string;
   body: string;
-  attachments: { id: string; filename: string; mimeType: string }[];
+  /** The HTML part as Gmail has it (shown in a sandboxed frame). */
+  html?: string;
+  /** RFC 822 Message-ID, for replies. */
+  messageIdHeader?: string;
+  labelIds?: string[];
+  attachments: { id: string; filename: string; mimeType: string; size?: number }[];
+}
+
+export interface Label {
+  id: string;
+  name: string;
+  type: "system" | "user";
+  unread?: number;
 }
 
 export interface MailClient {
@@ -51,4 +70,16 @@ export interface MailClient {
   search(q: string, max?: number): Promise<ThreadSummary[]>;
   getThread(id: string): Promise<{ id: string; messages: Message[] }>;
   saveAttachments(messageId: string, destDir: string, filter?: RegExp): Promise<string[]>;
+
+  // ---- the Mail tab
+  /** One page of a mailbox: a label (INBOX, SENT, DRAFT, STARRED, a user label) and/or a Gmail search. */
+  listThreads?(o: { label?: string; q?: string; pageToken?: string; max?: number }): Promise<{ threads: ThreadSummary[]; nextPageToken?: string }>;
+  labels?(): Promise<Label[]>;
+  /** Sends now. Only the Mail tab's Send button calls this, after Hunter confirms. */
+  send?(d: DraftInput): Promise<{ id: string; threadId: string; messageId: string }>;
+  /** Archive (remove INBOX), mark read (remove UNREAD), star, trash. */
+  modifyThread?(id: string, change: { add?: string[]; remove?: string[]; trash?: boolean }): Promise<void>;
+  attachment?(messageId: string, attachmentId: string): Promise<Buffer>;
+  /** False when Gmail was connected before the Mail tab existed (drafts + read only): reconnect to send/archive. */
+  fullAccess?(): boolean;
 }

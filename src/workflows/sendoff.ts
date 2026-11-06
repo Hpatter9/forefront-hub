@@ -122,13 +122,15 @@ export async function sendoff(hub: Hub, jobNumber: number, o: SendoffOptions): P
 }
 
 async function buildPhotoReport(hub: Hub, jobNumber: number, writer: EmailWriter, estimateJson?: string): Promise<string> {
+  // Photos live in CompanyCam. Claude picks from small preview copies; only the picked ones download full size.
   const photosDir = hub.jobs.path(jobNumber, "photos");
-  const indexFile = path.join(photosDir, "index.json");
-  if (!existsSync(indexFile)) await downloadPhotos(hub, jobNumber);
-  const photos: PhotoInfo[] = JSON.parse(readFileSync(indexFile, "utf8"));
-  if (!photos.length) throw new Error("No photos for the photo report (CompanyCam project is empty).");
+  const previewDir = path.join(photosDir, "previews");
+  const all = await downloadPhotos(hub, jobNumber, { size: "web", dir: previewDir });
+  const photos: PhotoInfo[] = JSON.parse(readFileSync(path.join(previewDir, "index.json"), "utf8"));
+  if (!all.length) throw new Error("No photos for the photo report (the CompanyCam project is empty).");
   const job = hub.jobs.get(jobNumber);
-  const picks = await writer.pickPhotos(job, photos, photosDir);
+  const picks = await writer.pickPhotos(job, photos, previewDir);
+  await downloadPhotos(hub, jobNumber, { size: "original", dir: photosDir, only: picks.map((p) => p.file) });
   const picksFile = path.join(photosDir, "report-picks.json");
   writeFileSync(
     picksFile,

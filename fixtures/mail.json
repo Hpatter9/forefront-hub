@@ -1,0 +1,24 @@
+[
+  {
+    "id": "mock-thread-1",
+    "labelIds": ["INBOX", "UNREAD"],
+    "messages": [
+      { "id": "m1", "from": "Alex Adjuster <alex.adjuster@carrier.example>", "to": ["hunter@forefrontteam.com"], "cc": [], "date": "2026-11-05T21:10:00Z", "subject": "RE: Sample – 123 Main St – Repair Estimate – Claim EX-12345", "body": "Hi Hunter,\n\nThanks for the estimate. Can you send over a few more photos of the hallway flooring? I'd like to see the cupping before I approve the LVP.\n\nAlex", "attachments": [] }
+    ]
+  },
+  {
+    "id": "mock-thread-2",
+    "labelIds": ["INBOX"],
+    "messages": [
+      { "id": "m2", "from": "Hunter Patterson <hunter@forefrontteam.com>", "to": ["sam@example.com"], "cc": [], "date": "2026-10-20T16:00:00Z", "subject": "Your Reconstruction Estimate – 45 Pine Ave", "body": "Hi Sam,\n\nAttached is the reconstruction estimate for 45 Pine Ave.\n\nThanks again,", "attachments": [] },
+      { "id": "m3", "from": "Sam Example <sam@example.com>", "to": ["hunter@forefrontteam.com"], "cc": [], "date": "2026-11-04T14:22:00Z", "subject": "Re: Your Reconstruction Estimate – 45 Pine Ave", "body": "Hi Hunter, we're good to go. What do you need from us to get on the schedule?\n\nSam", "attachments": [] }
+    ]
+  },
+  {
+    "id": "mock-thread-3",
+    "labelIds": ["INBOX", "UNREAD"],
+    "messages": [
+      { "id": "m4", "from": "DocuSketch <help@docusketch.com>", "to": ["hunter@forefrontteam.com"], "cc": [], "date": "2026-11-03T00:35:00Z", "subject": "Sketch request for the project 5600001 delivered", "body": "Interior sketch request for project 5600001 delivered.\n\nProject name\nSample - 123 Main St - Denver - Recon", "attachments": [] }
+    ]
+  }
+]

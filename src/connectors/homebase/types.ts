@@ -64,6 +64,18 @@ export interface HomebaseClient {
   downloadDocument?(doc: HomebaseDocument, dest: string): Promise<void>;
   /** Adds a file to the job's Documents tab. */
   uploadDocument?(jobNumber: number, file: string, o: { kind: DocumentKind; title?: string; version?: number }): Promise<HomebaseDocument>;
+
+  // ---- editing the job like its Homebase page (drivers that can)
+  /** The whole job record as Homebase answers it, for the field editor. */
+  rawJob?(jobNumber: number): Promise<Record<string, any>>;
+  /** Writes job fields; one result per field (a refused field doesn't stop the others). */
+  updateFields?(jobNumber: number, changes: Record<string, unknown>): Promise<Record<string, FieldResult>>;
+  createContact?(jobNumber: number, c: { first: string; last: string; email?: string; phone?: string; title?: string }): Promise<{ id: string; adopted?: boolean; ignored?: Record<string, unknown> }>;
+  updateContact?(contactId: string, c: { first?: string; last?: string; email?: string; phone?: string; mobile?: string; title?: string }): Promise<Record<string, FieldResult>>;
+  searchAccounts?(q: string, kind?: string): Promise<{ id: string; name: string; kind: string }[]>;
+  vocabulary?(): Promise<Record<string, any>>;
+  /** Which jobs an email is probably about, from its addresses, job numbers, streets and claim numbers. */
+  suggestJobs?(clues: { addresses?: string[]; numbers?: string[]; streets?: string[]; claims?: string[] }): Promise<JobSummary[]>;
   close?(): Promise<void>;
 }
 
@@ -78,6 +90,13 @@ export interface FiledEmail {
   subject: string;
   preview?: string;
   attachmentCount?: number;
+}
+
+export interface FieldResult {
+  ok: boolean;
+  changed?: boolean;
+  code?: string;
+  message?: string;
 }
 
 export type DocumentKind = "estimate" | "invoice" | "scope" | "contract" | "photo" | "report" | "other";

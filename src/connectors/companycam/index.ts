@@ -10,6 +10,9 @@ export interface CCProject {
   address: string;
   photoCount: number;
   url: string;
+  /** CompanyCam's own viewer for the project, made to sit inside another page. */
+  embedUrl?: string;
+  publicUrl?: string;
 }
 
 export interface CCPhoto {
@@ -20,14 +23,17 @@ export interface CCPhoto {
   url: string; // CompanyCam page for the photo
   original: string; // full-size image URI
   web: string; // ~400 px
+  thumb?: string; // ~250 px
 }
 
 export interface PhotoClient {
   readonly kind: "mock" | "rest";
   findProjects(query: string): Promise<CCProject[]>;
+  project?(projectId: string): Promise<CCProject>;
+  /** Photos stay in CompanyCam; the hub shows them from their CompanyCam addresses. */
   listPhotos(projectId: string): Promise<CCPhoto[]>;
-  /** Downloads the photos (full size) into destDir as cc_<capturedAt>_<id>.jpg, skipping ones already there. */
-  download(photos: CCPhoto[], destDir: string): Promise<string[]>;
+  /** Downloads photos into destDir as cc_<capturedAt>_<id>.jpg (skipping ones already there): only for a photo report. */
+  download(photos: CCPhoto[], destDir: string, size?: "original" | "web"): Promise<string[]>;
 }
 
 /** "3226 - Augustine - 1071 Acapulco Ct - ..." is how Forefront names CompanyCam projects. */
@@ -56,13 +62,11 @@ export class RestCompanyCam implements PhotoClient {
 
   async findProjects(query: string): Promise<CCProject[]> {
     const data = await this.get<any[]>(`/projects?query=${encodeURIComponent(query)}&per_page=25`);
-    return data.map((p) => ({
-      id: String(p.id),
-      name: p.name ?? "",
-      address: [p.address?.street_address_1, p.address?.city, p.address?.state, p.address?.postal_code].filter(Boolean).join(", "),
-      photoCount: p.photo_count ?? 0,
-      url: p.project_url ?? `https://app.companycam.com/projects/${p.id}`,
-    }));
+    return data.map(toProject);
+  }
+
+  async project(projectId: string): Promise<CCProject> {
+    return toProject(await this.get<any>(`/projects/${projectId}`));
   }
 
   async listPhotos(projectId: string): Promise<CCPhoto[]> {
@@ -79,6 +83,7 @@ export class RestCompanyCam implements PhotoClient {
           url: p.photo_url ?? "",
           original: uri("original"),
           web: uri("web"),
+          thumb: uri("thumbnail") || uri("web"),
         });
       }
       if (data.length < 100) break;
@@ -86,13 +91,13 @@ export class RestCompanyCam implements PhotoClient {
     return out.sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
   }
 
-  async download(photos: CCPhoto[], destDir: string): Promise<string[]> {
+  async download(photos: CCPhoto[], destDir: string, size: "original" | "web" = "original"): Promise<string[]> {
     mkdirSync(destDir, { recursive: true });
     const files: string[] = [];
     for (const p of photos) {
       const file = path.join(destDir, photoFileName(p));
       if (!existsSync(file)) {
-        const res = await this.fetchFn(p.original || p.web);
+        const res = await this.fetchFn(size === "web" ? p.web || p.original : p.original || p.web);
         if (!res.ok) throw new Error(`CompanyCam photo ${p.id}: ${res.status}`);
         writeFileSync(file, Buffer.from(await res.arrayBuffer()));
       }
@@ -100,6 +105,18 @@ export class RestCompanyCam implements PhotoClient {
     }
     return files;
   }
+}
+
+function toProject(p: any): CCProject {
+  return {
+    id: String(p.id),
+    name: p.name ?? "",
+    address: [p.address?.street_address_1, p.address?.city, p.address?.state, p.address?.postal_code].filter(Boolean).join(", "),
+    photoCount: p.photo_count ?? 0,
+    url: p.project_url ?? `https://app.companycam.com/projects/${p.id}`,
+    embedUrl: p.embedded_project_url ?? undefined,
+    publicUrl: p.public_url ?? undefined,
+  };
 }
 
 export class MockCompanyCam implements PhotoClient {
@@ -130,7 +147,7 @@ export class MockCompanyCam implements PhotoClient {
       }));
   }
 
-  async download(photos: CCPhoto[], destDir: string): Promise<string[]> {
+  async download(photos: CCPhoto[], destDir: string, _size?: "original" | "web"): Promise<string[]> {
     mkdirSync(destDir, { recursive: true });
     return photos.map((p) => {
       const file = path.join(destDir, photoFileName(p));

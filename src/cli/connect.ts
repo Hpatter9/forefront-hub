@@ -56,7 +56,7 @@ function findClientJson(): { id: string; secret: string; file: string } | null {
 
 export async function connectGmail() {
   const cfg = loadConfig();
-  console.log("Connecting Gmail (hunter@forefrontteam.com). The hub only gets to create drafts and read mail; it can't send.");
+  console.log("Connecting Gmail (hunter@forefrontteam.com) for the hub's Mail tab: reading, drafts, archive/labels, and sending when you press Send.");
   if (!cfg.gmail.clientId) {
     console.log("Google needs a one-time 'app' entry for the hub. Each page opens in your browser; sign in as hunter@forefrontteam.com.");
     step(1, "Create a project named Forefront Hub (Create).");

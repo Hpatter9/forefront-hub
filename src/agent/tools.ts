@@ -125,10 +125,10 @@ export function hubTools(hub: Hub) {
     tool("gmail_read_thread", "Read every message in a Gmail thread.", { threadId: z.string() }, wrap(async ({ threadId }) => hub.gmail.getThread(threadId))),
     tool(
       "gmail_create_draft",
-      "Create a Gmail DRAFT (never sent; Hunter sends it). The job's Homebase log address is BCC'd automatically. Attachments are local file paths (use the PDFs in the job's estimate/ folder). Write the body per the forefront-estimate skill's step 6 (Hunter's voice); his Gmail signature is appended, so don't add one.",
+      "Create a Gmail DRAFT (never sent; Hunter sends it). With a jobNumber the job's Homebase log address is BCC'd automatically. kind: 'homeowner' / 'adjuster' only for an estimate send-off (it is then tracked for logging the proposal); 'other' for replies, follow-ups and everything else. To reply in a thread, pass threadId (the draft goes into that conversation). Attachments are local file paths (the PDFs in the job's estimate/ folder). Write in Hunter's voice per the forefront-estimate skill's step 6; his Gmail signature is appended, so don't add one.",
       {
-        jobNumber,
-        kind: z.enum(["homeowner", "adjuster", "other"]),
+        jobNumber: jobNumber.optional(),
+        kind: z.enum(["homeowner", "adjuster", "other"]).default("other"),
         to: z.array(z.string()).min(1),
         cc: z.array(z.string()).default([]),
         subject: z.string(),
@@ -137,16 +137,19 @@ export function hubTools(hub: Hub) {
         threadId: z.string().optional().describe("to draft a reply inside an existing thread"),
       },
       wrap(async (a) => {
-        const bcc = intakeAddress(a.jobNumber);
-        const files = a.attachments.map((f) => (path.isAbsolute(f) ? f : hub.jobs.path(a.jobNumber, f)));
-        const ref = await hub.gmail.createDraft({ to: a.to, cc: a.cc, bcc: [bcc], subject: a.subject, body: a.body, attachments: files, threadId: a.threadId });
-        if (hub.jobs.exists(a.jobNumber) && a.kind !== "other") {
+        const bcc = a.jobNumber ? [intakeAddress(a.jobNumber)] : [];
+        const files = a.attachments.map((f) => (path.isAbsolute(f) || !a.jobNumber ? f : hub.jobs.path(a.jobNumber, f)));
+        let inReplyTo: string | undefined;
+        if (a.threadId) inReplyTo = (await hub.gmail.getThread(a.threadId).catch(() => null))?.messages.at(-1)?.messageIdHeader;
+        const ref = await hub.gmail.createDraft({ to: a.to, cc: a.cc, bcc, subject: a.subject, body: a.body, attachments: files, threadId: a.threadId, inReplyTo });
+        if (a.jobNumber && hub.jobs.exists(a.jobNumber)) hub.jobs.log(a.jobNumber, `Draft "${a.subject}" to ${a.to.join(", ")}`);
+        if (a.jobNumber && hub.jobs.exists(a.jobNumber) && a.kind !== "other") {
           const j = hub.jobs.get(a.jobNumber);
           const d: SendoffDraft = { id: ref.id, kind: a.kind, to: a.to, subject: a.subject, messageId: ref.messageId, attachments: files.map((f) => path.basename(f)), createdAt: new Date().toISOString() };
           hub.jobs.upsert(a.jobNumber, { sendoff: { ...j.sendoff, drafts: [...j.sendoff.drafts, d], homebaseLoggedAt: null } });
           hub.jobs.log(a.jobNumber, `Draft (${a.kind}) "${a.subject}"`);
         }
-        return { draftId: ref.id, bcc, note: "Draft created. Hunter reviews and sends it; then hub_sync logs it in Homebase." };
+        return { draftId: ref.id, bcc, note: "Draft created in Gmail. Hunter reviews and sends it." };
       }),
     ),
     tool(
@@ -154,6 +157,38 @@ export function hubTools(hub: Hub) {
       "Check which send-off drafts Hunter has sent; for those, update Homebase (proposal amount + real send date, stage -> Proposal Submitted), asking first.",
       { jobNumber: jobNumber.optional() },
       wrap(async ({ jobNumber: n }) => sync(hub, n)),
+    ),
+
+    // ---------------------------------------------------------------- what needs Hunter, and a job's history
+    tool(
+      "hub_today",
+      "Everything that needs Hunter right now: emails waiting on a reply, jobs needing an estimate, proposals to follow up, untouched jobs, send-offs to log, unsent drafts, files to upload.",
+      {},
+      wrap(async () => (await import("../workflows/reminders.js")).reminders(hub)),
+    ),
+    tool(
+      "job_timeline",
+      "A job's whole history, newest first: Homebase notes, calls/texts/meetings, every email (Homebase-filed and Gmail, with threadId), drafts.",
+      { jobNumber },
+      wrap(async ({ jobNumber: n }) => (await import("../workflows/timeline.js")).timeline(hub, n)),
+    ),
+    tool(
+      "homebase_update_fields",
+      "Change fields on the Homebase job (Hunter is shown each old -> new value and must OK it). Keys: detail, propertyType, estimator, preferredContactMethod, picturesLink, fundingType, claimStatus, claimNumber, carrier (an account id from homebase_find_account), deductible, poWoNumber, proposalAmount (also restamps the proposal date to today), estimatedCosts, desiredMargin, mitEstimatedInvoice, lockboxCode, gateCode, alarm, pets, parking, elevatorAccess, accessNotes, customerNotes, pmNotes, toolAccess, address ({street, unit, city, state, zip}).",
+      { jobNumber, changes: z.record(z.string(), z.any()) },
+      wrap(async ({ jobNumber: n, changes }) => (await import("../workflows/fields.js")).editFields(hub, n, changes) ?? "Hunter declined; nothing changed."),
+    ),
+    tool(
+      "homebase_set_adjuster",
+      "Put an adjuster on the Homebase job (adds the person, or reuses the one Homebase has by that exact name). Asks Hunter first.",
+      { jobNumber, slot: z.union([z.literal(1), z.literal(2)]).default(1), first: z.string(), last: z.string(), email: z.string().optional(), phone: z.string().optional() },
+      wrap(async ({ jobNumber: n, slot, ...a }) => (await import("../workflows/fields.js")).setAdjuster(hub, n, slot, a) ?? "Hunter declined; nothing changed."),
+    ),
+    tool(
+      "homebase_find_account",
+      "Search Homebase accounts (carriers, agencies, vendors) by name; kind 'Carrier' for insurance companies.",
+      { q: z.string().min(3), kind: z.string().optional() },
+      wrap(async ({ q, kind }) => (await hub.homebase.searchAccounts?.(q, kind)) ?? []),
     ),
 
     // ---------------------------------------------------------------- CompanyCam / DocuSketch
@@ -171,11 +206,12 @@ export function hubTools(hub: Hub) {
     ),
     tool(
       "companycam_download_photos",
-      "Download all of the job's CompanyCam photos into its photos/ folder (with photos/index.json: dates and descriptions). Then run the skill's photo_sheets.py on that folder to look through them.",
-      { jobNumber },
-      wrap(async ({ jobNumber: n }) => {
-        const files = await downloadPhotos(hub, n);
-        return { folder: hub.jobs.path(n, "photos"), count: files.length };
+      "Copy the job's CompanyCam photos into photos/previews (small) for looking through: photos/previews/index.json has dates and descriptions. Run the skill's photo_sheets.py on that folder. For full-size copies of particular photos, pass their file names in `only`.",
+      { jobNumber, only: z.array(z.string()).optional().describe("file names to copy full size into photos/") },
+      wrap(async ({ jobNumber: n, only }) => {
+        const dir = only ? hub.jobs.path(n, "photos") : path.join(hub.jobs.path(n, "photos"), "previews");
+        const files = await downloadPhotos(hub, n, only ? { size: "original", only } : { size: "web", dir });
+        return { folder: dir, count: files.length };
       }),
     ),
     tool(

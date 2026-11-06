@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import path from "node:path";
-import { pickProject } from "../connectors/companycam/index.js";
+import { photoFileName, pickProject } from "../connectors/companycam/index.js";
 import { lastName, type Job } from "../core/job.js";
 import type { Hub } from "../hub.js";
 
@@ -18,7 +18,8 @@ export async function pullJob(hub: Hub, jobNumber: number, opts: { quiet?: boole
   const keep = <T>(fresh: T | undefined | "", old: T | undefined) => (fresh === undefined || fresh === "" ? old : fresh);
 
   let job = hub.jobs.upsert(jobNumber, {
-    name: prior?.name || lastName(customer?.name ?? "") || hb.name.split(/\s+/)[0] || "",
+    // Homebase's own short customer name ("Augustine", "Westward 360"), else the main contact's last name.
+    name: hb.name || prior?.name || lastName(customer?.name ?? "") || "",
     homebaseId: hb.id,
     homebaseUrl: hb.url,
     address: keep(hb.address, prior?.address) ?? "",
@@ -72,14 +73,20 @@ export async function pullJob(hub: Hub, jobNumber: number, opts: { quiet?: boole
   return hub.jobs.get(jobNumber);
 }
 
-export async function downloadPhotos(hub: Hub, jobNumber: number): Promise<string[]> {
+/**
+ * Photos stay in CompanyCam and the hub shows them from there. This copies them down only when a file is needed:
+ * small previews for Claude to pick report photos from, and full size for the photos that go in a report.
+ * `only`: just these file names (cc_<date>_<id>.jpg). Writes index.json (dates, descriptions) next to them.
+ */
+export async function downloadPhotos(hub: Hub, jobNumber: number, o: { size?: "original" | "web"; dir?: string; only?: string[] } = {}): Promise<string[]> {
   const job = hub.jobs.get(jobNumber);
   if (!job.companycamProjectId) throw new Error(`No CompanyCam project linked to #${jobNumber}. Run: hub pull ${jobNumber}`);
-  const photos = await hub.photos.listPhotos(job.companycamProjectId);
-  const files = await hub.photos.download(photos, hub.jobs.path(jobNumber, "photos"));
-  // Keep CompanyCam's dates and descriptions next to the files, for picking report photos later.
+  const dir = o.dir ?? hub.jobs.path(jobNumber, "photos");
+  let photos = await hub.photos.listPhotos(job.companycamProjectId);
+  if (o.only) photos = photos.filter((p) => o.only!.includes(photoFileName(p)));
+  const files = await hub.photos.download(photos, dir, o.size ?? "original");
   const index = photos.map((p, i) => ({ file: path.basename(files[i]), id: p.id, capturedAt: p.capturedAt, description: p.description, creator: p.creator }));
-  writeFileSync(hub.jobs.path(jobNumber, "photos", "index.json"), JSON.stringify(index, null, 2));
-  hub.say(`${files.length} photos in ${hub.jobs.path(jobNumber, "photos")}`);
+  writeFileSync(path.join(dir, "index.json"), JSON.stringify(index, null, 2));
+  hub.say(`${files.length} photo${files.length === 1 ? "" : "s"} copied from CompanyCam${o.size === "web" ? " (previews)" : ""}`);
   return files;
 }

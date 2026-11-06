@@ -68,6 +68,17 @@ export const JobSchema = z.object({
   /** Last background sync with Homebase, and the last CompanyCam/DocuSketch look-up (those run at most daily). */
   syncedAt: z.string().default(""),
   lookupsAt: z.string().default(""),
+  /** What the background sync last saw on the job, for the Today screen's reminders. */
+  pulse: z
+    .object({
+      lastTouchAt: z.string().default(""),
+      lastTouch: z.string().default(""),
+      /** The newest email from someone else on the job that has no answer from Hunter after it. */
+      waiting: z.object({ from: z.string(), subject: z.string(), at: z.string(), threadId: z.string().default("") }).nullable().default(null),
+      proposalAmount: z.number().nullable().default(null),
+      checkedAt: z.string().default(""),
+    })
+    .default({ lastTouchAt: "", lastTouch: "", waiting: null, proposalAmount: null, checkedAt: "" }),
 });
 
 export type Job = z.infer<typeof JobSchema>;

@@ -5,10 +5,12 @@ import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { google, type gmail_v1 } from "googleapis";
 import { buildMime, htmlToText, newMessageId } from "./mime.js";
-import type { DraftInput, DraftRef, DraftStatus, MailClient, Message, ThreadSummary } from "./types.js";
+import type { DraftInput, DraftRef, DraftStatus, Label, MailClient, Message, ThreadSummary } from "./types.js";
 
-// compose = create drafts (no send scope is requested), readonly = search, threads, attachments, signature.
-const SCOPES = ["https://www.googleapis.com/auth/gmail.compose", "https://www.googleapis.com/auth/gmail.readonly"];
+// modify = read, label (archive / mark read / star / trash) and send; compose = drafts. Claude and the workflows only
+// create drafts; sending happens only from the Mail tab's Send button after Hunter confirms.
+const SCOPES = ["https://www.googleapis.com/auth/gmail.modify", "https://www.googleapis.com/auth/gmail.compose"];
+const MODIFY = "https://www.googleapis.com/auth/gmail.modify";
 
 export interface GoogleOpts {
   clientId: string;
@@ -102,6 +104,74 @@ export class GoogleGmail implements MailClient {
     return { state: "sent", sentAt: new Date(Number(msg.data.internalDate)).toISOString() };
   }
 
+  fullAccess(): boolean {
+    if (!existsSync(this.opts.tokenFile)) return false;
+    const scope: string = JSON.parse(readFileSync(this.opts.tokenFile, "utf8")).scope ?? "";
+    return scope.split(/\s+/).includes(MODIFY);
+  }
+
+  async listThreads(o: { label?: string; q?: string; pageToken?: string; max?: number } = {}) {
+    const { data } = await this.gmail().users.threads.list({
+      userId: "me",
+      labelIds: o.label ? [o.label] : undefined,
+      q: o.q || undefined,
+      pageToken: o.pageToken,
+      maxResults: o.max ?? 30,
+    });
+    const threads = await Promise.all((data.threads ?? []).map((t) => this.summary(t.id!)));
+    return { threads, nextPageToken: data.nextPageToken ?? undefined };
+  }
+
+  private async summary(id: string): Promise<ThreadSummary> {
+    const th = await this.gmail().users.threads.get({ userId: "me", id, format: "metadata", metadataHeaders: ["Subject", "From", "Date"] });
+    const msgs = th.data.messages ?? [];
+    const first = msgs[0];
+    const last = msgs.at(-1);
+    const h = (m: gmail_v1.Schema$Message | undefined, n: string) => m?.payload?.headers?.find((x) => x.name === n)?.value ?? "";
+    const labels = new Set(msgs.flatMap((m) => m.labelIds ?? []));
+    return {
+      id,
+      subject: h(first, "Subject"),
+      from: h(last, "From"),
+      date: last?.internalDate ? new Date(Number(last.internalDate)).toISOString() : h(last, "Date"),
+      snippet: last?.snippet ?? "",
+      messageCount: msgs.length,
+      unread: labels.has("UNREAD"),
+      starred: labels.has("STARRED"),
+      labelIds: [...labels],
+      hasAttachments: msgs.some((m) => (m.payload?.parts ?? []).some((p) => !!p.filename)),
+    };
+  }
+
+  async labels(): Promise<Label[]> {
+    const { data } = await this.gmail().users.labels.list({ userId: "me" });
+    const wanted = (data.labels ?? []).filter((l) => l.type === "user" || ["INBOX", "STARRED", "SENT", "DRAFT", "IMPORTANT", "SPAM", "TRASH"].includes(l.id!));
+    const inbox = await this.gmail().users.labels.get({ userId: "me", id: "INBOX" });
+    return wanted.map((l) => ({ id: l.id!, name: l.name!, type: l.type === "user" ? "user" : "system", unread: l.id === "INBOX" ? inbox.data.threadsUnread ?? 0 : undefined }));
+  }
+
+  async send(d: DraftInput) {
+    for (const f of d.attachments) if (!existsSync(f)) throw new Error(`Attachment not found: ${f}`);
+    const { html, from } = await this.sendAs();
+    const messageId = newMessageId();
+    const raw = Buffer.from(buildMime({ ...d, from, messageId, signatureHtml: html })).toString("base64url");
+    const { data } = await this.gmail().users.messages.send({ userId: "me", requestBody: { raw, threadId: d.threadId } });
+    return { id: data.id!, threadId: data.threadId!, messageId };
+  }
+
+  async modifyThread(id: string, change: { add?: string[]; remove?: string[]; trash?: boolean }) {
+    if (change.trash) {
+      await this.gmail().users.threads.trash({ userId: "me", id });
+      return;
+    }
+    await this.gmail().users.threads.modify({ userId: "me", id, requestBody: { addLabelIds: change.add ?? [], removeLabelIds: change.remove ?? [] } });
+  }
+
+  async attachment(messageId: string, attachmentId: string): Promise<Buffer> {
+    const res = await this.gmail().users.messages.attachments.get({ userId: "me", messageId, id: attachmentId });
+    return Buffer.from(res.data.data!, "base64url");
+  }
+
   async search(q: string, max = 15): Promise<ThreadSummary[]> {
     const { data } = await this.gmail().users.threads.list({ userId: "me", q, maxResults: max });
     const out: ThreadSummary[] = [];
@@ -152,12 +222,15 @@ function toMessage(m: gmail_v1.Schema$Message): Message {
     from: h("From"),
     to: h("To").split(",").map((s) => s.trim()).filter(Boolean),
     cc: h("Cc").split(",").map((s) => s.trim()).filter(Boolean),
-    date: h("Date"),
+    date: m.internalDate ? new Date(Number(m.internalDate)).toISOString() : h("Date"),
     subject: h("Subject"),
     body: text ? decode(text) : htmlToText(decode(html)),
+    html: html ? decode(html) : undefined,
+    messageIdHeader: h("Message-ID") || h("Message-Id") || undefined,
+    labelIds: m.labelIds ?? [],
     attachments: parts
       .filter((p) => p.filename && p.body?.attachmentId)
-      .map((p) => ({ id: p.body!.attachmentId!, filename: p.filename!, mimeType: p.mimeType ?? "" })),
+      .map((p) => ({ id: p.body!.attachmentId!, filename: p.filename!, mimeType: p.mimeType ?? "", size: p.body?.size ?? undefined })),
   };
 }
 
