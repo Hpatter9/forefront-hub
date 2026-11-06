@@ -698,7 +698,36 @@ const server = http.createServer(async (req, res) => {
       const b = await body(req);
       if (!cfg.anthropicApiKey) return send(res, 400, { error: "Claude is off on this machine (no Anthropic API key). Set ANTHROPIC_API_KEY in .env, or save it in the Estimator app." });
       const job = b.job ? Number(b.job) : undefined;
-      return send(res, 202, task(`Ask: ${String(b.prompt).slice(0, 60)}`, job, async () => (await import("../agent/run.js")).ask(hub, String(b.prompt), { jobNumber: job }), "timeline"));
+      // The answer comes back as an "answer" event with what the hub should show: the drafts made (to open in Gmail),
+      // the jobs and contacts Claude looked at (for buttons on the popup), and Claude's reply.
+      const id = crypto.randomUUID();
+      const prompt = String(b.prompt);
+      const made: import("../workflows/generated.js").GeneratedDraft[] = [];
+      const jobsSeen = new Set<number>(), contacts = new Set<string>();
+      task(`Ask: ${prompt.slice(0, 60)}`, job, async () => {
+        const { withDraftSource } = await import("../workflows/generated.js");
+        let text = "", error: string | undefined;
+        try {
+          text = await withDraftSource("Claude", async () => (await import("../agent/run.js")).ask(hub, prompt, {
+            jobNumber: job,
+            onMessage: (m) => {
+              if (m.type !== "assistant") return;
+              for (const c of m.message.content) {
+                if (c.type !== "tool_use") continue;
+                const inp = c.input as Record<string, unknown>;
+                if (typeof inp.jobNumber === "number") jobsSeen.add(inp.jobNumber);
+                if (c.name.endsWith("contacts_find") && typeof inp.query === "string") contacts.add(inp.query);
+              }
+            },
+          }), made);
+        } catch (e) {
+          error = (e as Error).message;
+        }
+        for (const x of text.matchAll(/#(\d{4})\b/g)) jobsSeen.add(Number(x[1]));
+        bus.emit({ type: "answer", id, prompt, text, error, drafts: made.map((d) => ({ threadId: d.threadId || (hub.gmail.kind === "mock" ? d.draftId : undefined), subject: d.subject, to: d.to })), jobs: [...jobsSeen].slice(0, 4), contacts: [...contacts].slice(0, 3) });
+        if (error) throw new Error(error);
+      }, "timeline");
+      return send(res, 202, { id });
     }
     const a = p.match(/^\/api\/approvals\/([\w-]+)$/);
     if (a && req.method === "POST") {

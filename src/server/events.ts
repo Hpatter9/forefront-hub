@@ -8,7 +8,8 @@ export type HubEvent =
   | { type: "approval-done"; id: string; answer: boolean }
   | { type: "task"; id: string; state: "running" | "done" | "error"; label: string; error?: string; job?: number }
   | { type: "changed"; job?: number; what: "timeline" | "mail" | "job" | "calendar" | "plan" | "summaries" }
-  | ({ type: "studio" } & StudioEvent);
+  | ({ type: "studio" } & StudioEvent)
+  | { type: "answer"; id: string; prompt: string; text: string; error?: string; drafts: { threadId?: string; subject: string; to: string[] }[]; jobs: number[]; contacts: string[] };
 
 /** Server-sent events to every open window. */
 export class EventBus {

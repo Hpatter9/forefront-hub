@@ -683,6 +683,16 @@
   .pv { display: inline-flex; gap: 6px; align-items: center; background: none; border: 0; color: var(--ink); font: inherit; padding: 0; cursor: pointer; text-decoration: none; }
   .pv .ms { font-size: 15px; color: var(--muted); }
   @media (max-width: 860px) { .ppl { grid-template-columns: 1fr; } .ppl-list { max-height: 40vh; } }
+
+  /* ---- Ask Claude: working card and answer popup */
+  .askcard { position: fixed; right: 24px; bottom: 96px; z-index: 55; display: grid; gap: 8px; }
+  .askcard[hidden] { display: none; }
+  .askcard > div { display: flex; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--link); border-radius: 10px; padding: 10px 14px; box-shadow: 0 8px 24px #0006; max-width: 380px; }
+  .askcard span:last-child { display: grid; } .askcard small { color: var(--muted); }
+  .answerdlg { width: min(720px, calc(100vw - 32px)); }
+  .answerdlg .ans-q { margin-bottom: 10px; font-style: italic; }
+  .answerdlg .ans-body { max-height: 60vh; overflow: auto; font-size: 15px; line-height: 1.6; }
+  .answerdlg .ans-body p { margin: 0 0 10px; }
 </style>
 </head>
 <body>
@@ -847,6 +857,9 @@
   </footer>
   </div>
 </div>
+
+<dialog id="answerdlg" class="answerdlg"><div class="in"><div class="ans-q small muted" id="ans-q"></div><div class="ans-body btext" id="ans-body"></div></div>
+  <div class="foot"><span class="row" id="ans-acts" style="flex:1;flex-wrap:wrap;gap:6px"></span><button class="btn primary" type="button" onclick="this.closest('dialog').close()">Done</button></div></dialog>
 
 <dialog id="approve"><div class="in"><h4 id="ap-title"></h4><ul id="ap-details"></ul><textarea id="ap-text" rows="3" hidden></textarea></div>
   <div class="foot"><button class="btn" id="ap-no">No</button><button class="btn primary" id="ap-yes">Yes, go ahead</button></div></dialog>
@@ -2303,11 +2316,63 @@ document.addEventListener("click", async (e) => {
 setInterval(() => { if (spState?.is_playing && spState.item) { spState.progress_ms = Math.min(spState.item.duration_ms, (spState.progress_ms || 0) + 1000); const r = $("#sp-seekr"); if (r && document.activeElement !== r) { r.value = spState.progress_ms; r.style.setProperty("--p", `${(spState.progress_ms / spState.item.duration_ms) * 100}%`); r.previousElementSibling.textContent = fmtMs(spState.progress_ms); } } }, 1000);
 
 // ============================================================= Claude
+// ---- Asking Claude takes you where the answer is: estimating and pricing go to the Estimator chat for the job,
+// a draft opens in Gmail, and anything else answers in a popup (with buttons to the jobs and people it's about).
+const EST_RX = /\b(estimates?|estimating|pric(e|es|ing|ed)|scope|scoping|xactimate|esx|line items?|agreements?|selections?|allowances?|photo report|revis(e|ed|ion)|supplements?|o&p|markup|square (feet|foot)|quantit(y|ies)|convert)\b/i;
+const DRAFT_RX = /\b(draft|e-?mail|reply|respond|write (to|back)|follow[- ]?up|send|text)\b/i;
+function jobFromText(t) {
+  const n = String(t).match(/#?\b(\d{4})\b/); if (n && jobs.some((j) => j.jobNumber === Number(n[1]))) return Number(n[1]);
+  const low = String(t).toLowerCase();
+  const hits = jobs.filter((j) => j.name && j.name.length >= 4 && new RegExp(`\\b${j.name.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(low));
+  return hits.length === 1 ? hits[0].jobNumber : null;
+}
+const asking = new Map();
 async function askClaude(prompt, job) {
   if (!status.agent) { log("Claude is off on this machine (no Anthropic API key).", "t-err"); return; }
-  await api("/api/ask", { method: "POST", body: { prompt, job } });
+  if (EST_RX.test(prompt) && !DRAFT_RX.test(prompt)) {
+    const n = jobFromText(prompt) || job || (store.get("tab") === "jobs" && view ? view.homebase.jobNumber : null) || estJob;
+    showTab("est");
+    if (!n) { $("#est-input").value = prompt; snack("Pick the job on the left, then press Send."); return; }
+    if (estJob !== n || !estData) { $("#est-job").value = String(n); await openEst(n); }
+    if (estData?.running) { $("#est-input").value = prompt; snack("Claude is still working on this job. Your message is ready to send."); return; }
+    await estSend(prompt);
+    return;
+  }
+  const r = await api("/api/ask", { method: "POST", body: { prompt, job: job || jobFromText(prompt) || undefined } });
   log("› " + prompt);
+  asking.set(r.id, prompt);
+  renderAskCard();
 }
+function renderAskCard() {
+  let el = $("#askcard"); if (!el) { el = document.createElement("div"); el.id = "askcard"; el.className = "askcard"; document.body.appendChild(el); }
+  el.hidden = !asking.size;
+  el.innerHTML = [...asking.values()].map((p) => `<div><span class="spin"></span><span><b>Claude is working on it</b><small>${esc(p.length > 90 ? p.slice(0, 90) + "…" : p)}</small></span></div>`).join("");
+}
+async function onAnswer(e) {
+  if (!asking.has(e.id)) return; // asked from another window
+  asking.delete(e.id); renderAskCard();
+  if (e.error) { log(`✗ ${e.error}`, "t-err"); }
+  const d = e.drafts.find((x) => x.threadId) || e.drafts[0];
+  if (d && !e.error) {
+    if (!mailLoaded) await loadMail(); // let Gmail finish loading first, or it would reset to the list on top of the draft
+    showTab("mail");
+    if (d.threadId) openThread(d.threadId);
+    else setTimeout(() => $('#labels [data-label="HUB_DRAFTS"]')?.click(), 400);
+    snack(`Claude drafted “${d.subject}”${e.drafts.length > 1 ? ` and ${e.drafts.length - 1} more (in Claude drafts)` : ""}. Review it, then press Send.`);
+    if (e.text) log(e.text);
+    return;
+  }
+  $("#ans-q").textContent = e.prompt;
+  $("#ans-body").innerHTML = e.error ? `<p style="color:var(--bad)">${esc(e.error)}</p>` : md(e.text || "(no answer)").replace(/(^|[\s(>])#(\d{4})\b/g, '$1<a href="#" data-do="open" data-n="$2">#$2</a>');
+  $("#ans-acts").innerHTML = [...e.jobs.filter((n) => jobs.some((j) => j.jobNumber === n)).map((n) => `<button class="btn small" data-do="open" data-n="${n}">Open #${n} ${esc(jobs.find((j) => j.jobNumber === n)?.name || "")}</button>`), ...e.contacts.map((q) => `<button class="btn small" data-ans-people="${esc(q)}">${msI("contacts")} ${esc(q)} in Contacts</button>`), e.drafts.length ? `<button class="btn small" data-label-go="HUB_DRAFTS">Claude drafts</button>` : ""].join("");
+  if (!$("#answerdlg").open) $("#answerdlg").showModal();
+}
+$("#answerdlg").addEventListener("click", (e) => {
+  if (e.target === $("#answerdlg")) { $("#answerdlg").close(); return; }
+  const o = e.target.closest("[data-do=open]"); if (o) { $("#answerdlg").close(); return; } // the global handler opens the job
+  const pq = e.target.closest("[data-ans-people]"); if (pq) { $("#answerdlg").close(); showTab("people"); $("#ppl-q").value = pq.dataset.ansPeople; loadPeople(pq.dataset.ansPeople, true); return; }
+  const lg = e.target.closest("[data-label-go]"); if (lg) { $("#answerdlg").close(); showTab("mail"); setTimeout(() => $(`#labels [data-label="${lg.dataset.labelGo}"]`)?.click(), 400); }
+});
 $("#askform").addEventListener("submit", async (e) => {
   e.preventDefault();
   const p = $("#prompt").value.trim(); if (!p) return;
@@ -2705,6 +2770,7 @@ es.onmessage = (m) => {
   const e = JSON.parse(m.data);
   if (e.type === "log") log(e.text);
   if (e.type === "studio") onStudio(e);
+  if (e.type === "answer") onAnswer(e);
   if (e.type === "approval") { if (!approvals.some((a) => a.id === e.id)) approvals.push(e); showApproval(); }
   if (e.type === "approval-done") { const i = approvals.findIndex((a) => a.id === e.id); if (i >= 0) { approvals.splice(i, 1); showApproval(); } }
   if (e.type === "task") {

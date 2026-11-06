@@ -28,10 +28,10 @@ export interface GeneratedDraft {
   checkedAt?: string;
 }
 
-const where = new AsyncLocalStorage<string>();
-/** Runs `fn` with drafts it makes credited to `source` ("Plan my day", ...). */
-export function withDraftSource<T>(source: string, fn: () => Promise<T>): Promise<T> {
-  return where.run(source, fn);
+const where = new AsyncLocalStorage<{ source: string; made?: GeneratedDraft[] }>();
+/** Runs `fn` with drafts it makes credited to `source` ("Plan my day", ...). `made` collects them as they're made. */
+export function withDraftSource<T>(source: string, fn: () => Promise<T>, made?: GeneratedDraft[]): Promise<T> {
+  return where.run({ source, made }, fn);
 }
 
 const file = (hub: Hub) => path.join(hub.cfg.stateDir, "generated-drafts.json");
@@ -60,11 +60,12 @@ export async function createGeneratedDraft(hub: Hub, d: DraftInput, meta: { jobN
     snippet: d.body.replace(/\s+/g, " ").trim().slice(0, 160),
     attachments: d.attachments.length,
     jobNumber: meta.jobNumber,
-    source: meta.source ?? where.getStore() ?? "Claude",
+    source: meta.source ?? where.getStore()?.source ?? "Claude",
     createdAt: new Date().toISOString(),
     state: "draft",
   });
   save(hub, list);
+  where.getStore()?.made?.push(list[list.length - 1]);
   return ref;
 }
 
