@@ -338,6 +338,12 @@ const server = http.createServer(async (req, res) => {
       if (req.method === "GET") {
         if (action === "") return send(res, 200, await jobView(n));
         if (action === "timeline") return send(res, 200, await timeline(hub, n));
+        if (action === "selections") {
+          const sl = await import("../workflows/selections.js");
+          const s = hub.jobs.exists(n) ? sl.loadSelections(hub, n) : { updatedAt: "", categories: [] };
+          const hasEstimate = hub.jobs.exists(n) && (hub.jobs.files(n, "estimate", /\.(json|pdf)$/i).length > 0 || hub.jobs.files(n, "files", /\.pdf$/i).length > 0);
+          return send(res, 200, { ...s, categories: s.categories.map((c) => ({ ...c, picks: c.picks.map((p) => ({ ...p, cmp: sl.compare(c, p) })) })), summary: sl.summary(s), hasEstimate, claude: !!cfg.anthropicApiKey });
+        }
         if (action === "notes") {
           let notes: HbNote[] = [], live = false;
           try {
@@ -375,6 +381,34 @@ const server = http.createServer(async (req, res) => {
         return send(res, 202, task(`Add ${name} to #${n}`, n, () => addFile(hub, n, name, bytes, { toHomebase: q("homebase") !== "0" }), "job"));
       }
       const b = await body(req);
+      if (action === "selections/build") {
+        return send(res, 202, task(`Set up selections for #${n}`, n, async () => {
+          const { buildSelections } = await import("../agent/selections.js");
+          const k = await buildSelections(hub, n);
+          hub.say(`#${n}: ${k} selection categories set up from the estimate.`);
+        }, "job"));
+      }
+      if (action === "selections/pick") {
+        // Added by hand: a link (its page gives the photo and price) and/or a product name and price.
+        const sl = await import("../workflows/selections.js");
+        const url = String(b.url ?? "").trim() || undefined;
+        const page = url ? await sl.productFromUrl(url) : {};
+        const per = b.pricePerUnit !== undefined && b.pricePerUnit !== "" ? Number(b.pricePerUnit) : undefined;
+        const pick = sl.addPick(hub, n, String(b.categoryId), { product: String(b.product || page.title || url || "Product"), brand: page.brand, sku: page.sku, url, image: page.image, pricePerUnit: Number.isFinite(per) ? per : undefined, priceText: page.priceText, note: b.note ? String(b.note) : undefined, source: "manual" });
+        hub.jobs.log(n, `Selection added: ${pick.product}`);
+        bus.emit({ type: "changed", job: n, what: "job" });
+        return send(res, 200, { pick, page });
+      }
+      if (action === "selections/update") {
+        const sl = await import("../workflows/selections.js");
+        sl.updateSelection(hub, n, b);
+        return send(res, 200, { ok: true });
+      }
+      if (action === "selections/category") {
+        const sl = await import("../workflows/selections.js");
+        const c = sl.addCategory(hub, n, { name: String(b.name || "Selection"), room: b.room || undefined, quantity: Number(b.quantity) || 0, unit: String(b.unit || "EA"), budgetPerUnit: Number(b.budgetPerUnit) || 0, budgetTotal: 0, basis: "Added by hand" });
+        return send(res, 200, c);
+      }
       const rn = action.match(/^notes\/([\w-]+)\/reply$/);
       if (rn) {
         const text = String(b.body ?? "").trim();
@@ -785,6 +819,12 @@ async function runInbox() {
     // Claude adds Google Tasks for what new emails ask of you.
     const { tasksFromInbox } = await import("../agent/emailTasks.js");
     const added = await tasksFromInbox(hub);
+    // Customers emailing their selections: filed on the job with the link, a photo and the budget check.
+    const { selectionsFromInbox } = await import("../agent/selections.js");
+    for (const x of await selectionsFromInbox(hub).catch((e) => (console.error("selections:", e), []))) {
+      hub.say(`#${x.jobNumber}: ${x.added} selection${x.added === 1 ? "" : "s"} from "${x.subject}" added to the Selections tab.`);
+      bus.emit({ type: "changed", job: x.jobNumber, what: "job" });
+    }
     for (const t of added) hub.say(`New task from email: ${t.title}`);
     if (added.length) bus.emit({ type: "changed", what: "calendar" });
   } catch (e) {

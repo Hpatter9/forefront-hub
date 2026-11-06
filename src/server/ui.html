@@ -709,6 +709,29 @@
   .bmail { border: 1px solid var(--line); background: var(--panel-2); color: var(--link); border-radius: 999px; padding: 1px 10px; font: inherit; font-size: 12.5px; cursor: pointer; margin-left: 6px; text-decoration: none; display: inline-block; text-indent: 0; }
   .bmail:hover { background: var(--soft); }
   .brief li.done .bmail { text-decoration: none; opacity: .7; }
+
+  /* ---- Selections */
+  .sels { display: grid; gap: 14px; max-width: 980px; padding-top: 12px; }
+  .selhead { display: grid; gap: 14px; }
+  .selsum { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .selsum > div { display: grid; gap: 2px; } .selsum .k { font-size: 12px; color: var(--muted); } .selsum b { font-size: 22px; font-weight: 600; } .selsum small { color: var(--muted); font-size: 12px; }
+  .selsum b.over { color: var(--bad); } .selsum b.under { color: var(--ok); }
+  .selc-h { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 8px; }
+  .selc-h > div:first-child { flex: 1; min-width: 200px; }
+  .selbud { display: grid; text-align: right; } .selc-h select { width: auto; }
+  .picks { display: grid; gap: 8px; }
+  .pick { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; gap: 12px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+  .pick.chosen { border-color: var(--link); box-shadow: inset 3px 0 0 var(--link); }
+  .pick img, .pick .noimg { width: 84px; height: 84px; object-fit: cover; border-radius: 6px; background: #fff; display: grid; place-items: center; color: var(--muted); }
+  .pick .noimg { background: var(--soft); }
+  .pinfo { display: grid; gap: 3px; min-width: 0; }
+  .pacts { display: flex; gap: 6px; }
+  .cmp { font-size: 12.5px; padding: 1px 8px; border-radius: 999px; font-weight: 600; }
+  .cmp.under, .cmp.on { background: color-mix(in srgb, var(--ok) 20%, transparent); color: var(--ok); }
+  .cmp.over { background: color-mix(in srgb, var(--bad) 20%, transparent); color: var(--bad); }
+  .cmp.unk { background: var(--soft); color: var(--muted); font-weight: 400; }
+  .addpick { display: grid; grid-template-columns: minmax(0, 1fr) 130px auto; gap: 8px; margin-top: 10px; }
+  @media (max-width: 700px) { .pick { grid-template-columns: 64px minmax(0, 1fr); } .pacts { grid-column: 1 / -1; } .addpick { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -1206,7 +1229,7 @@ function renderJob() {
         <a class="btn" href="${esc(h.url)}" target="_blank" rel="noopener">Homebase ↗</a>
         ${ccId ? `<a class="btn" href="https://app.companycam.com/projects/${esc(ccId)}" target="_blank" rel="noopener">CompanyCam ↗</a>` : ""}
       </div>
-      <div class="subtabs" id="subtabs">${[["overview", "Dashboard"], ["notes", "Notes"], ["details", "Details"], ["timeline", "Timeline"], ["photos", "Photos"], ["files", `Documents ${(view.hbFiles?.docs?.length ?? 0) + (view.files?.estimate?.length ?? 0)}`]].map(([k, v]) => `<button data-sub="${k}" class="${jobTab === k ? "active" : ""}">${v}</button>`).join("")}</div>
+      <div class="subtabs" id="subtabs">${[["overview", "Dashboard"], ["notes", "Notes"], ["selections", "Selections"], ["details", "Details"], ["timeline", "Timeline"], ["photos", "Photos"], ["files", `Documents ${(view.hbFiles?.docs?.length ?? 0) + (view.files?.estimate?.length ?? 0)}`]].map(([k, v]) => `<button data-sub="${k}" class="${jobTab === k ? "active" : ""}">${v}</button>`).join("")}</div>
     </div>
     <div id="jobbody"></div>`;
   renderJobTab();
@@ -1242,6 +1265,7 @@ function renderJobTab() {
   if (t === "details") return renderDetails(el);
   if (t === "timeline") return renderTimeline(el);
   if (t === "notes") return renderNotes(el);
+  if (t === "selections") return renderSelections(el);
   if (t === "photos") return renderPhotos(el);
   if (t === "files") return renderFiles(el);
 }
@@ -2829,6 +2853,73 @@ function jobPicker(sel) {
 const enhanceJobSelects = () => JOB_SELECTS.forEach((id) => { const el = document.getElementById(id); if (el && el.tagName === "SELECT") jobPicker(el); });
 new MutationObserver(enhanceJobSelects).observe(document.body, { childList: true, subtree: true });
 enhanceJobSelects();
+
+// ============================================================= Selections: finishes to pick, budgets, and picks
+const usd0 = (n) => "$" + Math.round(Number(n) || 0).toLocaleString("en-US");
+const STATUS = [["needed", "Needs a pick"], ["selected", "Picked"], ["approved", "Approved"], ["ordered", "Ordered"]];
+async function renderSelections(el) {
+  const n = view.homebase.jobNumber;
+  el.innerHTML = `<div class="empty">Loading selections…</div>`;
+  let d; try { d = await api(`/api/jobs/${n}/selections`); } catch (e) { el.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  if (jobTab !== "selections" || view.homebase.jobNumber !== n) return;
+  const sm = d.summary, file = (rel) => `/api/jobs/${n}/file/${encodeURIComponent(rel)}`;
+  const img = (p) => p.image ? `<a href="${esc(p.url || (/^https?:/.test(p.image) ? p.image : file(p.image)))}" target="_blank" rel="noopener"><img src="${esc(/^https?:/.test(p.image) ? p.image : file(p.image))}" alt="" loading="lazy" referrerpolicy="no-referrer"></a>` : `<div class="noimg">${msI("image")}</div>`;
+  const cmpChip = (c) => c.verdict === "unknown" ? `<span class="cmp unk">price unknown${"" }</span>` : c.verdict === "on" ? `<span class="cmp on">on budget · ${usd0(c.total)}</span>` : `<span class="cmp ${c.verdict}">${usd0(Math.abs(c.diff))} ${c.verdict} budget (${c.pct > 0 ? "+" : ""}${c.pct}%) · ${usd0(c.total)}</span>`;
+  const head = `<div class="selhead card">
+      <div class="selsum">
+        <div><span class="k">Budget for finishes</span><b>${usd0(sm.budget)}</b></div>
+        <div><span class="k">Picked so far</span><b>${sm.picked ? usd0(sm.picked) : "—"}</b>${sm.pickedBudget ? `<small>vs ${usd0(sm.pickedBudget)} budget</small>` : ""}</div>
+        <div><span class="k">Difference</span><b class="${sm.diff > 0 ? "over" : sm.diff < 0 ? "under" : ""}">${sm.pickedBudget ? `${sm.diff > 0 ? "+" : sm.diff < 0 ? "−" : ""}${usd0(Math.abs(sm.diff))}` : "—"}</b><small>${sm.over ? `${sm.over} over budget` : sm.pickedBudget ? "within budget" : ""}</small></div>
+        <div><span class="k">Still to pick</span><b>${sm.open} of ${sm.count}</b></div>
+      </div>
+      <div class="row" style="gap:8px;flex-wrap:wrap">${d.claude ? `<button class="btn ${d.categories.length ? "" : "primary"}" data-sel="build" ${d.hasEstimate ? "" : "disabled title='No estimate in the job folder yet'"}>${d.categories.length ? "Rebuild from the estimate" : "Set up from the estimate with Claude"}</button>` : ""}<button class="btn" data-sel="addcat">Add a category</button>
+        <span class="small muted">Customer emails with picks (links or photos) are added here on their own.</span></div>
+    </div>`;
+  const body = d.categories.length ? d.categories.map((c) => `<div class="card selcat" data-cat="${esc(c.id)}">
+      <div class="selc-h"><div><h3 style="margin:0">${esc(c.name)}</h3><div class="small muted">${esc(c.room || "")}${c.room ? " · " : ""}${c.quantity ? `${Number(c.quantity).toLocaleString()} ${esc(c.unit)}` : "quantity not set"}</div></div>
+        <div class="selbud"><b>${c.budgetPerUnit ? `${usd(c.budgetPerUnit)}/${esc(c.unit)}` : "no budget"}</b><span class="small muted">${c.budgetTotal ? `${usd0(c.budgetTotal)} total` : ""}</span></div>
+        <select data-sel="status">${STATUS.map(([k, v]) => `<option value="${k}" ${c.status === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+      ${c.basis ? `<div class="small muted" style="margin:-4px 0 8px">${esc(c.basis)}</div>` : ""}
+      <div class="picks">${c.picks.map((p) => `<div class="pick ${p.chosen ? "chosen" : ""}" data-pick="${esc(p.id)}">${img(p)}
+          <div class="pinfo"><div><b>${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.product)} ↗</a>` : esc(p.product)}</b>${p.chosen && c.picks.length > 1 ? ` <span class="tag in">chosen</span>` : ""}</div>
+            <div class="small muted">${esc([p.brand, p.color, p.sku].filter(Boolean).join(" · "))}</div>
+            <div>${p.pricePerUnit !== undefined ? `<b>${usd(p.pricePerUnit)}/${esc(c.unit)}</b> ` : p.priceText ? `<b>${esc(p.priceText)}</b> ` : ""}${cmpChip(p.cmp)}</div>
+            <div class="small muted">${p.source === "email" ? `From ${esc((p.from || "").replace(/<.*>/, "").trim())}'s email · ${fmtDate(p.at)}${p.threadId ? ` · <a href="#" data-do="thread" data-thread="${esc(p.threadId)}">View email</a>` : ""}` : `Added ${fmtDate(p.at)}`}${p.note ? ` · ${esc(p.note)}` : ""}</div></div>
+          <div class="pacts">${!p.chosen ? `<button class="btn small" data-sel="choose">Choose</button>` : ""}<button class="btn small" data-sel="rmpick" title="Remove">✕</button></div></div>`).join("")}</div>
+      <form class="addpick" data-sel="addpick"><input type="text" name="url" placeholder="Paste a product link, or type a product name"><input type="number" step="0.01" min="0" name="price" placeholder="$ per ${esc(c.unit)}"><button class="btn small">Add pick</button></form>
+    </div>`).join("") : `<div class="card"><p class="muted" style="margin:0">${d.hasEstimate ? "No selections yet. Press <b>Set up from the estimate with Claude</b> to list the finishes the owner has to pick, with quantities and material budgets." : "No estimate in this job's folder yet. Once there is one, Claude can set up the selections from it. You can also add categories by hand."}</p></div>`;
+  el.innerHTML = `<div class="sels">${head}${body}</div>`;
+}
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-sel]"); if (!b || !view || b.tagName === "FORM" || b.tagName === "SELECT") return;
+  const n = view.homebase.jobNumber, cat = b.closest("[data-cat]")?.dataset.cat, pick = b.closest("[data-pick]")?.dataset.pick;
+  const k = b.dataset.sel;
+  try {
+    if (k === "build") { await api(`/api/jobs/${n}/selections/build`, { method: "POST", body: {} }); snack("Claude is reading the estimate. The categories show up here when it's done."); return; }
+    if (k === "addcat") {
+      const name = prompt("What needs picking? (e.g. Kitchen backsplash tile)"); if (!name) return;
+      const qty = prompt("Quantity and unit (e.g. 45 SF)", "1 EA") || "1 EA"; const [q, u] = qty.trim().split(/\s+/);
+      const bud = prompt(`Material budget per ${u || "EA"} ($)`, "0") || "0";
+      await api(`/api/jobs/${n}/selections/category`, { method: "POST", body: { name, quantity: Number(q) || 1, unit: (u || "EA").toUpperCase(), budgetPerUnit: Number(bud.replace(/[$,]/g, "")) || 0 } });
+    }
+    if (k === "choose") await api(`/api/jobs/${n}/selections/update`, { method: "POST", body: { categoryId: cat, pickId: pick, choose: true } });
+    if (k === "rmpick") { if (!confirm("Remove this pick?")) return; await api(`/api/jobs/${n}/selections/update`, { method: "POST", body: { categoryId: cat, pickId: pick, remove: true } }); }
+    if (["addcat", "choose", "rmpick"].includes(k)) renderJobTab();
+  } catch (err) { log(err.message, "t-err"); }
+});
+document.addEventListener("change", async (e) => {
+  const s = e.target.closest("select[data-sel=status]"); if (!s || !view) return;
+  await api(`/api/jobs/${view.homebase.jobNumber}/selections/update`, { method: "POST", body: { categoryId: s.closest("[data-cat]").dataset.cat, status: s.value } }).catch((err) => log(err.message, "t-err"));
+});
+document.addEventListener("submit", async (e) => {
+  const f = e.target.closest("form[data-sel=addpick]"); if (!f || !view) return;
+  e.preventDefault();
+  const v = f.url.value.trim(); if (!v) return;
+  const isUrl = /^https?:\/\//i.test(v);
+  f.querySelector("button").disabled = true; f.querySelector("button").textContent = isUrl ? "Reading the page…" : "Adding…";
+  try { await api(`/api/jobs/${view.homebase.jobNumber}/selections/pick`, { method: "POST", body: { categoryId: f.closest("[data-cat]").dataset.cat, url: isUrl ? v : undefined, product: isUrl ? undefined : v, pricePerUnit: f.price.value } }); renderJobTab(); }
+  catch (err) { log(err.message, "t-err"); f.querySelector("button").disabled = false; f.querySelector("button").textContent = "Add pick"; }
+});
 const es = new EventSource("/api/events");
 es.onmessage = (m) => {
   const e = JSON.parse(m.data);
