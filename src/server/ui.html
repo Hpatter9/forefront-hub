@@ -706,6 +706,9 @@
   #reader .jp { width: 240px; display: inline-block; } #reader .jp input { background: #f1f3f4; color: #1f1f1f; border-color: #dadce0; }
   #reader .jp-pop { background: #fff; border-color: #dadce0; } #reader .jp-pop button { color: #1f1f1f; } #reader .jp-pop button.on, #reader .jp-pop button:hover { background: #f1f3f4; }
   .gcomp .jp input { background: transparent; border: 0; color: var(--ink); padding: 6px 0; }
+  .bmail { border: 1px solid var(--line); background: var(--panel-2); color: var(--link); border-radius: 999px; padding: 1px 10px; font: inherit; font-size: 12.5px; cursor: pointer; margin-left: 6px; text-decoration: none; display: inline-block; text-indent: 0; }
+  .bmail:hover { background: var(--soft); }
+  .brief li.done .bmail { text-decoration: none; opacity: .7; }
 </style>
 </head>
 <body>
@@ -1129,7 +1132,7 @@ document.addEventListener("click", async (e) => {
   const n = Number(b.dataset.n);
   try {
     if (b.dataset.do === "open") { showTab("jobs"); openJob(n); }
-    if (b.dataset.do === "thread") { showTab("mail"); openThread(b.dataset.thread); }
+    if (b.dataset.do === "thread") { if (!mailLoaded) await loadMail(); showTab("mail"); openThread(b.dataset.thread); }
     if (b.dataset.do === "claude") { await askClaude(b.dataset.p, n || undefined); }
     if (b.dataset.do === "logsent") await api(`/api/jobs/${n}/sync`, { method: "POST" });
     if (b.dataset.do === "upload") await api(`/api/jobs/${n}/files-upload`, { method: "POST", body: {} });
@@ -2706,7 +2709,8 @@ async function renderBrief() {
   let total = 0, doneN = 0, html = "";
   if (p.state === "done") {
     const box = document.createElement("div");
-    box.innerHTML = md(p.text).replace(/(^|[\s(>])#(\d{4})\b/g, '$1<a href="#" data-do="open" data-n="$2">#$2</a>');
+    box.innerHTML = md(p.text).replace(/(^|[\s(>])#(\d{4})\b/g, '$1<a href="#" data-do="open" data-n="$2">#$2</a>')
+      .replace(/\s*\{email:([\w-]{6,})\}/g, ' <button type="button" class="bmail" data-do="thread" data-thread="$1" title="Open this email in Gmail">✉ View email</button>');
     box.querySelectorAll("li").forEach((li) => {
       const key = briefKey(li.textContent); const on = !!p.done?.[key]; total++; if (on) doneN++;
       li.classList.add("bitem"); if (on) li.classList.add("done");

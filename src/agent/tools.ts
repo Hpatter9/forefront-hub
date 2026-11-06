@@ -160,7 +160,7 @@ export function hubTools(hub: Hub) {
           hub.jobs.upsert(a.jobNumber, { sendoff: { ...j.sendoff, drafts: [...j.sendoff.drafts, d], homebaseLoggedAt: null } });
           hub.jobs.log(a.jobNumber, `Draft (${a.kind}) "${a.subject}"`);
         }
-        return { draftId: ref.id, bcc, note: "Draft created in Gmail. Hunter reviews and sends it." };
+        return { draftId: ref.id, threadId: ref.threadId, bcc, note: "Draft created in Gmail. Hunter reviews and sends it." };
       }),
     ),
     tool(
