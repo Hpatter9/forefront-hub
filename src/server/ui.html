@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Forefront Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Figtree:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap">
 <style>
   /*
    * Layout after Homebase (sidebar nav + breadcrumb bar + white cards, stat strip, stage table), with the colors
@@ -243,6 +243,73 @@
   .slots { display: grid; gap: 4px; }
   @media (max-width: 860px) { .calwrap { grid-template-columns: 1fr; } .calside { display: none; } }
 
+  /* ---- Music (Spotify): Spotify's own colors, scoped to this tab */
+  .sp { --sp-bg: #121212; --sp-base: #000; --sp-el: #181818; --sp-el2: #1f1f1f; --sp-hi: #2a2a2a; --sp-tx: #fff; --sp-sub: #b3b3b3; --sp-green: #1ed760; --sp-green2: #1db954;
+    background: var(--sp-base); color: var(--sp-tx); display: grid; grid-template-columns: 300px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 88px; gap: 8px; padding: 8px; height: 100%; font-family: "Figtree", "Jost", system-ui, sans-serif; }
+  .sp a { color: var(--sp-tx); }
+  .sp-lib, .sp-main { background: var(--sp-bg); border-radius: 8px; min-height: 0; overflow: auto; }
+  .sp-lib { padding: 12px 8px; display: grid; gap: 4px; align-content: start; }
+  .sp-lib h3 { margin: 4px 8px 10px; font-size: 16px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+  .sp-item { display: grid; grid-template-columns: 48px 1fr; gap: 12px; align-items: center; padding: 6px 8px; border-radius: 6px; cursor: pointer; border: 0; background: transparent; color: var(--sp-tx); text-align: left; font: inherit; }
+  .sp-item:hover { background: var(--sp-el2); } .sp-item.on { background: var(--sp-hi); }
+  .sp-item img, .sp-item .ph { width: 48px; height: 48px; border-radius: 4px; object-fit: cover; background: var(--sp-hi); display: grid; place-items: center; font-size: 20px; }
+  .sp-item b { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sp-item span { color: var(--sp-sub); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  .sp-main { padding: 0 0 24px; }
+  .sp-top { position: sticky; top: 0; z-index: 2; display: flex; gap: 10px; align-items: center; padding: 12px 20px; background: rgba(18,18,18,.92); backdrop-filter: blur(6px); }
+  .sp .sp-search { flex: 1; max-width: 420px; background: var(--sp-el2); border: 1px solid transparent; border-radius: 999px; padding: 10px 16px; color: var(--sp-tx); }
+  .sp .sp-search:focus { outline: none; border-color: var(--sp-tx); }
+  .sp-pill { background: var(--sp-el2); color: var(--sp-tx); border: 0; border-radius: 999px; padding: 7px 14px; cursor: pointer; font: inherit; font-size: 14px; }
+  .sp-pill:hover { background: var(--sp-hi); }
+  .sp-hero { display: flex; gap: 22px; align-items: flex-end; padding: 22px 20px 18px; background: linear-gradient(#2e3a4f, var(--sp-bg)); }
+  .sp-hero img, .sp-hero .ph { width: 190px; height: 190px; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,.5); object-fit: cover; background: var(--sp-hi); display: grid; place-items: center; font-size: 60px; flex: none; }
+  .sp-hero small { font-size: 13px; } .sp-hero h1 { margin: 6px 0 10px; font-size: clamp(28px, 5vw, 64px); font-weight: 800; line-height: 1; letter-spacing: -1px; text-wrap: balance; }
+  .sp-hero .meta { color: var(--sp-sub); font-size: 14px; }
+  .sp-actions { padding: 6px 20px 14px; display: flex; gap: 16px; align-items: center; }
+  .sp-play { width: 56px; height: 56px; border-radius: 50%; background: var(--sp-green); border: 0; cursor: pointer; display: grid; place-items: center; color: #000; }
+  .sp-play:hover { transform: scale(1.04); background: #3be477; }
+  .sp-play svg { width: 24px; height: 24px; }
+  .sp-sec { padding: 8px 20px; } .sp-sec h2 { font-size: 22px; font-weight: 700; margin: 10px 0 12px; }
+  .sp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+  .sp-card { background: transparent; border: 0; color: var(--sp-tx); text-align: left; padding: 12px; border-radius: 8px; cursor: pointer; font: inherit; min-width: 0; }
+  .sp-card:hover { background: var(--sp-el2); }
+  .sp-card img, .sp-card .ph { width: 100%; aspect-ratio: 1; border-radius: 6px; object-fit: cover; background: var(--sp-hi); display: grid; place-items: center; font-size: 40px; margin-bottom: 8px; }
+  .sp-card b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sp-card span { color: var(--sp-sub); font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .sp-tracks { width: 100%; border-collapse: collapse; font-size: 14px; color: var(--sp-sub); }
+  .sp-tracks th { text-align: left; font-weight: 400; font-size: 13px; padding: 8px; border-bottom: 1px solid var(--sp-hi); }
+  .sp-tracks td { padding: 6px 8px; } .sp-tracks tr.tr { cursor: pointer; } .sp-tracks tr.tr:hover td { background: var(--sp-el2); }
+  .sp-tracks td:first-child { width: 36px; text-align: right; border-radius: 4px 0 0 4px; } .sp-tracks td:last-child { border-radius: 0 4px 4px 0; text-align: right; width: 60px; }
+  .sp-tracks .tt { display: flex; gap: 12px; align-items: center; min-width: 0; } .sp-tracks .tt img { width: 40px; height: 40px; border-radius: 4px; }
+  .sp-tracks .tt b { color: var(--sp-tx); font-weight: 400; display: block; } .sp-tracks tr.now .tt b, .sp-tracks tr.now td:first-child { color: var(--sp-green); }
+  .sp-bar { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(180px, 1fr) minmax(280px, 1.4fr) minmax(180px, 1fr); align-items: center; gap: 12px; padding: 0 8px; }
+  .sp-now { display: flex; gap: 12px; align-items: center; min-width: 0; } .sp-now img { width: 56px; height: 56px; border-radius: 4px; background: var(--sp-hi); }
+  .sp-now b { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .sp-now span { color: var(--sp-sub); font-size: 12px; }
+  .sp-ctl { display: grid; gap: 6px; justify-items: center; }
+  .sp-btns { display: flex; gap: 18px; align-items: center; }
+  .sp-ic { background: transparent; border: 0; color: var(--sp-sub); cursor: pointer; padding: 0; display: grid; place-items: center; }
+  .sp-ic:hover { color: var(--sp-tx); } .sp-ic.on { color: var(--sp-green); } .sp-ic svg { width: 18px; height: 18px; }
+  .sp-ic.big { width: 34px; height: 34px; border-radius: 50%; background: var(--sp-tx); color: #000; } .sp-ic.big:hover { transform: scale(1.06); color: #000; } .sp-ic.big svg { width: 16px; height: 16px; }
+  .sp-seek { display: grid; grid-template-columns: 40px 1fr 40px; gap: 8px; align-items: center; width: 100%; font-size: 11px; color: var(--sp-sub); font-variant-numeric: tabular-nums; }
+  .sp-seek span:first-child { text-align: right; }
+  .sp input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--sp-tx) var(--p, 0%), #4d4d4d var(--p, 0%)); cursor: pointer; }
+  .sp input[type=range]:hover { background: linear-gradient(to right, var(--sp-green) var(--p, 0%), #4d4d4d var(--p, 0%)); }
+  .sp input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--sp-tx); }
+  .sp-right { display: flex; gap: 10px; align-items: center; justify-content: flex-end; }
+  .sp-right input[type=range] { width: 100px; }
+  .sp-dev { position: absolute; bottom: 96px; right: 16px; background: #282828; border-radius: 8px; padding: 12px; width: 280px; z-index: 5; box-shadow: 0 16px 24px rgba(0,0,0,.5); }
+  .sp-dev h4 { margin: 0 0 8px; font-size: 15px; } .sp-dev button { display: block; width: 100%; text-align: left; background: transparent; border: 0; color: var(--sp-tx); padding: 8px; border-radius: 4px; cursor: pointer; font: inherit; } .sp-dev button:hover { background: #3e3e3e; } .sp-dev button.on { color: var(--sp-green); }
+  .sp-setup { max-width: 640px; padding: 32px 24px; display: grid; gap: 12px; line-height: 1.55; }
+  .sp-setup h1 { font-size: 32px; margin: 0; } .sp-setup ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; } .sp-setup code { background: var(--sp-hi); padding: 2px 6px; border-radius: 4px; user-select: all; }
+  .sp-setup input { background: var(--sp-el2); border: 1px solid var(--sp-hi); color: var(--sp-tx); border-radius: 4px; padding: 10px 12px; width: 100%; }
+  .sp-green { background: var(--sp-green); color: #000; border: 0; border-radius: 999px; padding: 12px 28px; font-weight: 700; font-size: 15px; cursor: pointer; justify-self: start; }
+  .sp-green:hover { background: #3be477; transform: scale(1.02); }
+  .sp-msg { color: var(--sp-sub); font-size: 14px; padding: 20px; }
+  /* sidebar mini player */
+  .mini { margin: 8px 12px 4px; padding: 8px; border-radius: 8px; background: #181818; color: #fff; display: grid; grid-template-columns: 40px 1fr auto; gap: 8px; align-items: center; cursor: pointer; }
+  .mini img { width: 40px; height: 40px; border-radius: 4px; background: #2a2a2a; } .mini b { display: block; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .mini span { font-size: 12px; color: #b3b3b3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  .mini button { background: #fff; color: #000; border: 0; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; display: grid; place-items: center; } .mini button svg { width: 12px; height: 12px; }
+  @media (max-width: 860px) { .sp { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr) auto; } .sp-lib { max-height: 30vh; } .sp-bar { grid-template-columns: 1fr; padding: 8px; } .sp-right { justify-content: center; } .sp-hero { flex-direction: column; align-items: flex-start; } .sp-hero img, .sp-hero .ph { width: 140px; height: 140px; } }
   /* bottom: ask Claude + console */
   .askbar { padding: 10px 28px 12px; border-top: 1px solid var(--line); display: grid; gap: 6px; }
   .askbar form { display: flex; gap: 8px; }
@@ -298,8 +365,10 @@
       <button data-tab="jobs">Jobs</button>
       <button data-tab="mail">Gmail <span class="count" id="mailcount" hidden></span></button>
       <button data-tab="cal">Calendar</button>
+      <button data-tab="music">Music</button>
     </nav>
-    <div class="navlabel" style="margin-top:auto">Where you were</div>
+    <div class="mini" id="mini" hidden style="margin-top:auto"><img id="mini-art" alt=""><div style="min-width:0"><b id="mini-t"></b><span id="mini-a"></span></div><button type="button" id="mini-pp" aria-label="Play or pause"></button></div>
+    <div class="navlabel" id="wherelabel" style="margin-top:auto">Where you were</div>
     <div class="recent" id="recent" style="margin-top:0"></div>
     <div class="side-search"><input type="search" id="globalq" placeholder="Search everything"></div>
     <div class="side-foot"><button type="button" id="themebtn">Homebase colors</button></div>
@@ -311,7 +380,7 @@
       <span id="chips" class="row"></span>
       <span class="small muted" id="syncstate"></span>
       <button class="topbtn" id="syncnow" type="button" title="Refresh every job folder from Homebase (also runs every 15 minutes)">Sync now</button>
-      <button class="topbtn" id="playerbtn" type="button" title="Spotify and Audible">♪ Player</button>
+      <button class="topbtn" id="playerbtn" type="button" title="Quick player: Spotify links and Audible">♪ Player</button>
     </div>
   </div>
 
@@ -369,6 +438,10 @@
         <div class="calbody" id="cal-body"><div class="empty">Loading…</div></div>
       </div>
     </div>
+  </section>
+
+  <section class="view" id="v-music" hidden>
+    <div class="sp" id="sp"><div class="sp-main" style="grid-column:1/-1;grid-row:1/-1"><div class="sp-msg">Loading…</div></div></div>
   </section>
 
   <footer class="askbar">
@@ -491,9 +564,10 @@ function log(text, cls = "") { const c = $("#console"); const d = document.creat
 function showTab(t) {
   store.set("tab", t);
   $$("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === t));
-  for (const v of ["today", "jobs", "mail", "cal"]) $("#v-" + v).hidden = v !== t;
+  for (const v of ["today", "jobs", "mail", "cal", "music"]) $("#v-" + v).hidden = v !== t;
   if (t === "cal") loadCal();
-  setCrumbs(t === "jobs" && view ? `Jobs / <b>#${view.homebase.jobNumber}</b>` : `<b>${{ today: "Dashboard", jobs: "Jobs", mail: "Gmail", cal: "Calendar" }[t]}</b>`);
+  if (t === "music" && !$("#sp-bar")) renderMusic();
+  setCrumbs(t === "jobs" && view ? `Jobs / <b>#${view.homebase.jobNumber}</b>` : `<b>${{ today: "Dashboard", jobs: "Jobs", mail: "Gmail", cal: "Calendar", music: "Music" }[t]}</b>`);
   if (t === "today") loadToday();
   if (t === "mail" && !mailLoaded) loadMail();
 }
@@ -1295,6 +1369,219 @@ $("#cal-slots").addEventListener("click", (e) => { const b = e.target.closest("[
 // Keep the calendar and tasks current (things added on the phone show up here).
 setInterval(() => { if (store.get("tab", "today") === "cal" && !$("#evdlg").open && !$("#taskdlg").open) { renderCal(); renderTaskPanel(); } }, 60000);
 
+// ============================================================= Music: Spotify (Web API + Web Playback SDK)
+// Sign-in is Spotify's PKCE flow, entirely in this browser: tokens are kept in this browser's storage, never on disk.
+const SP_SCOPES = "streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private playlist-read-collaborative user-library-read user-library-modify user-read-recently-played user-top-read";
+const SP_REDIRECT = `${location.origin}/`;
+const IC = {
+  play: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 1.7v12.6a.7.7 0 0 0 1.05.6l10.9-6.3a.7.7 0 0 0 0-1.2L4.05 1.1A.7.7 0 0 0 3 1.7z"/></svg>',
+  pause: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 1.7c0-.4.3-.7.7-.7h2.6c.4 0 .7.3.7.7v12.6c0 .4-.3.7-.7.7H3.7a.7.7 0 0 1-.7-.7V1.7zm6 0c0-.4.3-.7.7-.7h2.6c.4 0 .7.3.7.7v12.6c0 .4-.3.7-.7.7H9.7a.7.7 0 0 1-.7-.7V1.7z"/></svg>',
+  prev: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.3 1a.7.7 0 0 1 .7.7v5.15l9.95-5.74a.7.7 0 0 1 1.05.6v12.6a.7.7 0 0 1-1.05.6L4 9.15v5.15a.7.7 0 0 1-1.4 0V1.7a.7.7 0 0 1 .7-.7z"/></svg>',
+  next: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M12.7 1a.7.7 0 0 0-.7.7v5.15L2.05 1.1A.7.7 0 0 0 1 1.7v12.6a.7.7 0 0 0 1.05.6L12 9.15v5.15a.7.7 0 0 0 1.4 0V1.7a.7.7 0 0 0-.7-.7z"/></svg>',
+  shuffle: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M13.15.6 16 3.4l-2.85 2.8V4.4h-1.3a2.5 2.5 0 0 0-2.04 1.06L4.37 13.1A4 4 0 0 1 1.1 14.8H0v-1.5h1.1a2.5 2.5 0 0 0 2.04-1.06L8.6 4.6A4 4 0 0 1 11.85 2.9h1.3V.6zM0 2.9h1.1a4 4 0 0 1 3.27 1.7l.9 1.27-.92 1.3-1.21-1.71A2.5 2.5 0 0 0 1.1 4.4H0V2.9zm9.66 7.25.92-1.3 1.2 1.71a2.5 2.5 0 0 0 2.04 1.06h.33v-1.8L16 12.6l-2.85 2.8v-1.8h-.33a4 4 0 0 1-3.27-1.7l-.9-1.27z"/></svg>',
+  repeat: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 4.75A3.75 3.75 0 0 1 3.75 1h8.5A3.75 3.75 0 0 1 16 4.75v5a3.75 3.75 0 0 1-3.75 3.75H9.81l1 1-1.06 1.06L6.94 12.7l2.81-2.81 1.06 1.06-1 1h2.44a2.25 2.25 0 0 0 2.25-2.25v-5a2.25 2.25 0 0 0-2.25-2.25h-8.5A2.25 2.25 0 0 0 1.5 4.75v5A2.25 2.25 0 0 0 3.75 12H5v1.5H3.75A3.75 3.75 0 0 1 0 9.75v-5z"/></svg>',
+  vol: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M9.74 2.5A.75.75 0 0 1 11 3.06v9.88a.75.75 0 0 1-1.26.56L6.1 10.25H2.75A.75.75 0 0 1 2 9.5v-3c0-.41.34-.75.75-.75h3.35l3.64-3.25zM12.5 5.05a3.5 3.5 0 0 1 0 5.9l-.74-1.3a2 2 0 0 0 0-3.3l.74-1.3z"/></svg>',
+  dev: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 2.75C6 1.78 6.78 1 7.75 1h6.5c.97 0 1.75.78 1.75 1.75v10.5c0 .97-.78 1.75-1.75 1.75h-6.5C6.78 15 6 14.22 6 13.25V2.75zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .14.11.25.25.25h6.5c.14 0 .25-.11.25-.25V2.75a.25.25 0 0 0-.25-.25h-6.5zM11 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm0-6.5a1.25 1.25 0 1 0 0 2.5A1.25 1.25 0 0 0 11 4zM1 3.75C1 3.34 1.34 3 1.75 3H4v1.5H2.5v8H4V14H1.75a.75.75 0 0 1-.75-.75v-9.5z"/></svg>',
+};
+let spClientId = "", spDevice = null, spSDK = null, spState = null, spView = { kind: "home" }, spLibrary = [], spMe = null, spTimer = null, spDevices = [];
+const spTok = { get() { try { return JSON.parse(localStorage.getItem("hub:sp") || "null"); } catch { return null; } }, set(v) { try { localStorage.setItem("hub:sp", JSON.stringify(v)); } catch {} }, clear() { try { localStorage.removeItem("hub:sp"); } catch {} } };
+const b64url = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const fmtMs = (ms) => { const s = Math.floor((ms || 0) / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+
+async function spLogin() {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
+  const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+  const state = b64url(crypto.getRandomValues(new Uint8Array(12)));
+  sessionStorage.setItem("sp:verifier", verifier); sessionStorage.setItem("sp:state", state);
+  location.href = `https://accounts.spotify.com/authorize?${new URLSearchParams({ client_id: spClientId, response_type: "code", redirect_uri: SP_REDIRECT, code_challenge_method: "S256", code_challenge: challenge, scope: SP_SCOPES, state })}`;
+}
+async function spTokenRequest(params) {
+  const r = await fetch("https://accounts.spotify.com/api/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: spClientId, ...params }) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error_description || j.error || "Spotify sign-in failed");
+  const old = spTok.get() || {};
+  spTok.set({ access: j.access_token, refresh: j.refresh_token || old.refresh, exp: Date.now() + (j.expires_in - 60) * 1000 });
+}
+async function spHandleRedirect() {
+  const u = new URL(location.href);
+  if (!u.searchParams.get("code") || u.searchParams.get("state") !== sessionStorage.getItem("sp:state")) return false;
+  history.replaceState(null, "", "/");
+  await spTokenRequest({ grant_type: "authorization_code", code: u.searchParams.get("code"), redirect_uri: SP_REDIRECT, code_verifier: sessionStorage.getItem("sp:verifier") });
+  store.set("tab", "music");
+  return true;
+}
+async function spToken() {
+  const t = spTok.get(); if (!t) return null;
+  if (Date.now() > t.exp && t.refresh) await spTokenRequest({ grant_type: "refresh_token", refresh_token: t.refresh });
+  return spTok.get()?.access;
+}
+async function sp(path, opts = {}) {
+  const tok = await spToken(); if (!tok) throw new Error("Not signed in to Spotify");
+  const r = await fetch(path.startsWith("http") ? path : `https://api.spotify.com/v1${path}`, { ...opts, headers: { Authorization: `Bearer ${tok}`, ...(opts.body ? { "Content-Type": "application/json" } : {}) }, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  if (r.status === 401 && spTok.get()?.refresh) { spTok.set({ ...spTok.get(), exp: 0 }); return sp(path, opts); }
+  if (r.status === 204 || r.status === 202) return null;
+  const txt = await r.text(); const j = txt ? JSON.parse(txt) : null;
+  if (!r.ok) throw new Error(j?.error?.message || r.statusText);
+  return j;
+}
+
+// ---- the in-hub player (needs Spotify Premium); otherwise it controls Spotify on another device
+function spLoadSDK() {
+  if (spSDK || document.getElementById("sp-sdk")) return;
+  window.onSpotifyWebPlaybackSDKReady = () => {
+    spSDK = new Spotify.Player({ name: "Forefront Hub", getOAuthToken: async (cb) => cb(await spToken()), volume: store.get("spvol", 0.6) });
+    spSDK.addListener("ready", ({ device_id }) => { spDevice = device_id; spRefreshState(); });
+    spSDK.addListener("not_ready", () => { spDevice = null; });
+    spSDK.addListener("player_state_changed", () => spRefreshState());
+    spSDK.addListener("account_error", () => log("Playing inside the hub needs Spotify Premium. You can still control Spotify on your phone or computer from here.", "t-err"));
+    spSDK.addListener("authentication_error", () => { spTok.clear(); renderMusic(); });
+    spSDK.addListener("initialization_error", ({ message }) => log(`Spotify player: ${message}`, "t-err"));
+    spSDK.connect();
+  };
+  const s = document.createElement("script"); s.id = "sp-sdk"; s.src = "https://sdk.scdn.co/spotify-player.js"; document.head.appendChild(s);
+}
+async function spRefreshState() {
+  try { spState = await sp("/me/player"); } catch { spState = null; }
+  renderBar(); renderMini();
+  if (spView.kind === "playlist" || spView.kind === "liked") $$(".sp-tracks tr.tr").forEach((r) => r.classList.toggle("now", r.dataset.uri === spState?.item?.uri));
+}
+async function spPlay(body) {
+  const target = spState?.device?.id || spDevice;
+  if (!target) { const d = await sp("/me/player/devices"); const pick = d.devices?.[0]; if (!pick) { log("No Spotify device is on. Open Spotify on your phone or computer, or use Spotify Premium to play here.", "t-err"); return; } await sp(`/me/player/play?device_id=${pick.id}`, { method: "PUT", body }); }
+  else await sp(`/me/player/play?device_id=${target}`, { method: "PUT", body });
+  setTimeout(spRefreshState, 600);
+}
+const spCmd = async (path, method = "PUT") => { try { await sp(path, { method }); } catch (e) { log(`Spotify: ${e.message}`, "t-err"); } setTimeout(spRefreshState, 400); };
+
+// ---- screens
+const img = (images, cls = "") => images?.[0]?.url ? `<img src="${esc(images[0].url)}" alt="" loading="lazy" class="${cls}">` : `<span class="ph">♪</span>`;
+async function renderMusic() {
+  const root = $("#sp");
+  try { spClientId = (await api("/api/settings/spotify")).clientId; } catch {}
+  if (location.hostname === "localhost") {
+    root.innerHTML = `<div class="sp-main" style="grid-column:1/-1;grid-row:1/-1"><div class="sp-setup"><h1>Music</h1><p>Spotify only signs in at <code>127.0.0.1</code>, not <code>localhost</code>. Open the hub at <a href="http://127.0.0.1:${location.port}/">http://127.0.0.1:${location.port}</a> (the desktop icon does from now on).</p></div></div>`; return;
+  }
+  if (!spClientId) {
+    root.innerHTML = `<div class="sp-main" style="grid-column:1/-1;grid-row:1/-1"><div class="sp-setup"><h1>Connect Spotify</h1>
+      <p>One time, about 2 minutes. Spotify asks every app to register itself; this registration is yours alone.</p>
+      <ol><li>Open <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a> and log in with your Spotify account. Click <b>Create app</b>.</li>
+      <li>App name <b>Forefront Hub</b>, any description. Redirect URI: <code>${esc(SP_REDIRECT)}</code> (click <b>Add</b>). Tick <b>Web API</b> and <b>Web Playback SDK</b>, agree, <b>Save</b>.</li>
+      <li>Open the app's <b>Settings</b>, copy the <b>Client ID</b>, and paste it here:</li></ol>
+      <input type="text" id="sp-cid" placeholder="Client ID (32 letters and numbers)">
+      <button class="sp-green" id="sp-save">Save and sign in</button>
+      <p style="color:#b3b3b3;font-size:13px">Playing music inside the hub needs Spotify Premium. Without it, the hub still shows your library and controls Spotify on your phone or computer.</p></div></div>`;
+    $("#sp-save").onclick = async () => { try { await api("/api/settings/spotify", { method: "POST", body: { clientId: $("#sp-cid").value } }); spClientId = $("#sp-cid").value.trim(); spLogin(); } catch (e) { log(e.message, "t-err"); } };
+    return;
+  }
+  if (!spTok.get()) {
+    root.innerHTML = `<div class="sp-main" style="grid-column:1/-1;grid-row:1/-1"><div class="sp-setup"><h1>Music</h1><p>Sign in to Spotify to bring your playlists and library into the hub.</p><button class="sp-green" id="sp-login">Log in to Spotify</button></div></div>`;
+    $("#sp-login").onclick = spLogin; return;
+  }
+  root.innerHTML = `<div class="sp-lib" id="sp-lib"><h3>Your Library</h3><div class="sp-msg">Loading…</div></div>
+    <div class="sp-main" id="sp-main"><div class="sp-msg">Loading…</div></div>
+    <div class="sp-bar" id="sp-bar"></div>`;
+  spLoadSDK();
+  try { spMe = await sp("/me"); } catch (e) { $("#sp-main").innerHTML = `<div class="sp-msg">Spotify: ${esc(e.message)} <button class="sp-pill" id="sp-relog">Log in again</button></div>`; $("#sp-relog").onclick = () => { spTok.clear(); spLogin(); }; return; }
+  await renderLibrary();
+  renderView();
+  spRefreshState();
+  clearInterval(spTimer); spTimer = setInterval(() => { if (store.get("tab", "today") === "music" || !$("#mini").hidden) spRefreshState(); }, 5000);
+}
+async function renderLibrary() {
+  const items = []; let url = "/me/playlists?limit=50";
+  while (url && items.length < 300) { const pg = await sp(url).catch(() => null); if (!pg) break; items.push(...pg.items.filter(Boolean)); url = pg.next; }
+  spLibrary = items;
+  $("#sp-lib").innerHTML = `<h3>Your Library <button class="sp-pill" data-spv="home" title="Home">Home</button></h3>
+    <button class="sp-item ${spView.kind === "liked" ? "on" : ""}" data-spv="liked"><span class="ph" style="background:linear-gradient(135deg,#450af5,#c4efd9);color:#fff">♥</span><div><b>Liked Songs</b><span>Playlist</span></div></button>
+    ${items.map((p) => `<button class="sp-item ${spView.id === p.id ? "on" : ""}" data-spv="playlist" data-id="${esc(p.id)}">${img(p.images)}<div><b>${esc(p.name)}</b><span>Playlist · ${esc(p.owner?.display_name || "")}</span></div></button>`).join("")}`;
+}
+async function renderView() {
+  const m = $("#sp-main"); if (!m) return;
+  const top = `<div class="sp-top"><input class="sp-search" id="sp-q" type="search" placeholder="What do you want to play?" value="${esc(spView.q || "")}"><button class="sp-pill" data-spv="home">Home</button><span style="margin-left:auto;color:#b3b3b3;font-size:13px">${esc(spMe?.display_name || "")}${spMe?.product && spMe.product !== "premium" ? " · Free account: controls other devices" : ""}</span></div>`;
+  if (spView.kind === "home") {
+    m.innerHTML = top + `<div class="sp-msg">Loading…</div>`;
+    const [recent, top8] = await Promise.all([sp("/me/player/recently-played?limit=20").catch(() => null), sp("/me/top/artists?limit=8").catch(() => null)]);
+    const seen = new Set(); const recents = (recent?.items || []).map((i) => i.track).filter((t) => t && !seen.has(t.album.id) && seen.add(t.album.id)).slice(0, 8);
+    m.innerHTML = top + `<div class="sp-sec"><h2>Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}</h2>
+      <div class="sp-cards">${spLibrary.slice(0, 12).map((p) => `<button class="sp-card" data-spv="playlist" data-id="${esc(p.id)}">${img(p.images)}<b>${esc(p.name)}</b><span>${esc(p.description?.replace(/<[^>]+>/g, "") || `By ${p.owner?.display_name || ""}`)}</span></button>`).join("")}</div></div>
+      ${recents.length ? `<div class="sp-sec"><h2>Recently played</h2><div class="sp-cards">${recents.map((t) => `<button class="sp-card" data-play-ctx="${esc(t.album.uri)}" data-offset="${esc(t.uri)}">${img(t.album.images)}<b>${esc(t.album.name)}</b><span>${esc(t.artists.map((a) => a.name).join(", "))}</span></button>`).join("")}</div></div>` : ""}
+      ${top8?.items?.length ? `<div class="sp-sec"><h2>Your top artists</h2><div class="sp-cards">${top8.items.map((a) => `<button class="sp-card" data-play-ctx="${esc(a.uri)}">${img(a.images)}<b>${esc(a.name)}</b><span>Artist</span></button>`).join("")}</div></div>` : ""}`;
+  } else if (spView.kind === "playlist" || spView.kind === "liked") {
+    m.innerHTML = top + `<div class="sp-msg">Loading…</div>`;
+    let head, tracks = [], ctx = null;
+    if (spView.kind === "liked") { let url = "/me/tracks?limit=50"; while (url && tracks.length < 500) { const pg = await sp(url); tracks.push(...pg.items.map((i) => i.track).filter(Boolean)); url = pg.next; } head = { name: "Liked Songs", images: [], sub: `${spMe?.display_name || ""} · ${tracks.length} songs`, ph: "♥" }; }
+    else { const pl = await sp(`/playlists/${spView.id}`); ctx = pl.uri; let pg = pl.tracks; tracks = pg.items.map((i) => i.track).filter((t) => t && t.uri && !t.is_local); while (pg.next && tracks.length < 1000) { pg = await sp(pg.next); tracks.push(...pg.items.map((i) => i.track).filter((t) => t && t.uri && !t.is_local)); } head = { name: pl.name, images: pl.images, sub: `${pl.owner?.display_name || ""} · ${pl.tracks.total} songs`, desc: pl.description?.replace(/<[^>]+>/g, "") }; }
+    spView.tracks = tracks; spView.ctx = ctx;
+    m.innerHTML = top + `<div class="sp-hero">${head.images?.length ? img(head.images) : `<span class="ph" style="background:linear-gradient(135deg,#450af5,#c4efd9)">${head.ph || "♪"}</span>`}<div style="min-width:0"><small>Playlist</small><h1>${esc(head.name)}</h1>${head.desc ? `<div class="meta">${esc(head.desc)}</div>` : ""}<div class="meta"><b style="color:#fff">${esc(head.sub)}</b></div></div></div>
+      <div class="sp-actions"><button class="sp-play" id="sp-playall" aria-label="Play">${IC.play}</button><button class="sp-ic" id="sp-shufall" title="Shuffle play">${IC.shuffle}</button></div>
+      <div class="sp-sec"><table class="sp-tracks"><thead><tr><th>#</th><th>Title</th><th>Album</th><th style="text-align:right">⏱</th></tr></thead><tbody>
+      ${tracks.map((t, i) => `<tr class="tr ${spState?.item?.uri === t.uri ? "now" : ""}" data-uri="${esc(t.uri)}" data-i="${i}"><td>${i + 1}</td><td><div class="tt">${t.album?.images?.length ? `<img src="${esc(t.album.images.at(-1).url)}" alt="" loading="lazy">` : ""}<div style="min-width:0"><b>${esc(t.name)}</b>${esc(t.artists.map((a) => a.name).join(", "))}</div></div></td><td>${esc(t.album?.name || "")}</td><td>${fmtMs(t.duration_ms)}</td></tr>`).join("")}</tbody></table></div>`;
+    $("#sp-playall").onclick = () => spPlayList(0);
+    $("#sp-shufall").onclick = async () => { await spCmd("/me/player/shuffle?state=true"); spPlayList(Math.floor(Math.random() * tracks.length)); };
+  } else if (spView.kind === "search") {
+    m.innerHTML = top + `<div class="sp-msg">Searching…</div>`;
+    const r = await sp(`/search?${new URLSearchParams({ q: spView.q, type: "track,playlist,album,artist", limit: "10" })}`);
+    const tracks = r.tracks?.items || [];
+    spView.tracks = tracks; spView.ctx = null;
+    m.innerHTML = top + `<div class="sp-sec"><h2>Songs</h2><table class="sp-tracks"><tbody>${tracks.map((t, i) => `<tr class="tr" data-uri="${esc(t.uri)}" data-i="${i}"><td>${i + 1}</td><td><div class="tt">${t.album?.images?.length ? `<img src="${esc(t.album.images.at(-1).url)}" alt="">` : ""}<div style="min-width:0"><b>${esc(t.name)}</b>${esc(t.artists.map((a) => a.name).join(", "))}</div></div></td><td>${esc(t.album?.name || "")}</td><td>${fmtMs(t.duration_ms)}</td></tr>`).join("")}</tbody></table></div>
+      ${[["Artists", r.artists?.items, "Artist"], ["Albums", r.albums?.items, "Album"], ["Playlists", (r.playlists?.items || []).filter(Boolean), "Playlist"]].map(([h, list, kind]) => list?.length ? `<div class="sp-sec"><h2>${h}</h2><div class="sp-cards">${list.map((x) => kind === "Playlist" ? `<button class="sp-card" data-spv="playlist" data-id="${esc(x.id)}">${img(x.images)}<b>${esc(x.name)}</b><span>By ${esc(x.owner?.display_name || "")}</span></button>` : `<button class="sp-card" data-play-ctx="${esc(x.uri)}">${img(x.images)}<b>${esc(x.name)}</b><span>${kind}${x.artists ? " · " + esc(x.artists.map((a) => a.name).join(", ")) : ""}</span></button>`).join("")}</div></div>` : "").join("")}`;
+  }
+  const q = $("#sp-q");
+  q?.addEventListener("keydown", (e) => { if (e.key === "Enter" && q.value.trim()) { spView = { kind: "search", q: q.value.trim() }; renderView(); } });
+}
+function spPlayList(i) {
+  const list = spView.tracks || [];
+  if (spView.ctx) return spPlay({ context_uri: spView.ctx, offset: { position: i } });
+  return spPlay({ uris: list.slice(i, i + 100).map((t) => t.uri) });
+}
+function renderBar() {
+  const bar = $("#sp-bar"); if (!bar) return;
+  const s = spState, t = s?.item;
+  const pct = t ? Math.min(100, ((s.progress_ms || 0) / t.duration_ms) * 100) : 0;
+  const vol = s?.device?.volume_percent ?? Math.round(store.get("spvol", 0.6) * 100);
+  bar.innerHTML = `<div class="sp-now">${t ? `<img src="${esc(t.album?.images?.at(-1)?.url || "")}" alt=""><div style="min-width:0"><b>${esc(t.name)}</b><span>${esc(t.artists?.map((a) => a.name).join(", ") || "")}</span></div>` : `<span style="color:#b3b3b3;font-size:13px">Pick something to play.</span>`}</div>
+    <div class="sp-ctl"><div class="sp-btns"><button class="sp-ic ${s?.shuffle_state ? "on" : ""}" data-spc="shuffle" title="Shuffle">${IC.shuffle}</button><button class="sp-ic" data-spc="prev" title="Previous">${IC.prev}</button><button class="sp-ic big" data-spc="pp" title="${s?.is_playing ? "Pause" : "Play"}">${s?.is_playing ? IC.pause : IC.play}</button><button class="sp-ic" data-spc="next" title="Next">${IC.next}</button><button class="sp-ic ${s?.repeat_state && s.repeat_state !== "off" ? "on" : ""}" data-spc="repeat" title="Repeat: ${esc(s?.repeat_state || "off")}">${IC.repeat}</button></div>
+      <div class="sp-seek"><span>${fmtMs(s?.progress_ms)}</span><input type="range" id="sp-seekr" min="0" max="${t?.duration_ms || 1}" value="${s?.progress_ms || 0}" style="--p:${pct}%" aria-label="Seek"><span>${fmtMs(t?.duration_ms)}</span></div></div>
+    <div class="sp-right"><button class="sp-ic ${s?.device && s.device.id !== spDevice ? "on" : ""}" data-spc="devices" title="${esc(s?.device ? `Playing on ${s.device.name}` : "Devices")}">${IC.dev}</button><span class="sp-ic">${IC.vol}</span><input type="range" id="sp-vol" min="0" max="100" value="${vol}" style="--p:${vol}%" aria-label="Volume"></div>`;
+  $("#sp-seekr").onchange = (e) => spCmd(`/me/player/seek?position_ms=${e.target.value}`);
+  $("#sp-vol").onchange = (e) => { store.set("spvol", e.target.value / 100); spSDK?.setVolume(e.target.value / 100); spCmd(`/me/player/volume?volume_percent=${e.target.value}`); };
+}
+function renderMini() {
+  const t = spState?.item, mini = $("#mini");
+  mini.hidden = !t; $("#wherelabel").style.marginTop = t ? "8px" : "auto";
+  if (!t) return;
+  $("#mini-art").src = t.album?.images?.at(-1)?.url || ""; $("#mini-t").textContent = t.name; $("#mini-a").textContent = t.artists?.map((a) => a.name).join(", ") || "";
+  $("#mini-pp").innerHTML = spState.is_playing ? IC.pause : IC.play;
+}
+$("#mini").addEventListener("click", (e) => { if (e.target.closest("#mini-pp")) { e.stopPropagation(); spCmd(spState?.is_playing ? "/me/player/pause" : "/me/player/play"); return; } showTab("music"); });
+$("#sp").addEventListener("click", async (e) => {
+  const v = e.target.closest("[data-spv]");
+  if (v) { spView = { kind: v.dataset.spv, id: v.dataset.id }; $$("#sp-lib .sp-item").forEach((x) => x.classList.toggle("on", x === v)); renderView(); return; }
+  const c = e.target.closest("[data-play-ctx]");
+  if (c) { const body = { context_uri: c.dataset.playCtx }; if (c.dataset.offset && !c.dataset.playCtx.includes(":artist:")) body.offset = { uri: c.dataset.offset }; spPlay(body); return; }
+  const tr = e.target.closest("tr.tr");
+  if (tr) { spPlayList(Number(tr.dataset.i)); return; }
+  const b = e.target.closest("[data-spc]"); if (!b) return;
+  const s = spState;
+  if (b.dataset.spc === "pp") spCmd(s?.is_playing ? "/me/player/pause" : "/me/player/play");
+  if (b.dataset.spc === "next") spCmd("/me/player/next", "POST");
+  if (b.dataset.spc === "prev") spCmd("/me/player/previous", "POST");
+  if (b.dataset.spc === "shuffle") spCmd(`/me/player/shuffle?state=${!s?.shuffle_state}`);
+  if (b.dataset.spc === "repeat") spCmd(`/me/player/repeat?state=${{ off: "context", context: "track", track: "off" }[s?.repeat_state || "off"]}`);
+  if (b.dataset.spc === "devices") {
+    $(".sp-dev")?.remove();
+    const d = await sp("/me/player/devices").catch(() => ({ devices: [] }));
+    $("#sp").insertAdjacentHTML("beforeend", `<div class="sp-dev"><h4>Connect to a device</h4>${(d.devices || []).map((x) => `<button data-dev="${esc(x.id)}" class="${x.is_active ? "on" : ""}">${esc(x.name)} <span style="color:#b3b3b3;font-size:12px">${esc(x.type)}</span></button>`).join("") || `<span style="color:#b3b3b3;font-size:13px">No devices on. Open Spotify somewhere.</span>`}</div>`);
+  }
+});
+document.addEventListener("click", async (e) => {
+  const d = e.target.closest("[data-dev]");
+  if (d) { await sp("/me/player", { method: "PUT", body: { device_ids: [d.dataset.dev], play: true } }).catch((err) => log(err.message, "t-err")); $(".sp-dev")?.remove(); setTimeout(spRefreshState, 800); return; }
+  if (!e.target.closest(".sp-dev") && !e.target.closest('[data-spc="devices"]')) $(".sp-dev")?.remove();
+});
+// Keep the seek bar moving between polls.
+setInterval(() => { if (spState?.is_playing && spState.item) { spState.progress_ms = Math.min(spState.item.duration_ms, (spState.progress_ms || 0) + 1000); const r = $("#sp-seekr"); if (r && document.activeElement !== r) { r.value = spState.progress_ms; r.style.setProperty("--p", `${(spState.progress_ms / spState.item.duration_ms) * 100}%`); r.previousElementSibling.textContent = fmtMs(spState.progress_ms); } } }, 1000);
+
 // ============================================================= Claude
 async function askClaude(prompt, job) {
   if (!status.agent) { log("Claude is off on this machine (no Anthropic API key).", "t-err"); return; }
@@ -1352,6 +1639,7 @@ es.onmessage = (m) => {
 setInterval(() => { loadSyncState(); if (store.get("tab", "today") === "today") loadToday(); if (mailLoaded && !$("#composedlg").open) loadThreads(); }, 120000);
 
 renderRecent();
+spHandleRedirect().catch((e) => log(`Spotify: ${e.message}`, "t-err")).finally(() => { if (spTok.get() && store.get("tab", "today") !== "music") renderMusic().catch(() => {}); });
 loadStatus().then(async () => {
   showTab(store.get("tab", "today"));
   await loadJobs();

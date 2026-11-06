@@ -211,6 +211,17 @@ const server = http.createServer(async (req, res) => {
         jobsRoot: cfg.jobsRoot,
       });
     }
+    // ---- Spotify: only the app's client ID lives on the hub (in .env); sign-in tokens stay in the browser.
+    if (p === "/api/settings/spotify" && req.method === "GET") return send(res, 200, { clientId: cfg.spotify.clientId });
+    if (p === "/api/settings/spotify" && req.method === "POST") {
+      const b = await body(req);
+      const id = String(b.clientId ?? "").trim();
+      if (!/^[0-9a-f]{32}$/i.test(id)) return send(res, 400, { error: "That doesn't look like a Spotify Client ID (32 letters and numbers, from your app's Settings)." });
+      const { setEnv } = await import("../cli/connect.js");
+      setEnv({ SPOTIFY_CLIENT_ID: id });
+      cfg.spotify.clientId = id;
+      return send(res, 200, { ok: true });
+    }
     if (p === "/api/meta") {
       return send(res, 200, { fields: FIELDS, sections: SECTIONS, vocab: (await hub.homebase.vocabulary?.().catch(() => ({}))) ?? {}, reminderGroups: REMINDER_GROUPS });
     }

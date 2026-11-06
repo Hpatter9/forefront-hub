@@ -20,6 +20,7 @@ export interface Config {
   gmail: { driver: "mock" | "google"; clientId: string; clientSecret: string; address: string; tokenFile: string };
   companycam: { driver: "mock" | "rest"; token: string };
   docusketch: { downloadsDir: string };
+  spotify: { clientId: string };
   /** Where mocks keep their state (mock outbox, mock Homebase writes). */
   stateDir: string;
 }
@@ -68,6 +69,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
       tokenFile: path.join(root, "auth", "google-token.json"),
     },
     companycam: { driver: live && ccToken ? "rest" : "mock", token: ccToken },
+    spotify: { clientId: e("SPOTIFY_CLIENT_ID") },
     docusketch: { downloadsDir: e("DOWNLOADS_DIR", path.join(env.USERPROFILE || env.HOME || root, "Downloads")) },
     stateDir,
   };
