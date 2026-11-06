@@ -203,9 +203,8 @@ program
     await new GoogleGmail({ clientId: c.gmail.clientId, clientSecret: c.gmail.clientSecret, tokenFile: c.gmail.tokenFile, address: c.gmail.address }).login();
   });
 
-const connect = program.command("connect").description("Guided set-up for a connection: gmail | companycam | maps");
+const connect = program.command("connect").description("Guided set-up for a connection: gmail | companycam");
 connect.command("gmail").description("Connect Gmail step by step").action(async () => (await import("./connect.js")).connectGmail());
-connect.command("maps").description("Connect Google Maps for drive times with traffic").action(async () => (await import("./connect.js")).connectGoogleMaps());
 connect.command("companycam").description("Connect CompanyCam with an access token").action(async () => (await import("./connect.js")).connectCompanyCam());
 
 program

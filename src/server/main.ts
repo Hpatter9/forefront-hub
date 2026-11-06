@@ -755,7 +755,7 @@ async function travelNote(): Promise<string> {
     const ev = await hub.calendar.events({ start: d0.toISOString(), end: d1.toISOString() });
     const legs = await (await import("../workflows/travel.js")).travelFor(hub, ev);
     const hm = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Denver" });
-    const lines = ev.filter((e) => legs[e.id]).map((e) => { const g = legs[e.id]; return `- ${hm(e.start)} ${e.title} at ${e.location}: ${g.minutes} min drive from ${g.fromLabel}${g.traffic ? " (with traffic)" : ""}, leave by ${hm(g.leaveBy)}${g.late ? `; ${g.late} min short coming straight from ${g.fromLabel}` : ""}`; });
+    const lines = ev.filter((e) => legs[e.id]).map((e) => { const g = legs[e.id]; return `- ${hm(e.start)} ${e.title} at ${e.location}: ${g.minutes} min drive from ${g.fromLabel}${g.rush ? " (rush hour)" : ""}, leave by ${hm(g.leaveBy)}${g.late ? `; ${g.late} min short coming straight from ${g.fromLabel}` : ""}`; });
     return lines.length ? `\n\nDrive times for today's appointments (already worked out; use them, and put the leave-by time on each calendar line of the brief; call out any that are short):\n${lines.join("\n")}` : "";
   } catch {
     return "";

@@ -21,8 +21,8 @@ export interface Config {
   companycam: { driver: "mock" | "rest"; token: string };
   docusketch: { downloadsDir: string };
   spotify: { clientId: string };
-  /** Drive times for calendar events: where the day starts, and an optional Google Maps key for traffic. */
-  travel: { start: string; googleKey: string };
+  /** Drive times for calendar events: where the day's driving starts. */
+  travel: { start: string };
   /** Where mocks keep their state (mock outbox, mock Homebase writes). */
   stateDir: string;
 }
@@ -72,7 +72,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
     },
     companycam: { driver: live && ccToken ? "rest" : "mock", token: ccToken },
     spotify: { clientId: e("SPOTIFY_CLIENT_ID") },
-    travel: { start: e("HUB_DAY_START_ADDRESS", officeAddress(skillDir)), googleKey: e("GOOGLE_MAPS_API_KEY") },
+    travel: { start: e("HUB_DAY_START_ADDRESS", officeAddress(skillDir)) },
     docusketch: { downloadsDir: e("DOWNLOADS_DIR", path.join(env.USERPROFILE || env.HOME || root, "Downloads")) },
     stateDir,
   };

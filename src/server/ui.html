@@ -1631,7 +1631,7 @@ const legLabel = (g) => `${g.minutes} min drive`;
 function legLine(g) {
   if (!g) return "";
   const t = new Date(g.leaveBy).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  return `${g.late ? `<b style="color:var(--bad)">⚠ ${g.late} min short</b> coming from ${esc(g.fromLabel)}. ` : ""}About <b>${g.minutes} min</b> (${g.miles} mi) from ${esc(g.fromLabel)}${g.traffic ? " with traffic" : ""} · leave by <b>${t}</b> · <a href="${esc(g.mapsUrl)}" target="_blank" rel="noopener">Directions ↗</a>`;
+  return `${g.late ? `<b style="color:var(--bad)">⚠ ${g.late} min short</b> coming from ${esc(g.fromLabel)}. ` : ""}About <b>${g.minutes} min</b> (${g.miles} mi) from ${esc(g.fromLabel)}${g.rush ? " at rush hour" : ""} · leave by <b>${t}</b> · <a href="${esc(g.mapsUrl)}" target="_blank" rel="noopener">Directions ↗</a>`;
 }
 const taskChip = (k) => `<div class="ev chip" style="background:var(--panel-2);color:var(--ink);border-color:var(--line)" data-task="${esc(k.id)}" data-list="${esc(k.listId)}" title="${esc(k.title)}"><span data-check="1" style="cursor:pointer">${k.completed ? "☑" : "☐"}</span> <span style="${k.completed ? "text-decoration:line-through;opacity:.6" : ""}">${esc(k.title)}</span></div>`;
 const evChip = (e) => `<div class="ev chip" style="background:${esc(e.color || "#7aa7ff")}" data-ev="${esc(e.id)}" data-cal="${esc(e.calendarId)}" title="${esc(e.title)}${calLegs[e.id] ? ` · ${calLegs[e.id].minutes} min drive` : ""}">${e.allDay ? "" : hm(e.start) + " "}${esc(e.title)}${calLegs[e.id] ? ` <span class="evdrive">🚗${calLegs[e.id].minutes}m</span>` : ""}</div>`;

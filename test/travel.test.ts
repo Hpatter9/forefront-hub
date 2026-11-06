@@ -27,6 +27,14 @@ describe("drive times for calendar events", () => {
     expect(legs.next.mapsUrl).toContain("google.com/maps/dir");
   });
 
+  it("knows Denver's weekday rush hours", async () => {
+    const { isRushHour } = await import("../src/connectors/travel/index.js");
+    expect(isRushHour(new Date("2026-11-09T07:30:00-07:00"))).toBe(true); // Mon 7:30 AM
+    expect(isRushHour(new Date("2026-11-09T11:00:00-07:00"))).toBe(false);
+    expect(isRushHour(new Date("2026-11-09T17:15:00-07:00"))).toBe(true);
+    expect(isRushHour(new Date("2026-11-07T07:30:00-07:00"))).toBe(false); // Saturday
+  });
+
   it("only routes real places", () => {
     expect(routable("123 Main St, Denver, CO")).toBe(true);
     expect(routable("https://meet.google.com/abc")).toBe(false);
@@ -36,34 +44,8 @@ describe("drive times for calendar events", () => {
 });
 
 describe("travel connectors", () => {
-  it("asks Google's Routes API for a traffic-aware drive and reads its answer", async () => {
-    const { GoogleTravel } = await import("../src/connectors/travel/index.js");
-    const { mkdtempSync } = await import("node:fs");
-    const os = await import("node:os");
-    const sent: any[] = [];
-    const real = globalThis.fetch;
-    globalThis.fetch = (async (url: string, init: any) => {
-      sent.push({ url, init });
-      return new Response(JSON.stringify({ routes: [{ duration: "1530s", distanceMeters: 24140 }] }), { status: 200 });
-    }) as any;
-    try {
-      const g = new GoogleTravel(mkdtempSync(`${os.tmpdir()}/trv-`), "KEY");
-      const leave = new Date(Date.now() + 3600_000);
-      const d = await g.drive("169 Inverness Dr W, Englewood, CO", "123 Main St, Denver, CO", leave);
-      expect(d).toEqual({ minutes: 26, miles: 15, traffic: true });
-      expect(sent[0].url).toBe("https://routes.googleapis.com/directions/v2:computeRoutes");
-      expect(sent[0].init.headers["X-Goog-Api-Key"]).toBe("KEY");
-      const body = JSON.parse(sent[0].init.body);
-      expect(body).toMatchObject({ travelMode: "DRIVE", routingPreference: "TRAFFIC_AWARE", departureTime: leave.toISOString() });
-      await g.drive("169 Inverness Dr W, Englewood, CO", "123 Main St, Denver, CO", leave);
-      expect(sent).toHaveLength(1); // kept for the same half hour
-    } finally {
-      globalThis.fetch = real;
-    }
-  });
-
   it("uses OpenStreetMap without a key, padding for traffic", async () => {
-    const { OsmTravel, TRAFFIC_PAD } = await import("../src/connectors/travel/index.js");
+    const { OsmTravel, RUSH_PAD, TRAFFIC_PAD } = await import("../src/connectors/travel/index.js");
     const { mkdtempSync } = await import("node:fs");
     const os = await import("node:os");
     const real = globalThis.fetch;
@@ -71,7 +53,9 @@ describe("travel connectors", () => {
       new Response(String(url).includes("nominatim") ? JSON.stringify([{ lat: "39.7", lon: "-104.9" }]) : JSON.stringify({ code: "Ok", routes: [{ duration: 1200, distance: 16093 }] }), { status: 200 })) as any;
     try {
       const d = await new OsmTravel(mkdtempSync(`${os.tmpdir()}/trv-`)).drive("A St 1, Denver", "B St 2, Denver");
-      expect(d).toEqual({ minutes: Math.round((1200 * TRAFFIC_PAD) / 60), miles: 10, traffic: false });
+      expect(d).toEqual({ minutes: Math.round((1200 * TRAFFIC_PAD) / 60), miles: 10, rush: false });
+      const rush = await new OsmTravel(mkdtempSync(`${os.tmpdir()}/trv-`)).drive("A St 1, Denver", "B St 2, Denver", new Date("2026-11-09T07:45:00-07:00"));
+      expect(rush).toEqual({ minutes: Math.round((1200 * RUSH_PAD) / 60), miles: 10, rush: true });
     } finally {
       globalThis.fetch = real;
     }

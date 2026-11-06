@@ -12,7 +12,8 @@ export interface Leg {
   fromLabel: string;
   minutes: number;
   miles: number;
-  traffic: boolean;
+  /** Padded for rush hour. */
+  rush: boolean;
   /** ISO time to leave. */
   leaveBy: string;
   /** Minutes you'd be late coming straight from the previous appointment (only when it's tight). */
@@ -52,7 +53,7 @@ export async function travelFor(hub: Hub, events: CalEvent[], o: { max?: number 
       fromLabel: prev ? prev.title : "the office",
       minutes: d.minutes,
       miles: d.miles,
-      traffic: d.traffic,
+      rush: d.rush,
       leaveBy: leave.toISOString(),
       mapsUrl: `https://www.google.com/maps/dir/?${new URLSearchParams({ api: "1", origin: from, destination: e.location!, travelmode: "driving" })}`,
     };
