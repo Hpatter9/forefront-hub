@@ -75,11 +75,16 @@ export interface MailClient {
   /** One page of a mailbox: a label (INBOX, SENT, DRAFT, STARRED, a user label) and/or a Gmail search. */
   listThreads?(o: { label?: string; q?: string; pageToken?: string; max?: number }): Promise<{ threads: ThreadSummary[]; nextPageToken?: string }>;
   labels?(): Promise<Label[]>;
-  /** Sends now. Only the Mail tab's Send button calls this, after Hunter confirms. */
+  /**
+   * Sends now. Called by the Mail tab's Send button (after Hunter confirms) and by auto-filing, which forwards job
+   * emails only to Forefront's own office+<job#> log addresses.
+   */
   send?(d: DraftInput): Promise<{ id: string; threadId: string; messageId: string }>;
   /** Archive (remove INBOX), mark read (remove UNREAD), star, trash. */
   modifyThread?(id: string, change: { add?: string[]; remove?: string[]; trash?: boolean }): Promise<void>;
   attachment?(messageId: string, attachmentId: string): Promise<Buffer>;
+  /** The id of a user label with this name, created if needed. */
+  ensureLabel?(name: string): Promise<string>;
   /** False when Gmail was connected before the Mail tab existed (drafts + read only): reconnect to send/archive. */
   fullAccess?(): boolean;
 }

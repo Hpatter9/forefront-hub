@@ -87,7 +87,7 @@ export type SendoffDraft = z.infer<typeof Draft>;
 export type JobPatch = { [K in keyof Job]?: Job[K] extends object ? Job[K] | { [P in keyof Job[K]]?: Job[K][P] | null } : Job[K] };
 
 /** `homebase/` mirrors the job's Documents tab in Homebase (see workflows/files.ts). */
-export const SUBDIRS = ["sketch", "photos", "estimate", "email", "notes", "homebase"] as const;
+export const SUBDIRS = ["sketch", "photos", "estimate", "email", "notes", "homebase", "files"] as const;
 
 /** One folder per job number under JOBS_ROOT ("3226 Augustine"), holding job.json and the job's files. */
 export class JobStore {

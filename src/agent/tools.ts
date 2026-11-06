@@ -191,6 +191,33 @@ export function hubTools(hub: Hub) {
       wrap(async ({ q, kind }) => (await hub.homebase.searchAccounts?.(q, kind)) ?? []),
     ),
 
+    tool(
+      "inbox_file_email",
+      "File a Gmail email (or every incoming message in a thread) to a job: forwards it to office+<job#> so Homebase logs it with its attachments, and saves the attachments in the job folder.",
+      { threadId: z.string(), jobNumber, messageId: z.string().optional() },
+      wrap(async ({ threadId, jobNumber: n, messageId }) => {
+        const { fileMessage } = await import("../workflows/inbox.js");
+        const t = await hub.gmail.getThread(threadId);
+        const me = hub.cfg.gmail.address.toLowerCase();
+        const ids = messageId ? [messageId] : t.messages.filter((m) => !m.from.toLowerCase().includes(me)).map((m) => m.id);
+        for (const id of ids) await fileMessage(hub, threadId, id, n);
+        return `Filed ${ids.length} email(s) to #${n}.`;
+      }),
+    ),
+    tool(
+      "homebase_upload_file",
+      "Add a file from the job folder to the job's Documents tab in Homebase (asks Hunter first). kind: estimate, invoice, scope, contract, photo, report or other.",
+      { jobNumber, path: z.string().describe("path inside the job folder, e.g. files/ITEL report.pdf"), kind: z.enum(["estimate", "invoice", "scope", "contract", "photo", "report", "other"]) },
+      wrap(async ({ jobNumber: n, path: rel, kind }) => {
+        const file = path.isAbsolute(rel) ? rel : hub.jobs.path(n, rel);
+        if (!existsSync(file)) throw new Error(`No file ${rel} in #${n}'s folder`);
+        if (!hub.homebase.uploadDocument) throw new Error("This Homebase connection can't upload.");
+        if (!(await hub.approver.confirm(`Add ${path.basename(file)} to the Documents tab of Homebase #${n}?`, [`Filed as: ${kind}`]))) return "Hunter declined; nothing uploaded.";
+        await hub.homebase.uploadDocument(n, file, { kind, title: path.basename(file) });
+        return "Uploaded.";
+      }),
+    ),
+
     // ---------------------------------------------------------------- CompanyCam / DocuSketch
     tool("companycam_find_project", "Find CompanyCam projects by job number, name or street address.", { query: z.string() }, wrap(async ({ query }) => hub.photos.findProjects(query))),
     tool(

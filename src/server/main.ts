@@ -16,6 +16,8 @@ import { editContact, editFields, FIELDS, fieldValues, SECTIONS, setAdjuster } f
 import { timeline } from "../workflows/timeline.js";
 import { REMINDER_GROUPS, reminders } from "../workflows/reminders.js";
 import { TemplateWriter, type Recipient } from "../workflows/writer.js";
+import { autoFile, dismissUnfiled, fileMessage, inboxState } from "../workflows/inbox.js";
+import { addFile } from "../workflows/uploads.js";
 import { EventBus, WebApprover } from "./events.js";
 
 /**
@@ -38,6 +40,26 @@ const MIME: Record<string, string> = { ".pdf": "application/pdf", ".jpg": "image
 function send(res: ServerResponse, status: number, body: unknown) {
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify(body));
+}
+
+async function rawBody(req: IncomingMessage, limit = 30 * 1024 * 1024): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  let n = 0;
+  for await (const c of req) {
+    n += c.length;
+    if (n > limit) throw new Error("That file is over 30 MB.");
+    chunks.push(c as Buffer);
+  }
+  return Buffer.concat(chunks);
+}
+
+function listTree(dir: string, base = ""): { name: string; size: number; modified: string }[] {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).flatMap((f) => {
+    const full = path.join(dir, f);
+    const rel = base ? `${base}/${f}` : f;
+    return statSync(full).isDirectory() ? listTree(full, rel) : [{ name: rel, size: statSync(full).size, modified: statSync(full).mtime.toISOString() }];
+  });
 }
 
 async function body(req: IncomingMessage): Promise<any> {
@@ -110,7 +132,11 @@ async function jobView(n: number) {
     customer: primary ? { id: primary.id, name: primary.name, email: primary.email, phone: primary.phone ?? primary.mobile } : null,
     adjusters: [raw?.brief?.adjuster1 ?? null, raw?.brief?.adjuster2 ?? null],
     carrier: raw?.brief?.carrier ? { id: raw.brief.carrier.id, name: raw.brief.carrier.name } : null,
-    files: Object.fromEntries((["estimate", "sketch", "email", "notes"] as const).map((s) => [s, listDir(hub.jobs.path(n, s))])),
+    files: {
+      ...Object.fromEntries((["estimate", "sketch", "notes", "files"] as const).map((s) => [s, listDir(hub.jobs.path(n, s))])),
+      attachments: listTree(hub.jobs.path(n, "email", "attachments")).sort((a, b) => b.name.localeCompare(a.name)),
+      photosAdded: listDir(hub.jobs.path(n, "photos")).filter((f) => /\.(jpe?g|png|heic|webp|gif)$/i.test(f.name)),
+    },
     hbFiles,
     hasEstimate: !!estimateFiles(hub, n).estimateJson,
     intake: intakeAddress(n),
@@ -191,7 +217,7 @@ const server = http.createServer(async (req, res) => {
     // ---- Today
     if (p === "/api/today") {
       const upload = new Set((lastSync?.needsUpload ?? []).map((x) => x.jobNumber));
-      return send(res, 200, { reminders: reminders(hub, { needsUpload: upload }), groups: REMINDER_GROUPS, lastSync: lastSync?.at ?? null, folders: hub.jobs.list().length });
+      return send(res, 200, { reminders: reminders(hub, { needsUpload: upload }), groups: REMINDER_GROUPS, lastSync: lastSync?.at ?? null, folders: hub.jobs.list().length, unfiled: inboxState(hub).unfiled, autoFiling: hub.gmail.kind === "google" && (hub.gmail.fullAccess?.() ?? false) });
     }
     if (p === "/api/plan" && req.method === "POST") {
       if (!cfg.anthropicApiKey) return send(res, 400, { error: "Claude is off on this machine (no Anthropic API key)." });
@@ -236,6 +262,11 @@ const server = http.createServer(async (req, res) => {
         return send(res, 404, { error: "not found" });
       }
       if (req.method !== "POST") return send(res, 405, { error: "method" });
+      if (action === "upload") {
+        const name = decodeURIComponent(String(req.headers["x-filename"] ?? "file"));
+        const bytes = await rawBody(req);
+        return send(res, 202, task(`Add ${name} to #${n}`, n, () => addFile(hub, n, name, bytes, { toHomebase: q("homebase") !== "0" }), "job"));
+      }
       const b = await body(req);
       switch (action) {
         case "pull":
@@ -339,6 +370,25 @@ const server = http.createServer(async (req, res) => {
         }
       }, "mail"));
     }
+    // ---- filing emails to jobs (automatic in the background; these are the by-hand doors)
+    if (p === "/api/inbox/file" && req.method === "POST") {
+      const b = await body(req);
+      const n = Number(b.jobNumber);
+      return send(res, 202, task(`File email to #${n}`, n, async () => {
+        const t = await hub.gmail.getThread(b.threadId);
+        const me = cfg.gmail.address.toLowerCase();
+        const ids: string[] = b.messageId ? [b.messageId] : t.messages.filter((m) => !m.from.toLowerCase().includes(me)).map((m) => m.id);
+        const done = inboxState(hub).filed;
+        let k = 0;
+        for (const id of ids) if (!done[id] || done[id].jobNumber === 0) { await fileMessage(hub, b.threadId, id, n); k++; }
+        hub.say(k ? `Filed ${k} email${k === 1 ? "" : "s"} to Homebase #${n}. Homebase picks it up in about 5 minutes.` : `Already filed to Homebase.`);
+      }, "timeline"));
+    }
+    if (p === "/api/inbox/dismiss" && req.method === "POST") {
+      const b = await body(req);
+      dismissUnfiled(hub, b.messageId);
+      return send(res, 200, { ok: true });
+    }
     if (p === "/api/mail/draft" && req.method === "POST") {
       const b = await body(req);
       const split = (s: unknown) => String(s ?? "").split(/[,;]/).map((x) => x.trim()).filter(Boolean);
@@ -394,6 +444,29 @@ const SYNC_MINUTES = Number(process.env.HUB_SYNC_MINUTES || 15);
 if (SYNC_MINUTES > 0 && hub.homebase.kind !== "mock") {
   setTimeout(runSyncAll, 15_000);
   setInterval(runSyncAll, SYNC_MINUTES * 60_000);
+}
+
+// ---- filing incoming job emails: every 5 minutes (needs Gmail connected with the Mail tab's access)
+let filing = false;
+async function runInbox() {
+  if (filing) return;
+  filing = true;
+  try {
+    const r = await autoFile(hub);
+    for (const f of r.filed) {
+      hub.say(`Filed "${f.subject}" to Homebase #${f.jobNumber}.`);
+      bus.emit({ type: "changed", job: f.jobNumber, what: "timeline" });
+    }
+  } catch (e) {
+    console.error("auto-file:", e);
+  } finally {
+    filing = false;
+  }
+}
+const INBOX_MINUTES = Number(process.env.HUB_INBOX_MINUTES || 5);
+if (INBOX_MINUTES > 0 && hub.gmail.kind === "google") {
+  setTimeout(runInbox, 30_000);
+  setInterval(runInbox, INBOX_MINUTES * 60_000);
 }
 
 const port = Number(process.env.HUB_PORT || 4317);

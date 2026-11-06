@@ -164,6 +164,9 @@
   dialog ul { margin: 0; padding-left: 18px; }
   dialog .foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--line); }
 
+  .dropzone { position: fixed; inset: 0; background: rgba(47, 111, 167, .18); border: 3px dashed var(--accent); display: grid; place-items: center; z-index: 50; pointer-events: none; }
+  .dropzone div { background: var(--panel); padding: 16px 22px; border-radius: 12px; font-weight: 600; box-shadow: var(--shadow); }
+  .attached { display: flex; gap: 6px; flex-wrap: wrap; }
   @media (max-width: 980px) {
     .mail { grid-template-columns: 1fr; grid-template-rows: auto 40vh 1fr; }
     .labels { display: flex; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); }
@@ -232,9 +235,12 @@
 
   <footer class="askbar">
     <form id="askform">
-      <textarea id="prompt" rows="1" placeholder="Ask Claude, e.g. “who's waiting on me?”, “draft a follow-up to the Wegener homeowner”, “estimate #3243 from the ESX and photos”"></textarea>
+      <button type="button" class="btn" id="addfiles" title="Add files to a job (or drag them anywhere onto the hub)">Add files</button>
+      <textarea id="prompt" rows="1" placeholder="Ask Claude, or drop files here, e.g. “who's waiting on me?”, “draft a follow-up to the Wegener homeowner”"></textarea>
       <button class="btn primary">Ask</button>
     </form>
+    <div class="attached small" id="attached"></div>
+    <input type="file" id="filepick" multiple hidden>
     <div class="console" id="console"></div>
   </footer>
 </div>
@@ -262,6 +268,14 @@
   <div class="fgrid"><label>First name<input type="text" id="adj-first"></label><label>Last name<input type="text" id="adj-last"></label><label>Email<input type="email" id="adj-email"></label><label>Phone<input type="text" id="adj-phone"></label></div>
   <p class="small muted">Adds them in Homebase (or uses the person Homebase already has by that name) and puts them on the job.</p>
   </div><div class="foot"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="go">Save to Homebase</button></div></form></dialog>
+
+<dialog id="filedlg"><form method="dialog"><div class="in">
+  <h4>Add <span id="fd-count"></span> to a job</h4>
+  <div class="small muted" id="fd-names"></div>
+  <select id="fd-job"></select>
+  <label class="row"><input type="checkbox" id="fd-hb" checked> Also add to the job's Documents in Homebase (you'll OK each one)</label>
+  </div><div class="foot"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="go">Add</button></div></form></dialog>
+<div class="dropzone" id="dropzone" hidden><div>Drop to add to <span id="dz-target">a job</span></div></div>
 
 <dialog id="composedlg"><form method="dialog" id="composeform"><div class="in">
   <h4 id="cp-title">New email</h4>
@@ -351,6 +365,9 @@ async function loadToday() {
     <div class="todayhead"><h2>${esc(date)}</h2><span class="muted">${total ? `${total} thing${total === 1 ? "" : "s"} to handle across ${d.folders} jobs` : `${d.folders} jobs, nothing waiting`}</span>
       <span style="margin-left:auto"></span><button class="btn primary" id="plan" ${status.agent ? "" : "disabled title='Claude is off on this machine'"}>Plan my day with Claude</button></div>
     ${!d.lastSync && !d.folders ? `<div class="alldone">The first sync is still running. Reminders appear when it finishes (about a minute).</div>` : ""}
+    ${!d.autoFiling ? `<div class="banner">Incoming job emails are filed to Homebase automatically once Gmail is fully connected${status.gmail === "google" ? ": double-click <b>Connect Gmail</b> in the hub folder once more and click Allow" : ""}.</div>` : ""}
+    ${d.unfiled?.length ? `<div class="group"><h3>Emails to file <span class="muted">${d.unfiled.length} · couldn't tell which job; pick one</span></h3>
+      ${d.unfiled.map((u) => `<div class="rem"><div class="l"><div class="ttl">${esc(u.subject || "(no subject)")}</div><div class="small muted">from ${esc(u.from)} · ${fmtDate(u.at)}</div></div><div class="r">${u.candidates.map((c) => `<button class="btn small primary" data-do="fileto" data-thread="${esc(u.threadId)}" data-msg="${esc(u.messageId)}" data-n="${c.jobNumber}">#${c.jobNumber} ${esc(c.name)}</button>`).join("")}<button class="btn small" data-do="thread" data-thread="${esc(u.threadId)}">Open</button><button class="btn small" data-do="notjob" data-msg="${esc(u.messageId)}">Not a job email</button></div></div>`).join("")}</div>` : ""}
     ${d.groups.filter((g) => by[g.kind]?.length).map((g) => `<div class="group"><h3>${esc(g.label)} <span class="muted">${by[g.kind].length} · ${esc(g.hint)}</span></h3>
       ${by[g.kind].map((r) => `<div class="rem"><div class="l"><div class="ttl"><a href="#" data-do="open" data-n="${r.jobNumber}">#${r.jobNumber} ${esc(r.name)}</a> · ${esc(r.title)}</div><div class="small muted">${esc(r.detail)}${r.detail ? " · " : ""}<span class="stage">${esc(r.stage)}</span>${r.days && r.days < 999 ? ` · ${r.days} day${r.days === 1 ? "" : "s"}` : ""}</div></div><div class="r">${ACTIONS[r.kind]?.(r) ?? ""}</div></div>`).join("")}</div>`).join("")}
     ${d.lastSync && !total ? `<div class="alldone">You're caught up. Nothing is waiting on you.</div>` : ""}`;
@@ -366,6 +383,9 @@ document.addEventListener("click", async (e) => {
     if (b.dataset.do === "claude") { await askClaude(b.dataset.p, n || undefined); }
     if (b.dataset.do === "logsent") await api(`/api/jobs/${n}/sync`, { method: "POST" });
     if (b.dataset.do === "upload") await api(`/api/jobs/${n}/files-upload`, { method: "POST", body: {} });
+    if (b.dataset.do === "fileto") { await api("/api/inbox/file", { method: "POST", body: { threadId: b.dataset.thread, messageId: b.dataset.msg, jobNumber: n } }); b.closest(".rem")?.remove(); }
+    if (b.dataset.do === "notjob") { await api("/api/inbox/dismiss", { method: "POST", body: { messageId: b.dataset.msg } }); b.closest(".rem")?.remove(); }
+    if (b.dataset.do === "filethread") { const sel = $("#fileto-job"); const jn = n || Number(sel?.value); if (!jn) return; await api("/api/inbox/file", { method: "POST", body: { threadId: b.dataset.thread, jobNumber: jn } }); }
   } catch (err) { log(err.message, "t-err"); }
 });
 
@@ -420,6 +440,7 @@ function renderJob() {
       <button class="btn" data-act="sync" ${drafts.length ? "" : "disabled"} title="After you send the drafts: log the proposal in Homebase">Check sent &amp; log</button>
       <button class="btn" data-act="compose">Email…</button>
       <button class="btn" data-act="log">Log call…</button>
+      <button class="btn" data-act="addfiles">Add files</button>
       <button class="btn" data-act="pull">Refresh</button>
       ${status.gmail === "mock" && drafts.some((x) => !x.sentAt) ? `<button class="btn" data-act="mocksend">Pretend I sent them</button>` : ""}
       <a class="btn" href="${esc(h.url)}" target="_blank" rel="noopener">Homebase ↗</a>
@@ -449,6 +470,7 @@ $("#job").addEventListener("click", async (e) => {
     if (act === "revert") renderJobTab();
     if (act === "note") { const t = $("#tl-note").value.trim(); if (t) { await api(`/api/jobs/${n}/note`, { method: "POST", body: { body: t } }); $("#tl-note").value = ""; } }
     if (act === "embed") { const f = $("#ccembed"); f.hidden = !f.hidden; }
+    if (act === "addfiles") { pickTarget = n; $("#filepick").click(); }
   } catch (err) { log(err.message, "t-err"); }
 });
 
@@ -616,6 +638,10 @@ function renderFiles(el) {
     <div class="card"><h3>In Homebase ${hb.toUpload.length ? `<button class="btn small primary" data-act="upload">Upload ${hb.toUpload.length}</button>` : ""}</h3>
       ${hb.docs.length ? `<ul class="items">${hb.docs.map((d) => `<li><span class="tag">${esc(d.kind)}</span> <a href="${d.localFile ? fileUrl(d.localFile) : `/api/jobs/${n}/hbdoc/${d.id}`}" target="_blank">${esc(d.title || d.fileName)}</a><div class="small muted">${fmtDate(d.createdAt)}${d.createdBy ? " · " + esc(d.createdBy) : ""}</div></li>`).join("")}</ul>` : `<p class="muted">No files on the job in Homebase.</p>`}
       ${hb.toUpload.length ? `<p class="small muted" style="margin:10px 0 0">Not in Homebase yet: ${hb.toUpload.map((f) => esc(f.name)).join(", ")}</p>` : ""}</div>
+    <div class="card"><h3>Added files <button class="btn small" data-act="addfiles">Add files</button></h3>
+      ${(files.files || []).length || (files.photosAdded || []).length ? `<ul class="items">${(files.files || []).map((f) => `<li><a href="${fileUrl("files/" + f.name)}" target="_blank">${esc(f.name)}</a> <span class="small muted">${fmtDate(f.modified)}</span></li>`).join("")}${(files.photosAdded || []).slice(0, 12).map((f) => `<li><a href="${fileUrl("photos/" + f.name)}" target="_blank">${esc(f.name)}</a> <span class="tag">photo</span></li>`).join("")}</ul>` : `<p class="muted">Drag files anywhere onto the hub, or use Add files.</p>`}</div>
+    <div class="card"><h3>Email attachments</h3>
+      ${(files.attachments || []).length ? `<ul class="items">${files.attachments.slice(0, 40).map((f) => `<li><a href="${fileUrl("email/attachments/" + f.name)}" target="_blank">${esc(f.name.split("/").pop())}</a><div class="small muted">${esc(f.name.split("/")[0])}</div></li>`).join("")}</ul>` : `<p class="muted">Attachments from emails filed to this job land here.</p>`}</div>
     <div class="card"><h3>Sketch</h3>${(files.sketch || []).length ? `<ul class="items">${files.sketch.map((f) => `<li><a href="${fileUrl("sketch/" + f.name)}">${esc(f.name)}</a></li>`).join("")}</ul>` : `<p class="muted">No ESX yet. Download it from DocuSketch; the hub picks it up from Downloads.</p>`}</div>
   </div>`;
 }
@@ -689,7 +715,8 @@ async function openThread(id) {
   $("#reader").innerHTML = `
     <div class="row"><h3 style="margin:0;flex:1;min-width:200px">${esc(t.messages[0]?.subject || "(no subject)")}</h3>
       <button class="btn small" data-m="archive">Archive</button><button class="btn small" data-m="star">${t.messages.some((m) => m.labelIds?.includes("STARRED")) ? "Unstar" : "Star"}</button><button class="btn small" data-m="unread">Mark unread</button><button class="btn small" data-m="trash">Delete</button></div>
-    <div class="jobchips">${t.jobs.length ? `<span class="small muted">Job:</span>${t.jobs.map((j) => `<a href="#" class="tag" data-do="open" data-n="${j.jobNumber}">#${j.jobNumber} ${esc(j.name)} · ${esc(j.stage)}</a>`).join("")}` : `<span class="small muted">Not matched to a job</span>`}</div>
+    <div class="jobchips">${t.jobs.length ? `<span class="small muted">Job:</span>${t.jobs.map((j) => `<a href="#" class="tag" data-do="open" data-n="${j.jobNumber}">#${j.jobNumber} ${esc(j.name)} · ${esc(j.stage)}</a> <button class="btn small" data-do="filethread" data-thread="${esc(t.id)}" data-n="${j.jobNumber}">File to #${j.jobNumber}</button>`).join("")}` : `<span class="small muted">Not matched to a job.</span>`}
+      <select id="fileto-job" style="width:auto"><option value="">File to another job…</option>${jobs.map((j) => `<option value="${j.jobNumber}">#${j.jobNumber} ${esc(j.name)}</option>`).join("")}</select><button class="btn small" data-do="filethread" data-thread="${esc(t.id)}">File</button></div>
     ${t.messages.map((m, i) => `<div class="msg"><div class="mh"><div><b>${esc(m.from)}</b><div class="small muted">to ${esc(m.to.join(", "))}${m.cc.length ? ` · cc ${esc(m.cc.join(", "))}` : ""}</div></div><div class="small muted">${new Date(m.date).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div></div>
       ${m.html ? `<iframe sandbox="allow-popups allow-popups-to-escape-sandbox" data-i="${i}" title="Email"></iframe>` : `<pre>${esc(m.body)}</pre>`}
       ${m.attachments.length ? `<div class="atts">${m.attachments.map((a) => `<a class="tag" href="/api/mail/attachment/${esc(m.id)}/${esc(a.id)}?name=${encodeURIComponent(a.filename)}" target="_blank">📎 ${esc(a.filename)}</a>`).join("")}</div>` : ""}</div>`).join("")}
@@ -753,6 +780,39 @@ $("#composedlg").addEventListener("close", async () => {
   } catch (e) { log(e.message, "t-err"); $("#composedlg").showModal(); }
 });
 
+// ============================================================= adding files (drag & drop anywhere, or Add files)
+let pickTarget = null, pendingFiles = [], dragDepth = 0, recentFiles = [];
+const currentJob = () => (store.get("tab", "today") === "jobs" && view ? view.homebase.jobNumber : null);
+window.addEventListener("dragenter", (e) => { if (![...(e.dataTransfer?.types || [])].includes("Files")) return; dragDepth++; const j = currentJob(); $("#dz-target").textContent = j ? `#${j} ${view.homebase.name}` : "a job"; $("#dropzone").hidden = false; });
+window.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; $("#dropzone").hidden = true; } });
+window.addEventListener("dragover", (e) => { if ([...(e.dataTransfer?.types || [])].includes("Files")) e.preventDefault(); });
+window.addEventListener("drop", (e) => {
+  if (!e.dataTransfer?.files?.length) return;
+  e.preventDefault(); dragDepth = 0; $("#dropzone").hidden = true;
+  chooseTarget([...e.dataTransfer.files], currentJob());
+});
+$("#addfiles").addEventListener("click", () => { pickTarget = currentJob(); $("#filepick").click(); });
+$("#filepick").addEventListener("change", () => { const f = [...$("#filepick").files]; $("#filepick").value = ""; if (f.length) chooseTarget(f, pickTarget); });
+function chooseTarget(files, job) {
+  pendingFiles = files;
+  $("#fd-count").textContent = files.length === 1 ? files[0].name : `${files.length} files`;
+  $("#fd-names").textContent = files.length > 1 ? files.map((f) => f.name).join(", ") : "";
+  $("#fd-job").innerHTML = jobs.map((j) => `<option value="${j.jobNumber}" ${j.jobNumber === job ? "selected" : ""}>#${j.jobNumber} ${esc(j.name)}</option>`).join("");
+  $("#filedlg").showModal();
+}
+$("#filedlg").addEventListener("close", async () => {
+  if ($("#filedlg").returnValue !== "go") return;
+  const n = Number($("#fd-job").value), hb = $("#fd-hb").checked;
+  for (const f of pendingFiles) {
+    try {
+      const r = await fetch(`/api/jobs/${n}/upload?homebase=${hb ? 1 : 0}`, { method: "POST", headers: { "X-Filename": encodeURIComponent(f.name) }, body: f });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
+      recentFiles.push({ job: n, name: f.name });
+    } catch (e) { log(`${f.name}: ${e.message}`, "t-err"); }
+  }
+  $("#attached").innerHTML = recentFiles.slice(-6).map((x) => `<span class="tag">📎 #${x.job} ${esc(x.name)}</span>`).join("");
+});
+
 // ============================================================= Claude
 async function askClaude(prompt, job) {
   if (!status.agent) { log("Claude is off on this machine (no Anthropic API key).", "t-err"); return; }
@@ -763,7 +823,8 @@ $("#askform").addEventListener("submit", async (e) => {
   e.preventDefault();
   const p = $("#prompt").value.trim(); if (!p) return;
   const tab = store.get("tab", "today");
-  try { await askClaude(p, tab === "jobs" ? selected : undefined); $("#prompt").value = ""; } catch (err) { log(err.message, "t-err"); }
+  const withFiles = recentFiles.length ? `${p}\n\n(Files I just added: ${recentFiles.map((x) => `#${x.job} ${x.name}`).join("; ")}. They're in those jobs' folders.)` : p;
+  try { await askClaude(withFiles, tab === "jobs" ? selected : recentFiles.at(-1)?.job); $("#prompt").value = ""; recentFiles = []; $("#attached").innerHTML = ""; } catch (err) { log(err.message, "t-err"); }
 });
 $("#prompt").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#askform").requestSubmit(); } });
 

@@ -167,6 +167,14 @@ export class GoogleGmail implements MailClient {
     await this.gmail().users.threads.modify({ userId: "me", id, requestBody: { addLabelIds: change.add ?? [], removeLabelIds: change.remove ?? [] } });
   }
 
+  async ensureLabel(name: string): Promise<string> {
+    const { data } = await this.gmail().users.labels.list({ userId: "me" });
+    const hit = data.labels?.find((l) => l.name === name);
+    if (hit?.id) return hit.id;
+    const made = await this.gmail().users.labels.create({ userId: "me", requestBody: { name, labelListVisibility: "labelShow", messageListVisibility: "show" } });
+    return made.data.id!;
+  }
+
   async attachment(messageId: string, attachmentId: string): Promise<Buffer> {
     const res = await this.gmail().users.messages.attachments.get({ userId: "me", messageId, id: attachmentId });
     return Buffer.from(res.data.data!, "base64url");
