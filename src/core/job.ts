@@ -65,6 +65,9 @@ export const JobSchema = z.object({
     })
     .default({ drafts: [] }),
   log: z.array(z.object({ at: z.string(), what: z.string() })).default([]),
+  /** Last background sync with Homebase, and the last CompanyCam/DocuSketch look-up (those run at most daily). */
+  syncedAt: z.string().default(""),
+  lookupsAt: z.string().default(""),
 });
 
 export type Job = z.infer<typeof JobSchema>;
@@ -72,7 +75,8 @@ export type SendoffDraft = z.infer<typeof Draft>;
 /** A partial job.json; nested objects merge, arrays replace, and `null` clears a field. */
 export type JobPatch = { [K in keyof Job]?: Job[K] extends object ? Job[K] | { [P in keyof Job[K]]?: Job[K][P] | null } : Job[K] };
 
-export const SUBDIRS = ["sketch", "photos", "estimate", "email", "notes"] as const;
+/** `homebase/` mirrors the job's Documents tab in Homebase (see workflows/files.ts). */
+export const SUBDIRS = ["sketch", "photos", "estimate", "email", "notes", "homebase"] as const;
 
 /** One folder per job number under JOBS_ROOT ("3226 Augustine"), holding job.json and the job's files. */
 export class JobStore {

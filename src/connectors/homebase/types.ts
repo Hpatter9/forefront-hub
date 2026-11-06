@@ -58,6 +58,12 @@ export interface HomebaseClient {
   emails?(jobNumber: number): Promise<FiledEmail[]>;
   /** The job's Activity log (calls, emails, meetings), newest first. Not every driver has it. */
   activity?(jobNumber: number): Promise<ActivityRow[]>;
+  /** The job's Documents tab, newest first. */
+  documents?(jobNumber: number): Promise<HomebaseDocument[]>;
+  /** Saves one document's bytes to `dest`. */
+  downloadDocument?(doc: HomebaseDocument, dest: string): Promise<void>;
+  /** Adds a file to the job's Documents tab. */
+  uploadDocument?(jobNumber: number, file: string, o: { kind: DocumentKind; title?: string; version?: number }): Promise<HomebaseDocument>;
   close?(): Promise<void>;
 }
 
@@ -72,6 +78,23 @@ export interface FiledEmail {
   subject: string;
   preview?: string;
   attachmentCount?: number;
+}
+
+export type DocumentKind = "estimate" | "invoice" | "scope" | "contract" | "photo" | "report" | "other";
+
+export interface HomebaseDocument {
+  id: string;
+  kind: DocumentKind | "email";
+  title: string;
+  fileName: string;
+  mimeType: string;
+  byteSize: number;
+  /** Content hash: how the hub tells which files are already on both sides. */
+  sha256: string;
+  source: "homebase" | "archive";
+  createdAt: string;
+  createdBy?: string;
+  download: string;
 }
 
 export interface ActivityRow {

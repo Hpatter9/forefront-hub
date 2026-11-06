@@ -26,6 +26,11 @@
   header.top { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
   header.top h1 { font-size: 16px; margin: 0; color: var(--navy); letter-spacing: .2px; }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+  #syncnow { padding: 4px 10px; font-size: 13px; }
+  .flag { font-size: 10px; padding: 0 5px; border-radius: 4px; margin-left: 4px; vertical-align: 1px; }
+  .flag.log { background: var(--accent); color: var(--accent-ink); }
+  .flag.up { border: 1px solid var(--warn); color: var(--warn); }
+  .files-sub { margin: 12px 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
   .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--pill); color: var(--muted); white-space: nowrap; }
   .chip.on { color: var(--ok); } .chip.off { color: var(--warn); }
   .body { display: grid; grid-template-columns: 340px 1fr; min-height: 0; }
@@ -103,6 +108,8 @@
     <h1>Forefront Hub</h1>
     <span class="muted small" id="who"></span>
     <div class="chips" id="chips"></div>
+    <span class="small muted" id="syncstate"></span>
+    <button class="btn" id="syncnow" type="button" title="Refresh your job folders and files from Homebase (it also runs every 15 minutes)">Sync now</button>
   </header>
   <div class="body">
     <aside>
@@ -232,7 +239,7 @@ function renderList() {
     const d = daysSince(j.stageSince);
     const old = d !== null && ((j.stage === "Proposal Submitted" && d >= 10) || d >= 30);
     return `<div class="job ${j.jobNumber === selected ? "sel" : ""}" data-n="${j.jobNumber}">
-      <div class="t"><span class="n">#${j.jobNumber}</span> ${esc(j.name)}</div><div class="amt">${usd(j.proposalAmount)}</div>
+      <div class="t"><span class="n">#${j.jobNumber}</span> ${esc(j.name)}${j.readyToLog ? `<span class="flag log" title="Send-off sent: log it in Homebase">log</span>` : ""}${j.needsUpload ? `<span class="flag up" title="Estimate files Homebase doesn't have yet">upload</span>` : ""}</div><div class="amt">${usd(j.proposalAmount)}</div>
       <div class="sub"><span class="stage">${esc(j.stage)}</span> ${esc(j.address.split(",")[0])}</div><div class="days ${old ? "old" : ""}">${d === null ? "" : d + "d"}</div>
     </div>`;
   }).join("") || `<div class="empty">No jobs match.</div>`;
@@ -281,6 +288,7 @@ function renderJob() {
       <button class="btn" data-act="pull">${l ? "Refresh job folder" : "Set up job folder"}</button>
       <button class="btn primary" data-act="sendoff">Draft send-off…</button>
       <button class="btn" data-act="sync" ${drafts.length ? "" : "disabled"} title="After you send the drafts: log the proposal in Homebase">Check sent &amp; log</button>
+      <button class="btn" data-act="files">Sync files</button>
       <button class="btn" data-act="log">Log call / note…</button>
       <button class="btn" data-act="edit">Edit contacts…</button>
       ${status.gmail === "mock" && drafts.some((x) => !x.sentAt) ? `<button class="btn" data-act="mocksend" title="Gmail isn't connected here, so pretend you sent the drafts">Pretend I sent them</button>` : ""}
@@ -302,6 +310,11 @@ function renderJob() {
         ${!l ? `<p class="muted">No job folder yet. <b>Set up job folder</b> pulls this job from Homebase into ${esc(view.folder)}.</p>`
           : est.length ? `<ul class="items">${est.map((f) => `<li><a href="${fileUrl("estimate", f.name)}" target="_blank">${esc(f.name)}</a> <span class="small muted">${Math.round(f.size / 1024)} KB</span></li>`).join("")}</ul>`
           : `<p class="muted">No estimate files yet. Ask Claude below to write one from the ESX and photos, or drop the PDFs in<br><span class="small">${esc(view.folder)}\\estimate</span></p>`}
+      </div>
+
+      <div class="card"><h3>Homebase files ${view.hbFiles.toUpload.length ? `<button class="btn" data-act="upload">Upload ${view.hbFiles.toUpload.length} to Homebase</button>` : ""}</h3>
+        ${view.hbFiles.docs.length ? `<ul class="items">${view.hbFiles.docs.map((d) => `<li><span class="tag">${esc(d.kind)}</span> <a href="${d.localFile ? fileUrl(d.localFile.split("/")[0], d.localFile.split("/").slice(1).join("/")) : `/api/jobs/${n}/hbdoc/${d.id}`}" target="_blank">${esc(d.title || d.fileName)}</a><div class="small muted">${fmtDate(d.createdAt)}${d.createdBy ? " · " + esc(d.createdBy) : ""} · ${Math.max(1, Math.round(d.byteSize / 1024))} KB${d.localFile ? " · in the job folder" : ""}</div></li>`).join("")}</ul>` : `<p class="muted">No files on the job in Homebase.</p>`}
+        ${view.hbFiles.toUpload.length ? `<div class="files-sub">Not in Homebase yet</div><ul class="items">${view.hbFiles.toUpload.map((f) => `<li>${esc(f.name)} <span class="tag">${esc(f.kind)}</span></li>`).join("")}</ul>` : ""}
       </div>
 
       <div class="card"><h3>Send-off drafts</h3>
@@ -337,6 +350,8 @@ $("#job").addEventListener("click", async (e) => {
     if (act === "pull") await api(`/api/jobs/${n}/pull`, { method: "POST" });
     if (act === "photos") await api(`/api/jobs/${n}/photos`, { method: "POST" });
     if (act === "sync") await api(`/api/jobs/${n}/sync`, { method: "POST" });
+    if (act === "files") await api(`/api/jobs/${n}/files-sync`, { method: "POST" });
+    if (act === "upload") await api(`/api/jobs/${n}/files-upload`, { method: "POST", body: {} });
     if (act === "mocksend") { await api(`/api/jobs/${n}/mock-send`, { method: "POST" }); log(`#${n}: marked the drafts as sent (test mode). Now press “Check sent & log”.`); openJob(n, false); }
     if (act === "sendoff") openSendoff();
     if (act === "log") $("#logdlg").showModal();
@@ -424,12 +439,24 @@ es.onmessage = (m) => {
   if (e.type === "approval-done") { const i = approvals.findIndex((a) => a.id === e.id); if (i >= 0) { approvals.splice(i, 1); showApproval(); } }
   if (e.type === "task") {
     if (e.state === "running") log(`▶ ${e.label}`, "t-run");
-    if (e.state === "done") { log(`✓ ${e.label}`, "t-ok"); if (e.job && e.job === selected) openJob(selected, false); }
+    if (e.state === "done") { log(`✓ ${e.label}`, "t-ok"); if (e.job && e.job === selected) openJob(selected, false); if (e.label.startsWith("Sync my jobs")) { loadSyncState(); loadJobs(); } }
+    if (e.state === "running" && e.label.startsWith("Sync my jobs")) loadSyncState();
     if (e.state === "error") log(`✗ ${e.label}: ${e.error}`, "t-err");
   }
 };
 
-loadStatus().then(loadJobs).catch((e) => log(e.message, "t-err"));
+async function loadSyncState() {
+  try {
+    const s = await api("/api/sync-all");
+    const ago = s.last ? Math.round((Date.now() - Date.parse(s.last.at)) / 60000) : null;
+    $("#syncstate").textContent = s.running ? "Syncing…" : s.last ? `Synced ${ago < 1 ? "just now" : ago + " min ago"}` : "";
+    $("#syncnow").disabled = !!s.running;
+  } catch {}
+}
+$("#syncnow").addEventListener("click", async () => { try { await api("/api/sync-all", { method: "POST" }); loadSyncState(); } catch (e) { log(e.message, "t-err"); } });
+setInterval(loadSyncState, 60000);
+
+loadStatus().then(loadJobs).then(loadSyncState).catch((e) => log(e.message, "t-err"));
 </script>
 </body>
 </html>

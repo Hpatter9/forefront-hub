@@ -15,7 +15,7 @@ const PROPOSAL_SUBMITTED = "Proposal Submitted";
  * amount AND submitted date (the real send date) in Homebase and move the job to Proposal Submitted if it's earlier
  * in the pipeline. Nothing is written to Homebase until a draft has actually been sent.
  */
-export async function sync(hub: Hub, only?: number): Promise<SyncResult[]> {
+export async function sync(hub: Hub, only?: number, opts: { checkOnly?: boolean } = {}): Promise<SyncResult[]> {
   const results: SyncResult[] = [];
   for (const job of hub.jobs.list()) {
     if (only !== undefined && job.jobNumber !== only) continue;
@@ -29,7 +29,7 @@ export async function sync(hub: Hub, only?: number): Promise<SyncResult[]> {
       if (s.state === "sent") {
         d.sentAt = s.sentAt;
         sent.push(`${d.kind} (${s.sentAt?.slice(0, 10)})`);
-      } else if (s.state === "gone") hub.say(`#${job.jobNumber}: the ${d.kind} draft was deleted without sending.`);
+      } else if (s.state === "gone" && !opts.checkOnly) hub.say(`#${job.jobNumber}: the ${d.kind} draft was deleted without sending.`);
     }
     if (sent.length) hub.jobs.upsert(job.jobNumber, { sendoff: { ...job.sendoff, drafts } });
 
@@ -37,6 +37,10 @@ export async function sync(hub: Hub, only?: number): Promise<SyncResult[]> {
     results.push(res);
     const sentDrafts = drafts.filter((d) => d.sentAt);
     if (job.sendoff.homebaseLoggedAt || !sentDrafts.length) continue;
+    if (opts.checkOnly) {
+      res.note = "sent; ready to log in Homebase";
+      continue;
+    }
 
     const amount = job.sendoff.proposalAmount;
     if (!amount) {

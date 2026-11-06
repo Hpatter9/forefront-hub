@@ -1,4 +1,4 @@
-import type { ActivityRow, Contact, FiledEmail, HomebaseClient, JobDetail, JobSummary } from "./types.js";
+import type { ActivityRow, Contact, DocumentKind, FiledEmail, HomebaseClient, HomebaseDocument, JobDetail, JobSummary } from "./types.js";
 
 /**
  * Homebase over its real JSON API (https://homebase.forefrontteam.com/api/v1, reference at /api/v1/docs).
@@ -157,17 +157,36 @@ export class ApiHomebase implements HomebaseClient {
     return (await this.call<{ activity: ActivityRow[] }>("GET", `/projects/${id}/activity`)).activity;
   }
 
+  async documents(jobNumber: number): Promise<HomebaseDocument[]> {
+    const id = await this.projectId(jobNumber);
+    return (await this.call<{ documents: HomebaseDocument[] }>("GET", `/projects/${id}/documents`)).documents;
+  }
+
+  async downloadDocument(doc: HomebaseDocument, dest: string): Promise<void> {
+    const { writeFile, mkdir } = await import("node:fs/promises");
+    const path = await import("node:path");
+    const headers: Record<string, string> = {};
+    if (this.opts.token) headers.Authorization = `Bearer ${this.opts.token}`;
+    const res = await (this.opts.fetch ?? fetch)(`${this.opts.url}${doc.download || `/api/v1/documents/${doc.id}`}`, { headers });
+    if (!res.ok) throw new HomebaseError(`Homebase download ${doc.fileName}: ${res.status}`, res.status);
+    await mkdir(path.dirname(dest), { recursive: true });
+    await writeFile(dest, Buffer.from(await res.arrayBuffer()));
+  }
+
   /** Adds a file to the job's Documents tab (estimate PDFs, photo report). */
-  async uploadDocument(jobNumber: number, file: string, o: { kind: "estimate" | "report" | "contract" | "photo" | "scope" | "other"; title?: string; version?: number }) {
+  async uploadDocument(jobNumber: number, file: string, o: { kind: DocumentKind; title?: string; version?: number }): Promise<HomebaseDocument> {
     const { readFile } = await import("node:fs/promises");
+    const { createHash } = await import("node:crypto");
     const path = await import("node:path");
     const id = await this.projectId(jobNumber);
+    const bytes = await readFile(file);
     const form = new FormData();
-    form.append("file", new Blob([await readFile(file)], { type: file.toLowerCase().endsWith(".pdf") ? "application/pdf" : "application/octet-stream" }), path.basename(file));
+    form.append("file", new Blob([bytes], { type: file.toLowerCase().endsWith(".pdf") ? "application/pdf" : "application/octet-stream" }), path.basename(file));
     form.append("kind", o.kind);
     if (o.title) form.append("title", o.title);
     if (o.version) form.append("version", String(o.version));
-    const headers: Record<string, string> = { "Idempotency-Key": `hub:doc:${id}:${path.basename(file)}:${o.version ?? 0}` };
+    // Keyed on the content, so a retry never uploads the same file twice but a changed file goes up.
+    const headers: Record<string, string> = { "Idempotency-Key": `hub:doc:${id}:${createHash("sha256").update(bytes).digest("hex")}` };
     if (this.opts.token) headers.Authorization = `Bearer ${this.opts.token}`;
     if (this.opts.actingEmail) headers["X-Acting-User-Email"] = this.opts.actingEmail;
     const res = await (this.opts.fetch ?? fetch)(`${this.opts.url}/api/v1/projects/${id}/documents`, { method: "POST", headers, body: form });

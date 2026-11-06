@@ -8,7 +8,9 @@ import type { Hub } from "../hub.js";
  * Homebase -> job.json, plus the CompanyCam project and DocuSketch sketch for the job. Safe to run any time:
  * it only fills in what Homebase knows and never clears what you've set by hand.
  */
-export async function pullJob(hub: Hub, jobNumber: number): Promise<Job> {
+export async function pullJob(hub: Hub, jobNumber: number, opts: { quiet?: boolean; lookups?: boolean } = {}): Promise<Job> {
+  const say = opts.quiet ? () => {} : hub.say;
+  const lookups = opts.lookups ?? true;
   const hb = await hub.homebase.getJob(jobNumber);
   const customer = hb.contacts.find((c) => c.role === "customer");
   const adjuster = hb.contacts.find((c) => c.role === "adjuster");
@@ -35,37 +37,38 @@ export async function pullJob(hub: Hub, jobNumber: number): Promise<Job> {
     insurance: prior?.insurance !== "unknown" && prior?.insurance ? prior.insurance : hb.claimNumber || adjuster ? "claim" : "unknown",
   });
 
-  if (!job.companycamProjectId) {
+  if (lookups && !job.companycamProjectId) {
     try {
       const street = job.address.split(",")[0];
       const found = [...(await hub.photos.findProjects(String(jobNumber))), ...(street ? await hub.photos.findProjects(street) : [])];
       const p = pickProject(found, jobNumber, job.address);
       if (p) {
         job = hub.jobs.upsert(jobNumber, { companycamProjectId: p.id });
-        hub.say(`CompanyCam: ${p.name} (${p.photoCount} photos)`);
-      } else hub.say("CompanyCam: no project found for this job yet");
+        say(`CompanyCam: ${p.name} (${p.photoCount} photos)`);
+      } else say("CompanyCam: no project found for this job yet");
     } catch (e) {
-      hub.say(`CompanyCam: ${(e as Error).message}`);
+      say(`CompanyCam: ${(e as Error).message}`);
     }
   }
 
-  if (!job.docusketchProjectId) {
+  if (lookups && !job.docusketchProjectId) {
     try {
       const d = await hub.sketches.findDelivery({ name: job.name, address: job.address });
       if (d) {
         job = hub.jobs.upsert(jobNumber, { docusketchProjectId: d.projectId });
-        hub.say(`DocuSketch: project ${d.projectId} (${d.projectName}) delivered ${d.deliveredAt}`);
+        say(`DocuSketch: project ${d.projectId} (${d.projectName}) delivered ${d.deliveredAt}`);
       }
     } catch (e) {
-      hub.say(`DocuSketch: ${(e as Error).message}`);
+      say(`DocuSketch: ${(e as Error).message}`);
     }
   }
   if (job.docusketchProjectId) {
     const esx = await hub.sketches.fetchEsx({ projectId: job.docusketchProjectId, sketchDir: hub.jobs.path(jobNumber, "sketch") });
-    hub.say(esx ? `Sketch: ${esx}` : `Sketch: download ${job.docusketchProjectId}*.ESX from https://app.docusketch.com/portal-cc/projects (it's picked up from Downloads)`);
+    say(esx ? `Sketch: ${esx}` : `Sketch: download ${job.docusketchProjectId}*.ESX from https://app.docusketch.com/portal-cc/projects (it's picked up from Downloads)`);
   }
 
-  hub.jobs.log(jobNumber, "Pulled from Homebase");
+  if (lookups) hub.jobs.upsert(jobNumber, { lookupsAt: new Date().toISOString() });
+  if (!opts.quiet) hub.jobs.log(jobNumber, "Pulled from Homebase");
   return hub.jobs.get(jobNumber);
 }
 
