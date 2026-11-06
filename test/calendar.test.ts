@@ -34,6 +34,8 @@ describe("Google Tasks", () => {
     expect((await t.tasks()).some((x) => x.id === k.id)).toBe(false); // done ones hidden unless asked
     expect((await t.tasks({ showCompleted: true })).find((x) => x.id === k.id)?.completed).toBe(true);
     await t.update(k.listId, k.id, { completed: false, due: null });
-    expect((await t.tasks()).find((x) => x.id === k.id)).toMatchObject({ completed: false, due: undefined });
+    const reopened = (await t.tasks()).find((x) => x.id === k.id);
+    expect(reopened?.completed).toBe(false);
+    expect(reopened?.due).toBeUndefined();
   });
 });
