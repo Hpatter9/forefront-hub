@@ -30,6 +30,8 @@ export interface CalEvent {
   jobNumber?: number;
   /** The series a repeating event belongs to (Google's recurringEventId). */
   recurringId?: string;
+  /** Hunter's own answer when he's an invitee: "accepted", "declined", "tentative", "needsAction". */
+  myResponse?: string;
 }
 
 export interface EventInput {
@@ -111,6 +113,7 @@ export class GoogleCalendar implements CalendarClient {
       attendees: (e.attendees ?? []).filter((a) => !a.self).map((a) => ({ email: a.email!, name: a.displayName ?? undefined, response: a.responseStatus ?? undefined })),
       jobNumber: jobRef(text),
       recurringId: e.recurringEventId ?? undefined,
+      myResponse: e.attendees?.find((a) => a.self)?.responseStatus ?? undefined,
     };
   }
 

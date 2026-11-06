@@ -842,15 +842,17 @@ function startPlan(trigger: "button" | "morning"): { taskId: string } | { error:
   if (!cfg.anthropicApiKey) return { error: "Claude is off on this machine (no Anthropic API key).", code: 400 };
   if (readPlan().state === "running") return { error: "Claude is already planning your day.", code: 409 };
   const list = reminders(hub, { needsUpload: new Set((lastSync?.needsUpload ?? []).map((x) => x.jobNumber)) });
-  const prompt = `Plan my day. Here is everything the hub thinks needs me, as JSON (kind, job, title, detail, days waiting):\n${JSON.stringify(list.slice(0, 60))}\n\nCheck my Google Calendar and my Google Tasks (due today and overdue) for today and the next few days (hub tools) so the plan fits around what's already booked. For the top replies and follow-ups, read the thread or the job (hub tools) and draft the email in Gmail for me (drafts only; I'll send).\n\nYour final reply is my brief for the day, shown at the top of my dashboard. Write it in this shape, in markdown, and nothing else:\n**Today at a glance:** one or two sentences (what's booked, how many things are waiting, the one thing that matters most).\n\n**Do in this order**\n1. #<job> <Name>: what to do (one line each, most urgent first: an adjuster or homeowner waiting on me beats a stale job; money-heavy proposals before small ones).\n\n**On the calendar:** the day's appointments, one line each (skip if none).\n\n**Drafts ready in Gmail:** one line per draft you made (skip if none).`;
+  const buildPrompt = (myDayNote: string) => `Plan my day. Here is everything the hub thinks needs me, as JSON (kind, job, title, detail, days waiting):\n${JSON.stringify(list.slice(0, 60))}\n\n${myDayNote}\n\nThis brief is only for me and my time. Rules:\n- Use ONLY the calendar events and tasks listed above. They are mine: my own calendar (not shared team calendars) and my own Google Tasks. Don't look up other calendars or tasks with the hub tools, and leave out other people's meetings and to-dos.\n- Every line in the brief is something I do. If something waits on someone else, either write it as my action (\"Ask Shannon whether the selections went out\") or leave it out.\n\nFor the top replies and follow-ups, read the thread or the job (hub tools) and draft the email in Gmail for me (drafts only; I'll send).\n\nYour final reply is my brief for the day, shown at the top of my dashboard. Write it in this shape, in markdown, and nothing else:\n**Today at a glance:** one or two sentences (what's booked, how many things are waiting, the one thing that matters most).\n\n**Do in this order**\n1. #<job> <Name>: what to do (one line each, most urgent first: an adjuster or homeowner waiting on me beats a stale job; money-heavy proposals before small ones).\n\n**On the calendar:** the day's appointments, one line each (skip if none).\n\n**Drafts ready in Gmail:** one line per draft you made (skip if none).`;
   const plan: Plan = { state: "running", startedAt: new Date().toISOString(), text: "", steps: [], trigger };
   savePlan(plan);
+
   bus.emit({ type: "changed", what: "plan" });
   return task(trigger === "morning" ? "Morning brief" : "Plan my day", undefined, async () => {
     const { describeTool } = await import("../agent/studio.js");
     try {
       const { withDraftSource } = await import("../workflows/generated.js");
       const note = await travelNote();
+      const prompt = buildPrompt(await myDay());
       plan.text = await withDraftSource(trigger === "morning" ? "Morning brief" : "Plan my day", async () => (await import("../agent/run.js")).ask(hub, prompt + note, {
         onMessage: (m) => {
           if (m.type !== "assistant") return;
@@ -925,4 +927,30 @@ async function myCalendars(): Promise<Set<string>> {
 async function replaceDraft(messageId: string) {
   const id = await hub.gmail.draftIdFor?.(messageId).catch(() => null);
   if (id) await hub.gmail.deleteDraft?.(id).catch(() => {});
+}
+
+/** My calendar and my tasks for the brief: my own calendar only (no shared team calendars, nothing I declined) and
+ *  my own Google Tasks, today through the next three days. */
+async function myDay(): Promise<string> {
+  const lines: string[] = [];
+  const d0 = new Date(), d1 = new Date();
+  d0.setHours(0, 0, 0, 0);
+  d1.setDate(d1.getDate() + 3);
+  d1.setHours(24, 0, 0, 0);
+  const day = (iso: string) => new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/Denver" });
+  const hm = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Denver" });
+  if (hub.calendar.connected()) {
+    const mine = await myCalendars();
+    const ev = (await hub.calendar.events({ start: d0.toISOString(), end: d1.toISOString() }).catch(() => []))
+      .filter((e) => mine.has(e.calendarId) && e.myResponse !== "declined")
+      .sort((a, b) => a.start.localeCompare(b.start));
+    lines.push("My calendar (my own calendar only), today and the next 3 days:", ...(ev.length ? ev.map((e) => `- ${day(e.start)} ${e.allDay ? "all day" : `${hm(e.start)}-${hm(e.end)}`}: ${e.title}${e.location ? ` @ ${e.location}` : ""}${e.myResponse === "tentative" ? " (maybe)" : ""}`) : ["- nothing booked"]));
+  } else lines.push("My calendar: not connected.");
+  if (hub.tasks.connected()) {
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Denver" });
+    const soon = new Date(Date.now() + 86400_000).toLocaleDateString("en-CA", { timeZone: "America/Denver" });
+    const ts = (await hub.tasks.tasks().catch(() => [])).filter((t) => !t.completed && t.due && t.due <= soon).sort((a, b) => (a.due ?? "").localeCompare(b.due ?? ""));
+    lines.push("", "My Google Tasks due by tomorrow (and overdue):", ...(ts.length ? ts.map((t) => `- ${t.title}${t.due! < today ? ` (overdue since ${day(t.due!)})` : t.due === today ? " (due today)" : " (due tomorrow)"}`) : ["- none"]));
+  } else lines.push("", "My Google Tasks: not connected.");
+  return lines.join("\n");
 }
