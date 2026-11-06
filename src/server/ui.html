@@ -4,226 +4,281 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Forefront Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&display=swap">
 <style>
-  /* Tokens: every color comes from here, so the look can be re-themed in one place. */
+  /*
+   * Layout after Homebase (sidebar nav + breadcrumb bar + white cards, stat strip, stage table), with the colors
+   * flipped: light sidebar, dark navy work area. data-theme="homebase" switches to Homebase's own (unflipped) colors.
+   */
   :root {
-    --bg: #f4f6f8; --panel: #ffffff; --ink: #1c2733; --muted: #66727f; --line: #dfe4ea; --soft: #eef2f6;
-    --brand: #16324a; --brand-ink: #ffffff; --accent: #2f6fa7; --accent-ink: #ffffff;
-    --ok: #2e7d4f; --warn: #a86400; --bad: #b3261e; --pill: #e7eef6;
-    --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
-    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --mono: ui-monospace, Consolas, Menlo, monospace;
+    --side-bg: #0a1020; --side-ink: #e6e9f0; --side-muted: #8b95a8; --side-active: #18223a;
+    --bg: #0e1526; --panel: #151e33; --panel-2: #1b2640; --ink: #e9ecf2; --muted: #95a0b3; --line: #253150; --soft: #18223a;
+    --brand: #e9ecf2; --brand-ink: #0e1526;
+    --accent: #e9ecf2; --accent-ink: #0e1526; --link: #b4cdff; --focus: #b4cdff;
+    --ok: #6fc394; --warn: #e6ad55; --bad: #f08479; --pill: #212c49;
+    --shadow: none; color-scheme: dark;
+    --sans: "Jost", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; --mono: ui-monospace, Consolas, Menlo, monospace;
   }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #0f151c; --panel: #17202a; --ink: #e6ebf0; --muted: #94a1ae; --line: #2a3643; --soft: #1d2833;
-      --brand: #0c1a26; --brand-ink: #e6ebf0; --accent: #5b9bd5; --accent-ink: #0b1218;
-      --ok: #6cc08e; --warn: #e0a54a; --bad: #ef7b72; --pill: #22303d; --shadow: none; color-scheme: dark;
-    }
+  /* Homebase's layout with its colors flipped: light sidebar, dark work area. */
+  :root[data-theme="flipped"] { --side-bg: #f2f1ee; --side-ink: #141d33; --side-muted: #5d6578; --side-active: #e3e1db; }
+  :root[data-theme="homebase"] {
+    --side-bg: #121a2e; --side-ink: #eceef3; --side-muted: #a3acbd; --side-active: #1f2b47;
+    --bg: #f2f1ee; --panel: #ffffff; --panel-2: #f7f6f3; --ink: #1a2133; --muted: #686f7e; --line: #dedbd3; --soft: #eeece7;
+    --brand: #121a2e; --brand-ink: #eceef3;
+    --accent: #121a2e; --accent-ink: #ffffff; --link: #1f3f86; --focus: #1f3f86;
+    --ok: #2e7d4f; --warn: #a86400; --bad: #b3261e; --pill: #ebe9e3; color-scheme: light;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
-  body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--sans); }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--sans); }
   button, input, select, textarea { font: inherit; color: inherit; }
-  a { color: var(--accent); }
+  a { color: var(--link); }
   [hidden] { display: none !important; }
-  .app { display: grid; grid-template-rows: auto 1fr auto; height: 100%; }
+  .app { display: grid; grid-template-columns: 232px minmax(0, 1fr); height: 100%; }
 
-  /* ---- top bar */
-  header.top { display: flex; align-items: center; gap: 14px; padding: 0 16px; background: var(--brand); color: var(--brand-ink); flex-wrap: wrap; min-height: 52px; }
-  header.top h1 { font-size: 16px; margin: 0; letter-spacing: .3px; white-space: nowrap; }
-  nav.tabs { display: flex; gap: 2px; align-self: stretch; }
-  nav.tabs button { background: transparent; border: 0; color: inherit; opacity: .75; padding: 0 14px; cursor: pointer; border-bottom: 3px solid transparent; font-weight: 600; }
-  nav.tabs button.active { opacity: 1; border-bottom-color: var(--accent); }
-  nav.tabs .count { font-size: 11px; background: var(--accent); color: var(--accent-ink); border-radius: 999px; padding: 0 6px; margin-left: 4px; }
+  /* ---- left nav (Homebase's sidebar, flipped light) */
+  .side-nav { background: var(--side-bg); color: var(--side-ink); display: flex; flex-direction: column; min-height: 0; padding: 22px 0 14px; }
+  .logo { display: grid; justify-items: center; gap: 2px; padding: 0 16px 22px; color: var(--side-ink); text-decoration: none; }
+  .logo svg { width: 44px; height: 40px; }
+  .logo b { font-size: 21px; letter-spacing: 1.5px; font-weight: 700; }
+  .logo span { font-size: 8px; letter-spacing: 5px; color: var(--side-muted); }
+  nav.tabs { display: grid; gap: 2px; padding: 0 8px; }
+  nav.tabs button { background: transparent; border: 0; color: var(--side-ink); text-align: left; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
+  nav.tabs button:hover { background: var(--side-active); }
+  nav.tabs button.active { background: var(--side-active); font-weight: 600; }
+  nav.tabs .count { font-size: 11px; background: var(--side-ink); color: var(--side-bg); border-radius: 999px; padding: 0 7px; }
+  .navlabel { font-size: 12px; font-weight: 600; color: var(--side-muted); padding: 18px 18px 6px; }
+  .recent { display: grid; gap: 1px; padding: 0 8px; margin-top: auto; }
+  .recent button { background: transparent; border: 0; color: var(--side-ink); text-align: left; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .recent button:hover { background: var(--side-active); }
+  .side-search { padding: 10px 16px 6px; }
+  .side-search input { background: transparent; border: 1px solid color-mix(in srgb, var(--side-ink) 25%, transparent); color: var(--side-ink); border-radius: 4px; padding: 8px 10px; width: 100%; }
+  .side-foot { padding: 6px 16px 0; display: flex; gap: 8px; }
+  .side-foot button { background: transparent; border: 0; color: var(--side-muted); font-size: 12px; cursor: pointer; padding: 2px 0; text-decoration: underline; }
+
+  .mainc { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  .topbar { display: flex; align-items: center; gap: 12px; padding: 0 28px; min-height: 54px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .crumbs { color: var(--muted); font-size: 14px; }
+  .crumbs b { color: var(--ink); font-weight: 500; }
   .topright { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 0; }
-  .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.12); white-space: nowrap; }
-  .chip.off { opacity: .65; }
-  .topbtn { border: 1px solid rgba(255,255,255,.35); background: transparent; color: inherit; padding: 4px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  .chip { font-size: 12px; padding: 2px 9px; border-radius: 999px; background: var(--pill); color: var(--ink); white-space: nowrap; }
+  .chip.off { color: var(--muted); }
+  .topbtn { border: 1px solid var(--line); background: transparent; color: var(--ink); padding: 5px 11px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .topbtn:hover { border-color: var(--muted); }
 
-  .view { min-height: 0; overflow: hidden; }
-  .split { display: grid; grid-template-columns: 340px 1fr; height: 100%; min-height: 0; }
+  .view { flex: 1; min-height: 0; overflow: hidden; }
+  .split { display: grid; grid-template-columns: 330px 1fr; height: 100%; min-height: 0; }
   aside { border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
   .pad { padding: 12px; display: grid; gap: 8px; border-bottom: 1px solid var(--line); }
   .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  input[type=search], input[type=text], input[type=email], input[type=number], select, textarea { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+  input[type=search], input[type=text], input[type=email], input[type=number], select, textarea { width: 100%; padding: 7px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel-2); }
   textarea { resize: vertical; }
   .list { overflow: auto; flex: 1; min-height: 0; }
   .scroll { overflow: auto; height: 100%; min-height: 0; }
 
-  .btn { border: 1px solid var(--line); background: var(--panel); padding: 7px 12px; border-radius: 8px; cursor: pointer; box-shadow: var(--shadow); white-space: nowrap; text-decoration: none; color: var(--ink); display: inline-block; }
-  .btn:hover { border-color: var(--accent); }
+  .btn { border: 1px solid var(--line); background: var(--panel); padding: 7px 13px; border-radius: 6px; cursor: pointer; white-space: nowrap; text-decoration: none; color: var(--ink); display: inline-block; font-weight: 500; }
+  .btn:hover { border-color: var(--muted); }
   .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-  .btn.small { padding: 3px 9px; font-size: 12px; box-shadow: none; }
-  .btn:disabled { opacity: .5; cursor: not-allowed; }
-  .btn:focus-visible, nav.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn.small { padding: 3px 10px; font-size: 13px; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn:focus-visible, nav.tabs button:focus-visible, .subtabs button:focus-visible, .tile:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-  .job { padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; }
+  .job { padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; }
   .job:hover { background: var(--soft); }
-  .job.sel { background: var(--pill); box-shadow: inset 3px 0 0 var(--accent); }
+  .job.sel { background: var(--panel-2); box-shadow: inset 3px 0 0 var(--ink); }
   .job .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .n { color: var(--muted); font-weight: 400; }
   .amt { text-align: right; font-variant-numeric: tabular-nums; }
   .sub { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .days { font-size: 12px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
   .days.old { color: var(--warn); font-weight: 600; }
-  .stage { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--pill); color: var(--ink); }
+  .stage { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 999px; background: var(--pill); color: var(--ink); }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 5px; vertical-align: 1px; }
-  .dot.reply { background: var(--bad); } .dot.log, .dot.followup { background: var(--accent); } .dot.estimate { background: var(--warn); } .dot.stale { background: var(--muted); }
+  .dot.reply { background: var(--bad); } .dot.log, .dot.followup { background: var(--link); } .dot.estimate { background: var(--warn); } .dot.stale { background: var(--muted); }
 
   .empty { margin: auto; color: var(--muted); text-align: center; padding: 40px; }
-  .page { display: flex; flex-direction: column; min-height: 100%; }
-  .jobhead { padding: 18px 20px 6px; display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
-  .jobhead h2 { margin: 0; font-size: 20px; }
-  .muted { color: var(--muted); } .small { font-size: 12px; }
-  .actions { padding: 6px 20px 10px; display: flex; gap: 8px; flex-wrap: wrap; }
-  .subtabs { display: flex; gap: 4px; padding: 0 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  .subtabs button { border: 0; background: transparent; padding: 9px 12px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; font-weight: 600; }
-  .subtabs button.active { color: var(--ink); border-bottom-color: var(--accent); }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; padding: 16px 20px 20px; align-content: start; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
-  .card h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  .card h3 .btn { text-transform: none; letter-spacing: 0; }
-  dl { display: grid; grid-template-columns: 120px 1fr; gap: 5px 10px; margin: 0; }
-  dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
-  ul.items { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-  ul.items li { border-bottom: 1px dashed var(--line); padding-bottom: 8px; min-width: 0; }
-  ul.items li:last-child { border-bottom: 0; padding-bottom: 0; }
-  .tag { font-size: 11px; padding: 0 6px; border-radius: 4px; background: var(--soft); color: var(--muted); white-space: nowrap; }
-  .tag.out { color: var(--accent); } .tag.sent { color: var(--ok); } .tag.draft { color: var(--warn); } .tag.in { color: var(--bad); }
+  .page { display: flex; flex-direction: column; min-height: 100%; padding: 22px 28px 28px; gap: 16px; max-width: 1180px; }
+
+  /* job header card, like Homebase's */
+  .jobcard { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px 24px 0; }
+  .jobhead { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+  .jobhead h2 { margin: 0; font-size: 26px; font-weight: 500; flex: 1; min-width: 240px; text-wrap: balance; }
+  .jobmeta { color: var(--muted); margin-top: 4px; }
+  .stagepill { display: inline-flex; gap: 10px; align-items: center; background: var(--panel-2); border-radius: 8px; padding: 7px 14px; font-size: 14px; }
+  .stagepill span { color: var(--muted); font-size: 12px; letter-spacing: .5px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 14px 0 4px; }
+  .subtabs { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 12px; }
+  .subtabs button { border: 0; background: transparent; padding: 10px 0; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; font-weight: 500; font-size: 15px; }
+  .subtabs button.active { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; align-content: start; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; min-width: 0; }
+  .card h3 { margin: 0 0 12px; font-size: 19px; font-weight: 500; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .card h3 .btn { font-size: 13px; }
+  dl { display: grid; grid-template-columns: 130px 1fr; gap: 0; margin: 0; }
+  dt { color: var(--muted); font-size: 13px; padding: 9px 0; border-top: 1px solid var(--line); }
+  dd { margin: 0; overflow-wrap: anywhere; padding: 9px 0; border-top: 1px solid var(--line); }
+  .muted { color: var(--muted); } .small { font-size: 13px; }
+  ul.items { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+  ul.items li { border-top: 1px solid var(--line); padding: 9px 0; min-width: 0; }
+  ul.items li:first-child { border-top: 0; padding-top: 0; }
+  .tag { font-size: 11px; padding: 1px 7px; border-radius: 4px; background: var(--pill); color: var(--muted); white-space: nowrap; }
+  .tag.out { color: var(--link); } .tag.sent { color: var(--ok); } .tag.draft { color: var(--warn); } .tag.in { color: var(--bad); }
+
+  /* the stat strip (Homebase's row of figures) */
+  .strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .tile { background: transparent; border: 0; border-left: 1px solid var(--line); border-top: 3px solid transparent; padding: 14px 16px 12px; display: grid; gap: 1px; text-align: left; cursor: pointer; color: var(--ink); font: inherit; }
+  .tile:first-child { border-left: 0; }
+  .tile:hover, .tile.on { border-top-color: var(--ink); background: var(--soft); }
+  .tile .v { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .tile .k { font-size: 13px; color: var(--muted); }
+  .tile.hot .v { color: var(--bad); }
 
   /* details form */
-  .form { padding: 16px 20px 20px; display: grid; gap: 14px; }
-  .fsec { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
-  .fsec h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
-  .fgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px 14px; }
-  .fgrid label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); min-width: 0; }
+  .form { display: grid; gap: 16px; }
+  .fsec { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; }
+  .fsec h3 { margin: 0 0 12px; font-size: 19px; font-weight: 500; }
+  .fgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px 16px; }
+  .fgrid label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); min-width: 0; }
   .fgrid label.wide { grid-column: 1 / -1; }
-  .fgrid .help { font-size: 11px; }
-  .changed input, .changed select, .changed textarea { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-  .savebar { position: sticky; bottom: 0; background: var(--panel); border-top: 1px solid var(--line); padding: 10px 20px; display: flex; gap: 10px; align-items: center; }
+  .fgrid .help { font-size: 12px; }
+  .changed input, .changed select, .changed textarea { border-color: var(--link); box-shadow: 0 0 0 1px var(--link); }
+  .savebar { position: sticky; bottom: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 16px; display: flex; gap: 10px; align-items: center; }
+  .pencil { background: transparent; border: 0; color: var(--muted); cursor: pointer; padding: 0 2px; font-size: 14px; float: right; }
+  .pencil:hover { color: var(--ink); }
 
   /* timeline */
-  .tl { padding: 16px 20px; display: grid; gap: 10px; }
-  .tl .composer { display: grid; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
-  .ti { display: grid; grid-template-columns: 92px 1fr; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .tl { display: grid; gap: 10px; }
+  .tl .composer { display: grid; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .ti { display: grid; grid-template-columns: 92px 1fr; gap: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
   .ti .when { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-  .ti .what { min-width: 0; } .ti .what b { font-weight: 600; } .ti .body { white-space: pre-wrap; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+  .ti .what { min-width: 0; } .ti .what b { font-weight: 600; } .ti .body { white-space: pre-wrap; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
 
   /* photos */
-  .photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; padding: 16px 20px; }
+  .photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
   .photos figure { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
   .photos img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: var(--soft); }
-  .photos figcaption { font-size: 11px; color: var(--muted); padding: 4px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .photos figcaption { font-size: 12px; color: var(--muted); padding: 4px 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .embed { width: 100%; height: 70vh; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
 
-  /* today */
-  .today { padding: 18px 20px 30px; display: grid; gap: 16px; max-width: 1100px; }
-  .todayhead { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-  .todayhead h2 { margin: 0; font-size: 20px; }
-  .group h3 { margin: 0 0 8px; font-size: 14px; display: flex; gap: 8px; align-items: baseline; }
-  .group h3 .muted { font-weight: 400; font-size: 12px; }
-  .rem { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; }
+  /* dashboard */
+  .dash { padding: 24px 28px 34px; display: grid; gap: 16px; max-width: 1240px; }
+  .todayhead { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
+  .todayhead h2 { margin: 0; font-size: 32px; font-weight: 500; }
+  .dateline { color: var(--muted); margin-top: 4px; }
+  .group h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .group h3 .muted { font-weight: 400; font-size: 13px; }
+  .rem { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; border-top: 1px solid var(--line); padding: 10px 0; }
+  .group .rem:first-of-type { border-top: 0; }
   .rem .l { min-width: 0; } .rem .r { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-  .rem .ttl { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .dash { padding: 18px 20px 30px; display: grid; gap: 16px; }
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 2px; text-align: left; cursor: pointer; color: var(--ink); font: inherit; }
-  .tile:hover { border-color: var(--accent); }
-  .tile .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
-  .tile .k { font-size: 12px; color: var(--muted); }
-  .tile.hot .v { color: var(--bad); }
-  .cols { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .rem .ttl { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .needs { display: grid; gap: 18px; }
+  .alldone { color: var(--muted); padding: 8px 0; }
+  .cols { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 16px; align-items: start; }
   .side { display: grid; gap: 16px; }
-  .bars { display: grid; gap: 6px; }
-  .barrow { display: grid; grid-template-columns: 140px 1fr 40px; gap: 8px; align-items: center; font-size: 13px; cursor: pointer; border-radius: 6px; padding: 2px 4px; }
-  .barrow:hover { background: var(--soft); }
-  .barrow .track { height: 12px; display: flex; align-items: center; }
-  .barrow .fill { height: 12px; background: var(--accent); border-radius: 0 4px 4px 0; min-width: 3px; }
-  .barrow .c { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
-  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .tbl td { padding: 6px 4px; border-bottom: 1px dashed var(--line); vertical-align: top; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .tbl th { text-align: left; font-weight: 600; font-size: 13px; color: var(--ink); padding: 0 4px 8px; border-bottom: 1px solid var(--muted); }
+  .tbl th.num { text-align: right; }
+  .tbl td { padding: 8px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
   .tbl tr:last-child td { border-bottom: 0; }
-  .tbl .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--panel); font-size: 12px; padding: 4px 8px; border-radius: 6px; z-index: 60; }
-  @media (max-width: 1000px) { .cols { grid-template-columns: 1fr; } }
-  .alldone { background: var(--panel); border: 1px dashed var(--line); border-radius: 12px; padding: 24px; text-align: center; color: var(--muted); }
+  .tbl tr[data-stage] { cursor: pointer; } .tbl tr[data-stage]:hover td { background: var(--soft); }
+  .sbar { display: inline-block; height: 8px; background: var(--ink); opacity: .55; border-radius: 0 4px 4px 0; vertical-align: middle; min-width: 2px; }
+  .tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12px; padding: 4px 8px; border-radius: 6px; z-index: 60; }
+  .banner { background: var(--soft); border-left: 3px solid var(--ink); padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: 14px; }
 
-  /* mail */
+  /* gmail */
   .mail { display: grid; grid-template-columns: 200px 380px 1fr; height: 100%; min-height: 0; }
   .labels { border-right: 1px solid var(--line); background: var(--panel); padding: 12px 8px; overflow: auto; display: grid; gap: 2px; align-content: start; }
-  .labels button { text-align: left; border: 0; background: transparent; padding: 6px 10px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; }
-  .labels button.active { background: var(--pill); font-weight: 600; }
+  .labels button { text-align: left; border: 0; background: transparent; padding: 7px 10px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; color: var(--ink); }
+  .labels button.active { background: var(--panel-2); font-weight: 600; }
   .threads { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; background: var(--panel); }
   .th { padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; }
-  .th:hover { background: var(--soft); } .th.sel { background: var(--pill); }
+  .th:hover { background: var(--soft); } .th.sel { background: var(--panel-2); }
   .th.unread .who, .th.unread .subj { font-weight: 700; }
   .th .who, .th .subj, .th .snip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   .th .snip { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
-  .reader { overflow: auto; min-height: 0; padding: 16px 20px; display: grid; gap: 12px; align-content: start; }
-  .msg { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .reader { overflow: auto; min-height: 0; padding: 18px 24px; display: grid; gap: 12px; align-content: start; }
+  .msg { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
   .msg .mh { padding: 10px 14px; border-bottom: 1px solid var(--line); display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; }
   .msg iframe { width: 100%; border: 0; min-height: 120px; background: #fff; display: block; }
-  .msg pre { margin: 0; padding: 12px 14px; white-space: pre-wrap; font: 13px/1.5 var(--sans); }
+  .msg pre { margin: 0; padding: 12px 14px; white-space: pre-wrap; font: 14px/1.5 var(--sans); }
   .msg .atts { padding: 8px 14px; border-top: 1px solid var(--line); display: flex; gap: 8px; flex-wrap: wrap; }
   .jobchips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-  .composebox { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 8px; }
-  .composebox .hdr { display: grid; grid-template-columns: 50px 1fr; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
-  .banner { background: var(--soft); border-left: 3px solid var(--warn); padding: 8px 12px; border-radius: 6px; font-size: 13px; }
+  .composebox { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 8px; }
+  .composebox .hdr { display: grid; grid-template-columns: 56px 1fr; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
 
-  /* bottom: ask + console */
-  .askbar { padding: 10px 16px; background: var(--panel); border-top: 1px solid var(--line); display: grid; gap: 6px; }
+  /* bottom: ask Claude + console */
+  .askbar { padding: 10px 28px 12px; border-top: 1px solid var(--line); display: grid; gap: 6px; }
   .askbar form { display: flex; gap: 8px; }
-  .askbar textarea { min-height: 38px; max-height: 140px; resize: none; }
+  .askbar textarea { min-height: 40px; max-height: 140px; resize: none; }
   .console { max-height: 22vh; overflow: auto; font: 12px/1.5 var(--mono); white-space: pre-wrap; color: var(--muted); }
   .console:empty { display: none; }
-  .console .t-run { color: var(--accent); } .console .t-ok { color: var(--ok); } .console .t-err { color: var(--bad); }
+  .console .t-run { color: var(--link); } .console .t-ok { color: var(--ok); } .console .t-err { color: var(--bad); }
+  .attached { display: flex; gap: 6px; flex-wrap: wrap; }
 
-  dialog { border: 1px solid var(--line); border-radius: 14px; padding: 0; width: min(560px, calc(100vw - 32px)); background: var(--panel); color: var(--ink); }
-  dialog::backdrop { background: rgba(10, 15, 20, .45); }
-  dialog .in { padding: 18px 20px; display: grid; gap: 10px; }
-  dialog h4 { margin: 0; font-size: 16px; }
+  dialog { border: 1px solid var(--line); border-radius: 12px; padding: 0; width: min(560px, calc(100vw - 32px)); background: var(--panel); color: var(--ink); }
+  dialog::backdrop { background: rgba(5, 8, 15, .55); }
+  dialog .in { padding: 20px 22px; display: grid; gap: 10px; }
+  dialog h4 { margin: 0; font-size: 19px; font-weight: 500; }
   dialog ul { margin: 0; padding-left: 18px; }
-  dialog .foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--line); }
+  dialog .foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 22px; border-top: 1px solid var(--line); }
 
-  .player { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: 96px; width: min(380px, calc(100vw - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.18); z-index: 40; display: grid; gap: 8px; padding: 10px; }
+  .player { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: 96px; width: min(380px, calc(100vw - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 34px rgba(0,0,0,.35); z-index: 40; display: grid; gap: 8px; padding: 10px; }
   .player .bar { display: flex; gap: 6px; align-items: center; }
-  .player .bar b { flex: 1; font-size: 13px; }
+  .player .bar b { flex: 1; font-size: 14px; font-weight: 600; }
   .player iframe { width: 100%; height: 352px; border: 0; border-radius: 12px; }
   .player.min iframe, .player.min .more { display: none; }
   .player .more { display: grid; gap: 6px; }
-  .dropzone { position: fixed; inset: 0; background: rgba(47, 111, 167, .18); border: 3px dashed var(--accent); display: grid; place-items: center; z-index: 50; pointer-events: none; }
-  .dropzone div { background: var(--panel); padding: 16px 22px; border-radius: 12px; font-weight: 600; box-shadow: var(--shadow); }
-  .attached { display: flex; gap: 6px; flex-wrap: wrap; }
+  .dropzone { position: fixed; inset: 0; background: rgba(185, 210, 255, .14); border: 3px dashed var(--link); display: grid; place-items: center; z-index: 50; pointer-events: none; }
+  .dropzone div { background: var(--panel); padding: 16px 22px; border-radius: 12px; font-weight: 600; }
+
+  @media (prefers-reduced-motion: no-preference) { .tile, .btn, nav.tabs button { transition: background-color .15s, border-color .15s; } }
+  @media (max-width: 1100px) { .cols { grid-template-columns: 1fr; } }
   @media (max-width: 980px) {
     .mail { grid-template-columns: 1fr; grid-template-rows: auto 40vh 1fr; }
     .labels { display: flex; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); }
     .threads { border-right: 0; border-bottom: 1px solid var(--line); }
   }
   @media (max-width: 860px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+    .side-nav { flex-direction: row; align-items: center; padding: 8px 12px; gap: 8px; overflow-x: auto; }
+    .logo { padding: 0; grid-auto-flow: column; gap: 6px; } .logo svg { width: 26px; height: 24px; } .logo b { font-size: 15px; } .logo span { display: none; }
+    nav.tabs { grid-auto-flow: column; padding: 0; } .navlabel, .recent, .side-search, .side-foot { display: none; }
     .split { grid-template-columns: 1fr; grid-template-rows: 38vh 1fr; }
     aside { border-right: 0; border-bottom: 1px solid var(--line); }
-    .grid { grid-template-columns: 1fr; padding: 12px 16px; }
-    .jobhead, .actions, .subtabs, .form, .tl, .photos, .today { padding-left: 16px; padding-right: 16px; }
-    .split > .scroll { overflow: auto; }
+    .grid { grid-template-columns: 1fr; }
+    .page, .dash { padding-left: 16px; padding-right: 16px; }
+    .topbar, .askbar { padding-left: 16px; padding-right: 16px; }
+    .jobcard { padding: 16px 16px 0; }
   }
 </style>
 </head>
 <body>
 <div class="app">
-  <header class="top">
-    <h1>Forefront Hub</h1>
+  <nav class="side-nav" aria-label="Hub">
+    <a class="logo" href="#" id="logo"><svg viewBox="0 0 44 40" aria-hidden="true"><path d="M22 3 3 19h5v18h28V19h5L22 3zm0 5.5L33 18v15H11V18l11-9.5z" fill="currentColor"/></svg><b>HUB</b><span>BY FOREFRONT</span></a>
     <nav class="tabs" id="tabs">
       <button data-tab="today" class="active">Dashboard <span class="count" id="todaycount" hidden></span></button>
       <button data-tab="jobs">Jobs</button>
       <button data-tab="mail">Gmail <span class="count" id="mailcount" hidden></span></button>
     </nav>
+    <div class="navlabel" style="margin-top:auto">Where you were</div>
+    <div class="recent" id="recent" style="margin-top:0"></div>
+    <div class="side-search"><input type="search" id="globalq" placeholder="Search everything"></div>
+    <div class="side-foot"><button type="button" id="themebtn">Homebase colors</button></div>
+  </nav>
+  <div class="mainc">
+  <div class="topbar">
+    <div class="crumbs" id="crumbs">Dashboard</div>
     <div class="topright">
       <span id="chips" class="row"></span>
-      <span class="small" id="syncstate"></span>
+      <span class="small muted" id="syncstate"></span>
       <button class="topbtn" id="syncnow" type="button" title="Refresh every job folder from Homebase (also runs every 15 minutes)">Sync now</button>
       <button class="topbtn" id="playerbtn" type="button" title="Spotify and Audible">♪ Player</button>
     </div>
-  </header>
+  </div>
 
   <!-- TODAY -->
   <section class="view" id="v-today"><div class="scroll"><div class="dash" id="today"><div class="empty">Loading…</div></div></div></section>
@@ -272,6 +327,7 @@
     <input type="file" id="filepick" multiple hidden>
     <div class="console" id="console"></div>
   </footer>
+  </div>
 </div>
 
 <dialog id="approve"><div class="in"><h4 id="ap-title"></h4><ul id="ap-details"></ul><textarea id="ap-text" rows="3" hidden></textarea></div>
@@ -355,10 +411,21 @@ function showTab(t) {
   store.set("tab", t);
   $$("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === t));
   for (const v of ["today", "jobs", "mail"]) $("#v-" + v).hidden = v !== t;
+  setCrumbs(t === "jobs" && view ? `Jobs / <b>#${view.homebase.jobNumber}</b>` : `<b>${{ today: "Dashboard", jobs: "Jobs", mail: "Gmail" }[t]}</b>`);
   if (t === "today") loadToday();
   if (t === "mail" && !mailLoaded) loadMail();
 }
 $$("#tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+
+function setCrumbs(html) { $("#crumbs").innerHTML = html; }
+function rememberJob(n, name) {
+  const r = store.get("recent", []).filter((x) => x.n !== n); r.unshift({ n, name }); store.set("recent", r.slice(0, 4)); renderRecent();
+}
+function renderRecent() {
+  $("#recent").innerHTML = store.get("recent", []).map((x) => `<button type="button" data-do="open" data-n="${x.n}" title="#${x.n} ${esc(x.name)}">⌂ #${x.n} ${esc(x.name)}</button>`).join("");
+}
+$("#globalq").addEventListener("keydown", (e) => { if (e.key !== "Enter") return; const q = $("#globalq").value.trim(); if (!q) return; if (/^#?\d{4}$/.test(q)) { showTab("jobs"); openJob(Number(q.replace("#", ""))); } else { showTab("jobs"); $("#q").value = q; renderList(); } $("#globalq").value = ""; });
+$("#logo").addEventListener("click", (e) => { e.preventDefault(); showTab("today"); });
 
 // ============================================================= status
 async function loadStatus() {
@@ -406,33 +473,36 @@ async function loadToday() {
   for (const r of d.reminders) (by[r.kind] ??= []).push(r);
   const date = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
   const max = Math.max(1, ...d.byStage.map((x) => x.count));
-  const tile = (k, v, label, hot) => `<button class="tile ${hot && v ? "hot" : ""}" data-filter="${k}" type="button"><span class="v">${v}</span><span class="k">${label}</span></button>`;
+  const tile = (k, v, label, hot) => `<button class="tile ${hot && v ? "hot" : ""} ${k && dashFilter === k ? "on" : ""}" data-filter="${k}" type="button"><span class="v">${v}</span><span class="k">${label}</span></button>`;
   const groups = d.groups.filter((g) => by[g.kind]?.length && (!dashFilter || g.kind === dashFilter));
+  const longDate = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   $("#today").innerHTML = `
-    <div class="todayhead"><h2>${esc(date)}</h2><span class="muted">${d.folders} jobs synced${d.lastSync ? ` · ${fmtWhen(d.lastSync)}` : ""}</span><span style="margin-left:auto"></span>
+    <div class="todayhead"><div style="flex:1;min-width:240px"><h2>Dashboard</h2><div class="dateline">${esc(longDate)} · ${t.open} open jobs${d.lastSync ? ` · synced ${fmtWhen(d.lastSync)}` : ""}</div></div>
       <button class="btn primary" id="plan" ${status.agent ? "" : "disabled title='Claude is off on this machine'"}>Plan my day with Claude</button></div>
-    <div class="tiles">
+    ${!d.autoFiling ? `<div class="banner">Incoming job emails file themselves to Homebase once Gmail is fully connected${status.gmail === "google" ? ": double-click <b>Connect Gmail</b> in the hub folder once more and click Allow" : ""}.</div>` : ""}
+    <div class="strip">
       ${tile("reply", t.waiting, "waiting on your reply", true)}
       ${tile("estimate", t.estimate, "need an estimate")}
       ${tile("followup", t.followup, "proposals to follow up")}
-      ${tile("proposals", t.proposalsOut, `proposals out · ${usd(t.proposalsAmount).replace(/\.\d\d$/, "")}`)}
+      ${tile("proposals", usd(t.proposalsAmount).replace(/\.\d\d$/, ""), `${t.proposalsOut} proposals out`)}
       ${tile("stale", t.stale, "not touched this week")}
       ${tile("", t.open, "open jobs")}
     </div>
-    ${!d.autoFiling ? `<div class="banner">Incoming job emails file themselves to Homebase once Gmail is fully connected${status.gmail === "google" ? ": double-click <b>Connect Gmail</b> in the hub folder once more and click Allow" : ""}.</div>` : ""}
     <div class="cols">
-      <div class="side">
+      <div class="card"><h3>Needs you ${dashFilter ? `<button class="btn small" data-filter="">Show everything</button>` : ""}</h3>
+        <div class="needs">
         ${d.unfiled?.length && (!dashFilter || dashFilter === "reply") ? `<div class="group"><h3>Emails to file <span class="muted">${d.unfiled.length} · couldn't tell which job; pick one</span></h3>
           ${d.unfiled.map((u) => `<div class="rem"><div class="l"><div class="ttl">${esc(u.subject || "(no subject)")}</div><div class="small muted">from ${esc(u.from)} · ${fmtDate(u.at)}</div></div><div class="r">${u.candidates.map((c) => `<button class="btn small primary" data-do="fileto" data-thread="${esc(u.threadId)}" data-msg="${esc(u.messageId)}" data-n="${c.jobNumber}">#${c.jobNumber} ${esc(c.name)}</button>`).join("")}<button class="btn small" data-do="thread" data-thread="${esc(u.threadId)}">Open</button><button class="btn small" data-do="notjob" data-msg="${esc(u.messageId)}">Not a job email</button></div></div>`).join("")}</div>` : ""}
-        ${dashFilter ? `<div class="row"><span class="muted">Showing: ${esc(d.groups.find((g) => g.kind === dashFilter)?.label ?? dashFilter)}</span><button class="btn small" data-filter="">Show everything</button></div>` : ""}
-        ${groups.map((g) => `<div class="group"><h3>${esc(g.label)} <span class="muted">${by[g.kind].length} · ${esc(g.hint)}</span></h3>${by[g.kind].map(remRow).join("")}</div>`).join("") || `<div class="alldone">${d.lastSync || d.folders ? "You're caught up. Nothing is waiting on you." : "The first sync is still running. This fills in when it finishes (about a minute)."}</div>`}
-      </div>
+        ${groups.map((g) => `<div class="group"><h3>${esc(g.label)} <span class="muted">${by[g.kind].length} · ${esc(g.hint)}</span></h3>${by[g.kind].map(remRow).join("")}</div>`).join("") || `<div class="alldone">${d.lastSync || d.folders ? "Nothing is waiting on you." : "The first sync is still running. This fills in when it finishes (about a minute)."}</div>`}
+        </div></div>
       <div class="side">
-        <div class="card"><h3>Pipeline by stage</h3>
-          <div class="bars">${d.byStage.map((x) => `<div class="barrow" data-stage="${esc(x.stage)}" data-tip="${esc(x.stage)}: ${x.count} job${x.count === 1 ? "" : "s"}${x.amount ? ` · ${usd(x.amount)} in proposals` : ""}"><span>${esc(x.stage)}</span><span class="track"><span class="fill" style="width:${(x.count / max) * 100}%"></span></span><span class="c">${x.count}</span></div>`).join("") || `<p class="muted">No jobs yet.</p>`}</div></div>
-        <div class="card"><h3>Proposals out <span class="small muted" style="text-transform:none;letter-spacing:0">largest first</span></h3>
+        <div class="card"><h3><span><span class="muted small" style="font-variant-numeric:tabular-nums">01</span> Stages</span></h3>
+          <table class="tbl"><thead><tr><th>Stage</th><th class="num">Proposals</th><th class="num">Jobs</th></tr></thead><tbody>
+          ${d.byStage.map((x) => `<tr data-stage="${esc(x.stage)}" data-tip="${esc(x.stage)}: ${x.count} job${x.count === 1 ? "" : "s"}${x.amount ? ` · ${usd(x.amount)}` : ""}"><td>${esc(x.stage)}<div><span class="sbar" style="width:${Math.round((x.count / max) * 100)}%"></span></div></td><td class="num">${x.amount ? usd(x.amount).replace(/\.\d\d$/, "") : ""}</td><td class="num"><b>${x.count}</b></td></tr>`).join("")}
+          </tbody></table></div>
+        <div class="card"><h3><span><span class="muted small">02</span> Proposals out</span><span class="small muted">largest first</span></h3>
           ${d.proposals.length ? `<table class="tbl"><tbody>${d.proposals.map((x) => `<tr><td><a href="#" data-do="open" data-n="${x.jobNumber}">#${x.jobNumber} ${esc(x.name)}</a>${x.waiting ? ` <span class="tag in">reply</span>` : ""}<div class="small muted">${x.lastTouch ? esc(x.lastTouch) : "no activity"}</div></td><td class="num">${usd(x.amount) || "—"}<div class="small muted">${daysSince(x.lastTouchAt) ?? "?"}d quiet</div></td></tr>`).join("")}</tbody></table>` : `<p class="muted">None out.</p>`}</div>
-        <div class="card"><h3>Recent activity</h3>
+        <div class="card"><h3><span><span class="muted small">03</span> Recent activity</span></h3>
           ${d.activity.length ? `<ul class="items">${d.activity.map((a) => `<li><a href="#" data-do="open" data-n="${a.jobNumber}">#${a.jobNumber} ${esc(a.name)}</a> <span class="small muted">${fmtWhen(a.at)}</span><div class="small">${esc(a.what)}</div></li>`).join("")}</ul>` : `<p class="muted">Nothing yet. Activity from the hub shows here.</p>`}</div>
       </div>
     </div>`;
@@ -503,29 +573,34 @@ function renderJob() {
   const d = daysSince(h.stageSince);
   const drafts = l?.sendoff?.drafts || [];
   const ccId = l?.companycamProjectId;
+  rememberJob(h.jobNumber, h.name);
+  setCrumbs(`Jobs / <b>#${h.jobNumber}</b>`);
   $("#job").innerHTML = `
-    <div class="jobhead">
-      <div style="flex:1;min-width:240px"><h2>#${h.jobNumber} ${esc(h.name)}</h2><div class="muted">${esc(h.address)}</div></div>
-      <div style="text-align:right"><span class="stage" style="font-size:13px;padding:3px 10px">${esc(h.stage)}</span><div class="small muted">${d === null ? "" : d + " days in stage"}${l?.pulse?.lastTouchAt ? ` · touched ${fmtDate(l.pulse.lastTouchAt)}` : ""}</div></div>
+    <div class="jobcard">
+      <div class="jobhead">
+        <h2>${esc(view.projectName || h.name)}</h2>
+        <div class="stagepill"><span>Stage</span>${esc(h.stage)}</div>
+      </div>
+      <div class="jobmeta">#${h.jobNumber} · Reconstruction${view.fields?.propertyType ? ` · ${esc(view.fields.propertyType)}` : ""}${view.customer?.name ? ` · ${esc(view.customer.name)}` : ""}${d === null ? "" : ` · ${d} days in stage`}${l?.pulse?.lastTouchAt ? ` · touched ${fmtDate(l.pulse.lastTouchAt)}` : ""}</div>
+      <div class="actions">
+        <button class="btn primary" data-act="sendoff">Draft send-off…</button>
+        <button class="btn" data-act="sync" ${drafts.length ? "" : "disabled"} title="After you send the drafts: log the proposal in Homebase">Check sent &amp; log</button>
+        <button class="btn" data-act="compose">Email…</button>
+        <button class="btn" data-act="log">Log call…</button>
+        <button class="btn" data-act="addfiles">Add files</button>
+        <button class="btn" data-act="pull">Refresh</button>
+        ${status.gmail === "mock" && drafts.some((x) => !x.sentAt) ? `<button class="btn" data-act="mocksend">Pretend I sent them</button>` : ""}
+        <a class="btn" href="${esc(h.url)}" target="_blank" rel="noopener">Homebase ↗</a>
+        ${ccId ? `<a class="btn" href="https://app.companycam.com/projects/${esc(ccId)}" target="_blank" rel="noopener">CompanyCam ↗</a>` : ""}
+      </div>
+      <div class="subtabs" id="subtabs">${[["overview", "Dashboard"], ["details", "Details"], ["timeline", "Timeline"], ["photos", "Photos"], ["files", `Documents ${(view.hbFiles?.docs?.length ?? 0) + (view.files?.estimate?.length ?? 0)}`]].map(([k, v]) => `<button data-sub="${k}" class="${jobTab === k ? "active" : ""}">${v}</button>`).join("")}</div>
     </div>
-    <div class="actions">
-      <button class="btn primary" data-act="sendoff">Draft send-off…</button>
-      <button class="btn" data-act="sync" ${drafts.length ? "" : "disabled"} title="After you send the drafts: log the proposal in Homebase">Check sent &amp; log</button>
-      <button class="btn" data-act="compose">Email…</button>
-      <button class="btn" data-act="log">Log call…</button>
-      <button class="btn" data-act="addfiles">Add files</button>
-      <button class="btn" data-act="pull">Refresh</button>
-      ${status.gmail === "mock" && drafts.some((x) => !x.sentAt) ? `<button class="btn" data-act="mocksend">Pretend I sent them</button>` : ""}
-      <a class="btn" href="${esc(h.url)}" target="_blank" rel="noopener">Homebase ↗</a>
-      ${ccId ? `<a class="btn" href="https://app.companycam.com/projects/${esc(ccId)}" target="_blank" rel="noopener">CompanyCam ↗</a>` : ""}
-    </div>
-    <div class="subtabs" id="subtabs">${[["overview", "Overview"], ["details", "Details"], ["timeline", "Timeline"], ["photos", "Photos"], ["files", "Files"]].map(([k, v]) => `<button data-sub="${k}" class="${jobTab === k ? "active" : ""}">${v}</button>`).join("")}</div>
     <div id="jobbody"></div>`;
   renderJobTab();
 }
 $("#job").addEventListener("click", async (e) => {
   const sub = e.target.closest("[data-sub]");
-  if (sub) { jobTab = sub.dataset.sub; store.set("jobtab", jobTab); $$("#subtabs button").forEach((b) => b.classList.toggle("active", b === sub)); renderJobTab(); return; }
+  if (sub) { e.preventDefault(); jobTab = sub.dataset.sub; store.set("jobtab", jobTab); $$("#subtabs button").forEach((b) => b.classList.toggle("active", b.dataset.sub === jobTab)); renderJobTab(); return; }
   const b = e.target.closest("[data-act]"); if (!b) return;
   const n = view.homebase.jobNumber;
   try {
@@ -561,23 +636,37 @@ function renderOverview(el) {
   const adj = adjusters.filter(Boolean);
   const drafts = l?.sendoff?.drafts || [];
   const waiting = l?.pulse?.waiting;
-  el.innerHTML = `<div class="grid">
-    ${waiting ? `<div class="card" style="border-color:var(--bad)"><h3>Waiting on you</h3><div><b>${esc(waiting.from)}</b> · ${fmtDate(waiting.at)}</div><div>${esc(waiting.subject)}</div><div class="row" style="margin-top:8px">${waiting.threadId ? `<button class="btn small primary" data-do="thread" data-thread="${esc(waiting.threadId)}">Open &amp; reply</button>` : ""}<button class="btn small" data-do="claude" data-n="${h.jobNumber}" data-p="Read the latest email on job #${h.jobNumber} and draft my reply in Gmail (draft only).">Draft reply with Claude</button></div></div>` : ""}
-    <div class="card"><h3>Customer</h3><dl>
-      <dt>Name</dt><dd>${esc(c?.name || "—")}</dd><dt>Email</dt><dd>${esc(c?.email || "—")}</dd><dt>Phone</dt><dd>${esc(c?.phone || "—")}</dd>
-      <dt>Preferred</dt><dd>${esc(f.preferredContactMethod || "—")}</dd></dl></div>
-    <div class="card"><h3>Insurance</h3><dl>
-      <dt>Carrier</dt><dd>${esc(carrier?.name || "—")}</dd><dt>Claim #</dt><dd>${esc(f.claimNumber || "—")}</dd>
-      ${adj.length ? adj.map((a, i) => `<dt>Adjuster ${i + 1}</dt><dd>${esc(a.name)}${a.email ? `<br><span class="small">${esc(a.email)}</span>` : ""}${a.phone ? `<br><span class="small muted">${esc(a.phone)}</span>` : ""}</dd>`).join("") : `<dt>Adjuster</dt><dd><button class="btn small" data-act="adjuster" data-slot="1">Add adjuster</button></dd>`}
-      <dt>Funding</dt><dd>${esc(f.fundingType || "—")}${f.claimStatus ? ` · ${esc(f.claimStatus)}` : ""}</dd><dt>Deductible</dt><dd>${usd(f.deductible) || "—"}</dd></dl></div>
-    <div class="card"><h3>Money</h3><dl>
-      <dt>Proposal</dt><dd>${usd(f.proposalAmount) || "—"} ${h.proposalSubmittedAt ? `<span class="small muted">on ${esc(h.proposalSubmittedAt)}</span>` : ""}</dd>
-      <dt>Contract</dt><dd>${usd(h.contractAmount) || "—"}</dd><dt>Est. costs</dt><dd>${usd(f.estimatedCosts) || "—"}</dd><dt>Margin</dt><dd>${f.desiredMargin ? esc(f.desiredMargin) + "%" : "—"}</dd>
-      <dt>Estimator / PM</dt><dd>${esc(h.people?.estimator || "—")} / ${esc(h.people?.projectManager || "—")}</dd></dl></div>
-    <div class="card"><h3>Send-off drafts</h3>
-      ${drafts.length ? `<ul class="items">${drafts.map((x) => `<li><span class="tag ${x.sentAt ? "sent" : "draft"}">${x.sentAt ? "sent " + fmtDate(x.sentAt) : "draft"}</span> <b>${esc(x.kind)}</b> → ${esc(x.to.join(", "))}<div class="small">${esc(x.subject)}</div></li>`).join("")}</ul>${l?.sendoff?.homebaseLoggedAt ? `<p class="small" style="color:var(--ok)">Logged in Homebase ${fmtDate(l.sendoff.homebaseLoggedAt)}</p>` : ""}` : `<p class="muted">None yet.</p>`}</div>
-    <div class="card"><h3>Notes on the job</h3>${f.customerNotes || f.pmNotes ? `${f.customerNotes ? `<p style="margin:0 0 6px;white-space:pre-wrap">${esc(f.customerNotes)}</p>` : ""}${f.pmNotes ? `<p class="small muted" style="margin:0;white-space:pre-wrap">PM: ${esc(f.pmNotes)}</p>` : ""}` : `<p class="muted">None. Add them under Details.</p>`}</div>
-  </div>`;
+  const pen = `<button class="pencil" data-sub="details" title="Edit under Details">✎</button>`;
+  const row = (k, v) => `<dt>${k}</dt><dd>${v || `<span class="muted">—</span>`}</dd>`;
+  el.innerHTML = `
+    <div class="strip">
+      <div class="tile" style="cursor:default"><span class="k">Proposal</span><span class="v">${usd(f.proposalAmount) || "—"}</span><span class="k">${h.proposalSubmittedAt ? "sent " + esc(h.proposalSubmittedAt) : "&nbsp;"}</span></div>
+      <div class="tile" style="cursor:default"><span class="k">Contract amount</span><span class="v">${usd(h.contractAmount) || "—"}</span><span class="k">&nbsp;</span></div>
+      <div class="tile" style="cursor:default"><span class="k">Estimated costs</span><span class="v">${usd(f.estimatedCosts) || "—"}</span><span class="k">${f.desiredMargin ? `margin ${esc(f.desiredMargin)}%` : "&nbsp;"}</span></div>
+      <div class="tile" style="cursor:default"><span class="k">Days in stage</span><span class="v">${daysSince(h.stageSince) ?? "—"}</span><span class="k">${esc(h.stage)}</span></div>
+      <div class="tile" style="cursor:default"><span class="k">Last touched</span><span class="v">${l?.pulse?.lastTouchAt ? daysSince(l.pulse.lastTouchAt) + "d" : "—"}</span><span class="k">${esc((l?.pulse?.lastTouch || "").slice(0, 34))}</span></div>
+    </div>
+    ${waiting ? `<div class="banner" style="border-left-color:var(--bad)"><b>${esc(waiting.from)}</b> is waiting on you · ${esc(waiting.subject)} · ${fmtDate(waiting.at)} <span class="row" style="display:inline-flex;margin-left:8px">${waiting.threadId ? `<button class="btn small primary" data-do="thread" data-thread="${esc(waiting.threadId)}">Open &amp; reply</button>` : ""}<button class="btn small" data-do="claude" data-n="${h.jobNumber}" data-p="Read the latest email on job #${h.jobNumber} and draft my reply in Gmail (draft only).">Draft reply with Claude</button></span></div>` : ""}
+    <div class="grid" style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)">
+      <div class="side">
+        <div class="card"><h3>Customer ${pen}</h3>
+          ${f.customerNotes ? `<div class="banner" style="margin-bottom:10px;white-space:pre-wrap">${esc(f.customerNotes)}</div>` : ""}
+          <dl>${row("Project name", esc(view.projectName || ""))}${row("Name", esc(c?.name))}${row("Phone", esc(c?.phone))}${row("Email", c?.email ? `${esc(c.email)} <button class="pencil" style="float:none" data-act="compose" title="Email">✉</button>` : "")}${row("Loss address", esc(h.address))}${row("Preferred", esc(f.preferredContactMethod))}</dl></div>
+        <div class="card"><h3>Project ${pen}</h3>
+          <dl>${row("Loss type", esc(f.detail))}${row("Carrier", esc(carrier?.name))}${row("Claim number", esc(f.claimNumber))}
+            ${adj.length ? adj.map((a, i) => row(`Adjuster ${adj.length > 1 ? i + 1 : ""}`, `${esc(a.name)}${a.email ? `<br><span class="small">${esc(a.email)}</span>` : ""}${a.phone ? `<br><span class="small muted">${esc(a.phone)}</span>` : ""}`)).join("") : row("Adjuster", `<button class="btn small" data-act="adjuster" data-slot="1">Add adjuster</button>`)}
+            ${row("Funding", esc([f.fundingType, f.claimStatus].filter(Boolean).join(" · ")))}${row("Deductible", usd(f.deductible))}</dl></div>
+        <div class="card"><h3>Send-off</h3>
+          ${drafts.length ? `<ul class="items">${drafts.map((x) => `<li><span class="tag ${x.sentAt ? "sent" : "draft"}">${x.sentAt ? "sent " + fmtDate(x.sentAt) : "draft"}</span> <b>${esc(x.kind)}</b> → ${esc(x.to.join(", "))}<div class="small muted">${esc(x.subject)}</div></li>`).join("")}</ul>${l?.sendoff?.homebaseLoggedAt ? `<p class="small" style="color:var(--ok);margin:10px 0 0">Logged in Homebase ${fmtDate(l.sendoff.homebaseLoggedAt)}</p>` : ""}` : `<p class="muted" style="margin:0">No send-off drafted yet.</p>`}</div>
+      </div>
+      <div class="side">
+        <div class="card"><h3>Team</h3><dl>${row("Estimator", esc(h.people?.estimator))}${row("Project manager", esc(h.people?.projectManager))}${row("Owner", esc(h.people?.owner))}</dl></div>
+        <div class="card"><h3>Site access ${pen}</h3>
+          ${f.lockboxCode || f.gateCode || f.parking || f.alarm || f.pets ? `<dl>${f.lockboxCode ? row("Lockbox", esc(f.lockboxCode)) : ""}${f.gateCode ? row("Gate code", esc(f.gateCode)) : ""}${f.alarm ? row("Alarm", esc(f.alarm)) : ""}${f.pets ? row("Pets", esc(f.pets)) : ""}${f.parking ? row("Parking", esc(f.parking)) : ""}</dl>` : `<p class="muted" style="margin:0 0 8px">No lockbox, gate code or parking noted.</p>`}
+          <dl>${row("Photos", l?.companycamProjectId ? `<a href="#" data-sub="photos">View photos</a> · <a href="https://app.companycam.com/projects/${esc(l.companycamProjectId)}" target="_blank" rel="noopener">Open in CompanyCam</a>` : "")}</dl></div>
+        ${f.pmNotes ? `<div class="card"><h3>PM notes ${pen}</h3><div style="white-space:pre-wrap">${esc(f.pmNotes)}</div></div>` : ""}
+      </div>
+    </div>`;
 }
 
 // ---- details (edit like Homebase)
@@ -886,6 +975,17 @@ $("#filedlg").addEventListener("close", async () => {
   $("#attached").innerHTML = recentFiles.slice(-6).map((x) => `<span class="tag">📎 #${x.job} ${esc(x.name)}</span>`).join("");
 });
 
+// ============================================================= theme: dark (default) / flipped / Homebase
+const THEMES = [["dark", "Dark"], ["flipped", "Light sidebar"], ["homebase", "Homebase colors"]];
+function applyTheme(t) {
+  if (t === "dark") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", t);
+  const next = THEMES[(THEMES.findIndex(([k]) => k === t) + 1) % THEMES.length];
+  $("#themebtn").textContent = `Theme: ${THEMES.find(([k]) => k === t)[1]} (switch to ${next[1].toLowerCase()})`;
+  $("#themebtn").dataset.next = next[0];
+}
+$("#themebtn").addEventListener("click", () => { const t = $("#themebtn").dataset.next; store.set("theme", t); applyTheme(t); });
+applyTheme(store.get("theme", "dark"));
+
 // ============================================================= player: Spotify (embedded) + Audible (its own window)
 function spotifyEmbed(link) {
   const m = String(link).match(/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(playlist|album|track|episode|show|artist)\/([A-Za-z0-9]+)/) || String(link).match(/^spotify:(playlist|album|track|episode|show|artist):([A-Za-z0-9]+)$/);
@@ -970,6 +1070,7 @@ es.onmessage = (m) => {
 // Refresh the Today list and the inbox every few minutes while open.
 setInterval(() => { loadSyncState(); if (store.get("tab", "today") === "today") loadToday(); if (mailLoaded && !$("#composedlg").open) loadThreads(); }, 120000);
 
+renderRecent();
 loadStatus().then(async () => {
   showTab(store.get("tab", "today"));
   await loadJobs();

@@ -128,6 +128,7 @@ async function jobView(n: number) {
     homebase: { ...hb, text: undefined },
     local,
     folder: hub.jobs.folder(n),
+    projectName: raw?.name ?? "",
     fields: raw ? fieldValues(raw) : {},
     address: raw?.address ?? null,
     customer: primary ? { id: primary.id, name: primary.name, email: primary.email, phone: primary.phone ?? primary.mobile } : null,
