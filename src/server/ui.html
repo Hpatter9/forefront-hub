@@ -1621,12 +1621,12 @@ async function renderCal() {
   const draw = () => (calView === "month" ? renderMonth(start) : renderWeek(start, calView === "day" ? 1 : 7));
   draw();
   // Drive times arrive a moment later (each new address is looked up once, then kept).
-  if (calEvents.some((e) => !e.allDay && e.location)) {
+  if (calEvents.some((e) => !e.allDay)) {
     const key = `${start.toISOString()}|${end.toISOString()}`; calLegsKey = key;
-    api(`/api/cal/travel?${new URLSearchParams({ start: start.toISOString(), end: end.toISOString() })}`).then((t) => { if (calLegsKey !== key) return; calLegs = t.legs || {}; travelKind = t.kind; const sc = $("#cal-body").scrollTop; draw(); $("#cal-body").scrollTop = sc; }).catch(() => {});
+    api(`/api/cal/travel?${new URLSearchParams({ start: start.toISOString(), end: end.toISOString() })}`).then((t) => { if (calLegsKey !== key) return; calLegs = t.legs || {}; calWhy = t.why || {}; travelKind = t.kind; const sc = $("#cal-body").scrollTop; draw(); $("#cal-body").scrollTop = sc; }).catch(() => {});
   }
 }
-let calLegs = {}, calLegsKey = "", travelKind = "";
+let calLegs = {}, calWhy = {}, calLegsKey = "", travelKind = "";
 const legLabel = (g) => `${g.minutes} min drive`;
 function legLine(g) {
   if (!g) return "";
@@ -1703,7 +1703,17 @@ function openEvent(o) {
   $("#ev-del").hidden = !editing;
   $("#ev-meta").innerHTML = editing ? [o.meet ? `<a href="${esc(o.meet)}" target="_blank" rel="noopener">Join Meet</a>` : "", o.link ? `<a href="${esc(o.link)}" target="_blank" rel="noopener">Open in Google Calendar</a>` : "", o.jobNumber ? `<a href="#" data-do="open" data-n="${o.jobNumber}">Open job #${o.jobNumber}</a>` : ""].filter(Boolean).join(" · ") : "";
   const g = o.id ? calLegs[o.id] : null;
-  $("#ev-travel").hidden = !g; $("#ev-travel").innerHTML = legLine(g);
+  const loc = (o.location || "").trim();
+  $("#ev-travel").hidden = !g && !loc;
+  $("#ev-travel").innerHTML = g ? legLine(g) : loc ? `${o.id && calWhy[o.id] ? `<span>${esc(calWhy[o.id])}</span> ` : ""}<button type="button" class="linkbtn" id="ev-howlong">How long to get there?</button>` : "";
+  $("#ev-howlong")?.addEventListener("click", async (ev) => {
+    ev.preventDefault(); const b = ev.currentTarget; b.textContent = "Working it out…"; b.disabled = true;
+    try {
+      const d = await api(`/api/travel/drive?${new URLSearchParams({ to: $("#ev-loc").value.trim() || loc, ...(o.start ? { at: new Date(new Date(o.start).getTime() - 40 * 60000).toISOString() } : {}) })}`);
+      const leave = o.start ? new Date(new Date(o.start).getTime() - (d.minutes + 5) * 60000).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "";
+      $("#ev-travel").innerHTML = `About <b>${d.minutes} min</b> (${d.miles} mi) from the office${d.rush ? " at rush hour" : ""}${leave ? ` · leave by <b>${leave}</b>` : ""} · <a href="${esc(d.mapsUrl)}" target="_blank" rel="noopener">Directions ↗</a>`;
+    } catch (e) { $("#ev-travel").innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`; }
+  });
   $("#evdlg").showModal();
 }
 $("#ev-job").addEventListener("change", () => {

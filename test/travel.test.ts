@@ -78,3 +78,34 @@ describe("travel connectors", () => {
     }
   }, 10_000);
 });
+
+describe("finding the job and the address", () => {
+  it("recognizes a job visit by number, by address, or by the job's name", async () => {
+    const { jobForEvent } = await import("../src/workflows/travel.js");
+    const jobs: any[] = [
+      { jobNumber: 3226, name: "Augustine", address: "1071 Acapulco Ct, Colorado Springs, CO 80910" },
+      { jobNumber: 3184, name: "Wegener", address: "123 Main St, Denver, CO 80211" },
+    ];
+    const base = { id: "x", calendarId: "primary", start: "", end: "", allDay: false };
+    expect(jobForEvent({ ...base, title: "Walk", jobNumber: 3184 }, jobs)?.jobNumber).toBe(3184);
+    expect(jobForEvent({ ...base, title: "Walk", location: "1071 Acapulco Court, Colorado Springs" }, jobs)?.jobNumber).toBe(3226);
+    expect(jobForEvent({ ...base, title: "Augustine final walkthrough" }, jobs)?.jobNumber).toBe(3226);
+    expect(jobForEvent({ ...base, title: "Lunch with Sam" }, jobs)).toBeUndefined();
+  });
+
+  it("asks for an address without the suite when the full one isn't found", async () => {
+    const { addressVariants } = await import("../src/connectors/travel/index.js");
+    const v = addressVariants("169 Inverness Dr W Ste 120, Englewood, CO 80112");
+    expect(v[1]).toBe("169 Inverness Dr W, Englewood, CO 80112");
+    expect(v.at(-1)).toBe("Englewood, CO 80112");
+  });
+
+  it("says why an event got no drive time", async () => {
+    const { hub } = testHub();
+    hub.jobs.upsert(3226, { name: "Augustine", address: "1071 Acapulco Ct, Colorado Springs, CO 80910" });
+    const why: Record<string, string> = {};
+    await travelFor(hub, [ev("lunch", "2026-11-09T12:00:00-07:00", "2026-11-09T13:00:00-07:00", "4500 Lunch Pl, Denver, CO"), { ...ev("team", "2026-11-09T14:00:00-07:00", "2026-11-09T15:00:00-07:00"), calendarId: "team", jobNumber: 3226 }], { calendars: new Set(["primary"]), why });
+    expect(why.lunch).toMatch(/which job/);
+    expect(why.team).toMatch(/shared calendar/);
+  });
+});

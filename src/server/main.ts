@@ -468,10 +468,21 @@ const server = http.createServer(async (req, res) => {
     }
     // ---- calendar
     if (p === "/api/cal/calendars") return send(res, 200, await hub.calendar.calendars());
+    if (p === "/api/travel/drive") {
+      // A drive time on request, for any address: from the office unless another start is given.
+      const to = q("to"), from = q("from") || cfg.travel.start;
+      if (!to) return send(res, 400, { error: "No address to drive to." });
+      const d = await hub.travel.drive(from, to, q("at") ? new Date(q("at")) : undefined).catch((e: Error) => ({ error: /fetch failed|ENOTFOUND|ECONN/i.test(e.message) ? "The map service didn't answer (no internet?)." : e.message }));
+      if (!d) return send(res, 404, { error: `The map couldn't find "${to}". Check the address.` });
+      if ("error" in d) return send(res, 502, d);
+      return send(res, 200, { ...d, from, to, mapsUrl: `https://www.google.com/maps/dir/?${new URLSearchParams({ api: "1", origin: from, destination: to, travelmode: "driving" })}` });
+    }
     if (p === "/api/cal/travel") {
       const { travelFor } = await import("../workflows/travel.js");
       const ev = await hub.calendar.events({ start: q("start"), end: q("end") });
-      return send(res, 200, { kind: hub.travel.kind, start: cfg.travel.start, legs: await travelFor(hub, ev, { calendars: await myCalendars() }) });
+      const why: Record<string, string> = {};
+      const legs = await travelFor(hub, ev, { calendars: await myCalendars(), why });
+      return send(res, 200, { kind: hub.travel.kind, start: cfg.travel.start, legs, why });
     }
     if (p === "/api/cal/events" && req.method === "GET") {
       const ids = q("cals") ? q("cals").split(",") : undefined;

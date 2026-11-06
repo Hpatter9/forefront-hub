@@ -34,7 +34,7 @@ export function isRushHour(at: Date): boolean {
 }
 const padFor = (at?: Date) => (at && isRushHour(at) ? RUSH_PAD : TRAFFIC_PAD);
 
-type Cache = { geo: Record<string, [number, number] | null>; route: Record<string, { s: number; m: number; at: string }> };
+type Cache = { geo: Record<string, [number, number] | null>; miss?: Record<string, string>; route: Record<string, { s: number; m: number; at: string }> };
 
 abstract class Cached {
   private file: string;
@@ -54,6 +54,28 @@ abstract class Cached {
 }
 
 const norm = (a: string) => a.replace(/\s+/g, " ").trim().toLowerCase();
+
+/**
+ * Ways to ask for one address, most exact first. The free look-up often misses an address with a suite or unit
+ * ("169 Inverness Dr W Ste 120") or a typo in the city, so it then tries without the unit, the street with just
+ * the ZIP, and finally the city/ZIP alone (close enough for a drive time).
+ */
+export function addressVariants(address: string): string[] {
+  const clean = address
+    .replace(/\s+/g, " ")
+    .replace(/[,\s]+(?:ste|suite|unit|apt|apartment|bldg|building|fl|floor|rm|room|spc|space|lot)\.?\s*#?\s*[\w-]+/gi, "")
+    .replace(/\s*#\s*[\w-]+/g, "")
+    .replace(/\b(usa|united states)\b/gi, "")
+    .replace(/\s*,\s*,/g, ",")
+    .replace(/[,\s]+$/, "")
+    .trim();
+  const parts = clean.split(",").map((x) => x.trim()).filter(Boolean);
+  const zip = clean.match(/\b\d{5}\b(?!.*\b\d{5}\b)/)?.[0];
+  const street = parts[0] ?? "";
+  const tail = parts.slice(1).join(", ");
+  const out = [address.trim(), clean, zip && street ? `${street}, ${zip}` : "", tail && /\d/.test(street) ? `${street}, ${tail.replace(/\b\d{5}(-\d{4})?\b/, "").trim()}` : "", tail || zip || ""];
+  return [...new Set(out.map((x) => x.replace(/[,\s]+$/, "").trim()).filter((x) => x.length >= 5))];
+}
 const UA = "ForefrontHub/1.0 (personal work hub; light use)";
 
 export class OsmTravel extends Cached implements TravelClient {
@@ -61,19 +83,35 @@ export class OsmTravel extends Cached implements TravelClient {
   private lastGeo = 0;
 
   /** Nominatim allows one request a second; addresses are cached for good. */
+  /** Nominatim allows one request a second. Found addresses are kept for good; misses are retried after a day. */
   async geocode(address: string): Promise<[number, number] | null> {
     const k = norm(address);
-    if (k in this.cache.geo) return this.cache.geo[k];
+    const miss = this.cache.miss?.[k];
+    if (this.cache.geo[k]) return this.cache.geo[k];
+    if (miss && Date.now() - Date.parse(miss) < 86400_000) return null;
+    for (const q of addressVariants(address)) {
+      const hit = await this.search(q);
+      if (hit) {
+        this.cache.geo[k] = hit;
+        if (this.cache.miss) delete this.cache.miss[k];
+        this.save();
+        return hit;
+      }
+    }
+    (this.cache.miss ??= {})[k] = new Date().toISOString();
+    this.save();
+    return null;
+  }
+
+  private async search(q: string): Promise<[number, number] | null> {
     const wait = this.lastGeo + 1100 - Date.now();
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     this.lastGeo = Date.now();
-    const u = `https://nominatim.openstreetmap.org/search?${new URLSearchParams({ format: "json", limit: "1", countrycodes: "us", q: address })}`;
+    const u = `https://nominatim.openstreetmap.org/search?${new URLSearchParams({ format: "json", limit: "1", countrycodes: "us", q })}`;
     const r = await fetch(u, { headers: { "User-Agent": UA, Accept: "application/json" } });
     if (!r.ok) throw new Error(`Address look-up failed (${r.status})`);
     const hit = ((await r.json()) as { lat: string; lon: string }[])[0];
-    this.cache.geo[k] = hit ? [Number(hit.lon), Number(hit.lat)] : null;
-    this.save();
-    return this.cache.geo[k];
+    return hit ? [Number(hit.lon), Number(hit.lat)] : null;
   }
 
   async drive(from: string, to: string, departAt?: Date): Promise<Drive | null> {
