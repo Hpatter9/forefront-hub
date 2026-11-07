@@ -113,6 +113,16 @@
   .jobmeta { color: var(--muted); margin-top: 4px; }
   .stagepill { display: inline-flex; gap: 10px; align-items: center; background: var(--panel-2); border-radius: 8px; padding: 7px 14px; font-size: 14px; }
   .stagepill span { color: var(--muted); font-size: 12px; letter-spacing: .5px; }
+  button.stagepill { border: 1px solid var(--line); color: var(--ink); cursor: pointer; font: inherit; font-size: 14px; }
+  button.stagepill:hover { background: var(--soft); }
+  .stagewrap { position: relative; }
+  .stagepop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 70; width: 280px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 32px #0008; padding: 8px; display: grid; gap: 6px; }
+  .stagepop[hidden] { display: none; }
+  .stagepop .sl { max-height: 360px; overflow: auto; display: grid; }
+  .stagepop .sl[hidden] { display: none; }
+  .stagepop .sl button { text-align: left; background: none; border: 0; color: var(--ink); font: inherit; font-size: 14px; padding: 7px 9px; border-radius: 6px; cursor: pointer; }
+  .stagepop .sl button:hover { background: var(--panel-2); } .stagepop .sl button.cur { color: var(--link); font-weight: 600; cursor: default; }
+  .stagepop .lost { display: grid; gap: 8px; } .stagepop .lost[hidden] { display: none; }
   .actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 14px 0 4px; }
   .subtabs { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 12px; }
   .subtabs button { border: 0; background: transparent; padding: 10px 0; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; font-weight: 500; font-size: 15px; }
@@ -1222,7 +1232,7 @@ function renderJob() {
     <div class="jobcard">
       <div class="jobhead">
         <h2>${esc(view.projectName || h.name)}</h2>
-        <div class="stagepill"><span>Stage</span>${esc(h.stage)}</div>
+        <div class="stagewrap"><button type="button" class="stagepill" id="stagebtn" title="Change the stage in Homebase"><span>Stage</span>${esc(h.stage)} <i class="ms" style="font-style:normal;font-size:18px">expand_more</i></button><div class="stagepop" id="stagepop" hidden></div></div>
       </div>
       <div class="jobmeta">#${h.jobNumber} · Reconstruction${view.fields?.propertyType ? ` · ${esc(view.fields.propertyType)}` : ""}${view.customer?.name ? ` · ${esc(view.customer.name)}` : ""}${d === null ? "" : ` · ${d} days in stage`}${l?.pulse?.lastTouchAt ? ` · touched ${fmtDate(l.pulse.lastTouchAt)}` : ""}</div>
       <div class="actions">
@@ -2965,6 +2975,39 @@ document.addEventListener("click", (e) => {
   store.set("textScale", TSIZES[i]); applyTextSize(); snack(`Text size ${Math.round(TSIZES[i] * 100)}%`);
 });
 applyTextSize();
+
+// ---- changing a job's stage (Homebase asks for a loss reason on Closed Lost; every change is confirmed first)
+function openStagePicker() {
+  const pop = $("#stagepop"), cur = view.homebase.stage, stages = meta.stages?.length ? meta.stages : [];
+  const reasons = (meta.vocab?.lossReasons || []).filter((r) => r !== "Referred out");
+  const draw = (q = "") => {
+    const list = stages.filter((x) => !q || x.toLowerCase().includes(q.toLowerCase()));
+    pop.querySelector(".sl").innerHTML = list.map((x) => `<button type="button" data-stage="${esc(x)}" class="${x === cur ? "cur" : ""}">${x === cur ? "● " : ""}${esc(x)}</button>`).join("") || `<div class="jp-none">No stage matches.</div>`;
+  };
+  pop.innerHTML = `<input type="text" placeholder="Type to find a stage" autocomplete="off"><div class="sl"></div>
+    <form class="lost" hidden><b>Why was it lost?</b><select name="r">${reasons.map((r) => `<option>${esc(r)}</option>`).join("")}</select><input type="text" name="o" placeholder="Say why (for Other)" hidden><div class="row" style="gap:6px"><button class="btn small primary">Move to Closed Lost</button><button type="button" class="btn small" data-x="1">Cancel</button></div><span class="small muted">For Referred out, use Homebase (it needs the contractor).</span></form>`;
+  pop.hidden = false; draw();
+  const inp = pop.querySelector("input"); inp.focus();
+  inp.addEventListener("input", () => draw(inp.value));
+  inp.addEventListener("keydown", (e) => { if (e.key === "Escape") pop.hidden = true; if (e.key === "Enter") { e.preventDefault(); pop.querySelector(".sl button")?.click(); } });
+  const lost = pop.querySelector(".lost");
+  lost.r.addEventListener("change", () => { lost.o.hidden = lost.r.value !== "Other"; });
+  lost.addEventListener("submit", (e) => { e.preventDefault(); if (lost.r.value === "Other" && !lost.o.value.trim()) { lost.o.focus(); return; } moveStage("Closed Lost", { lossReason: lost.r.value, lossReasonOther: lost.o.value.trim() || undefined }); });
+  lost.querySelector("[data-x]").addEventListener("click", () => { lost.hidden = true; pop.querySelector(".sl").hidden = false; inp.hidden = false; });
+  pop.querySelector(".sl").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-stage]"); if (!b || b.dataset.stage === cur) return;
+    if (b.dataset.stage === "Closed Lost") { lost.hidden = false; pop.querySelector(".sl").hidden = true; inp.hidden = true; lost.o.hidden = lost.r.value !== "Other"; return; }
+    moveStage(b.dataset.stage, {});
+  });
+}
+async function moveStage(stage, extra) {
+  $("#stagepop").hidden = true;
+  try { await api(`/api/jobs/${view.homebase.jobNumber}/stage`, { method: "POST", body: { stage, ...extra } }); } catch (e) { log(e.message, "t-err"); }
+}
+document.addEventListener("click", (e) => {
+  if (e.target.closest("#stagebtn")) { const pop = $("#stagepop"); if (pop.hidden) openStagePicker(); else pop.hidden = true; return; }
+  if (!e.target.closest("#stagepop") && $("#stagepop") && !$("#stagepop").hidden) $("#stagepop").hidden = true;
+});
 const es = new EventSource("/api/events");
 es.onmessage = (m) => {
   const e = JSON.parse(m.data);

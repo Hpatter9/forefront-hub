@@ -85,7 +85,7 @@ export interface HomebaseClient {
   setProposal(jobNumber: number, p: { amount: number; submittedAt: string }): Promise<void>;
   setContractAmount(jobNumber: number, amount: number): Promise<void>;
   /** `fromStage`: the stage you read; the API refuses the move if the job has moved since. */
-  setStage(jobNumber: number, stage: string, fromStage?: string): Promise<void>;
+  setStage(jobNumber: number, stage: string, fromStage?: string, extra?: { lossReason?: string; lossReasonOther?: string }): Promise<void>;
   /** A call goes in the job's Activity log (first line = subject), a note on its Notes feed. */
   addNote(jobNumber: number, note: { kind: "note" | "call"; body: string; who?: string; direction?: "Inbound" | "Outbound" }): Promise<void>;
   /** The job's Notes tab with replies, newest first. */

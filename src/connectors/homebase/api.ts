@@ -135,10 +135,12 @@ export class ApiHomebase implements HomebaseClient {
     fieldResult(r, "contractAmount");
   }
 
-  async setStage(jobNumber: number, stage: string, fromStage?: string) {
+  /** Closed Lost needs a lossReason from the vocabulary's lossReasons (or "Other" with lossReasonOther). */
+  async setStage(jobNumber: number, stage: string, fromStage?: string, extra: { lossReason?: string; lossReasonOther?: string } = {}) {
     const id = await this.projectId(jobNumber);
     const from = fromStage ?? (await this.project(id)).stage;
-    await this.call("PATCH", `/projects/${id}/stage`, { stage, fromStage: from }, `hub:stage:${id}:${from}->${stage}`);
+    const reason = stage === "Closed Lost" ? { lossReason: extra.lossReason, ...(extra.lossReason === "Other" ? { lossReasonOther: extra.lossReasonOther } : {}) } : {};
+    await this.call("PATCH", `/projects/${id}/stage`, { stage, fromStage: from, ...reason }, `hub:stage:${id}:${from}->${stage}`);
   }
 
   async addNote(jobNumber: number, note: { kind: "note" | "call"; body: string; who?: string; direction?: "Inbound" | "Outbound" }) {

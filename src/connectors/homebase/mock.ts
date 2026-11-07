@@ -50,7 +50,8 @@ export class MockHomebase implements HomebaseClient {
     this.record(jobNumber, "setContractAmount", { amount });
   }
 
-  async setStage(jobNumber: number, stage: string) {
+  async setStage(jobNumber: number, stage: string, _from?: string, extra: { lossReason?: string; lossReasonOther?: string } = {}) {
+    if (stage === "Closed Lost" && !extra.lossReason) throw new Error("Closed Lost needs a loss reason.");
     const j = this.find(jobNumber);
     j.stage = stage;
     j.stageSince = new Date().toISOString().slice(0, 10);
@@ -129,7 +130,7 @@ export class MockHomebase implements HomebaseClient {
   }
 
   async vocabulary() {
-    return { fundingTypes: ["Insurance", "Self-pay", "TBD", "T&M"], claimStatuses: ["Not sure", "Agent recommended inspection", "Claim filed", "Adjuster already inspected", "Out of pocket"] };
+    return { fundingTypes: ["Insurance", "Self-pay", "TBD", "T&M"], claimStatuses: ["Not sure", "Agent recommended inspection", "Claim filed", "Adjuster already inspected", "Out of pocket"], lossReasons: ["Never heard back", "Lost to another contractor", "We turned the job down", "Price", "Referred out", "Other"] };
   }
 
   async documents(jobNumber: number) {

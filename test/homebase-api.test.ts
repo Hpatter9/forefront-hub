@@ -67,6 +67,18 @@ describe("Homebase API driver", () => {
     for (const w of writes) expect(w.headers["Idempotency-Key"]).toMatch(/^hub:/);
   });
 
+  it("sends the loss reason with Closed Lost, and only then", async () => {
+    const { calls, fetchFn } = fakeHomebase();
+    const hb = new ApiHomebase({ url: "https://hb", token: "hbk_x", fetch: fetchFn });
+    await hb.setStage(3226, "Closed Lost", "Estimating", { lossReason: "Other", lossReasonOther: "Went with their cousin's company" });
+    await hb.setStage(3226, "Job Won", "Estimating", { lossReason: "Price" });
+    const stage = calls.filter((c) => c.url.endsWith("/stage")).map((c) => c.body);
+    expect(stage).toEqual([
+      { stage: "Closed Lost", fromStage: "Estimating", lossReason: "Other", lossReasonOther: "Went with their cousin's company" },
+      { stage: "Job Won", fromStage: "Estimating" },
+    ]);
+  });
+
   it("refuses a stage move when the job moved meanwhile", async () => {
     const { fetchFn } = fakeHomebase();
     const hb = new ApiHomebase({ url: "https://hb", token: "hbk_x", fetch: fetchFn });

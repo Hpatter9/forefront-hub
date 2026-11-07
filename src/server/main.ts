@@ -238,7 +238,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === "/api/notes/recent") return send(res, 200, { me: cfg.homebase.me, notes: recentNotes(Number(q("days") || 14)), people: teamPeople() });
     if (p === "/api/meta") {
-      return send(res, 200, { fields: FIELDS, sections: SECTIONS, vocab: (await hub.homebase.vocabulary?.().catch(() => ({}))) ?? {}, reminderGroups: REMINDER_GROUPS });
+      return send(res, 200, { fields: FIELDS, sections: SECTIONS, vocab: (await hub.homebase.vocabulary?.().catch(() => ({}))) ?? {}, reminderGroups: REMINDER_GROUPS, stages: STAGES });
     }
     if (p.startsWith("/api/fixture-photo/")) {
       const f = path.join(cfg.hubRoot, "fixtures", "photos", path.basename(decodeURIComponent(p.slice(19))));
@@ -381,6 +381,26 @@ const server = http.createServer(async (req, res) => {
         return send(res, 202, task(`Add ${name} to #${n}`, n, () => addFile(hub, n, name, bytes, { toHomebase: q("homebase") !== "0" }), "job"));
       }
       const b = await body(req);
+      if (action === "stage") {
+        // Move the job to another Homebase stage, after an OK. Homebase refuses it if the stage moved meanwhile.
+        const stage = String(b.stage ?? "");
+        if (!(STAGES as readonly string[]).includes(stage)) return send(res, 400, { error: `"${stage}" isn't a Homebase stage.` });
+        if (stage === "Closed Lost" && !b.lossReason) return send(res, 400, { error: "Closed Lost needs a loss reason." });
+        return send(res, 202, task(`Move #${n} to ${stage}`, n, async () => {
+          const cur = (await hub.homebase.getJob(n)).stage;
+          if (cur === stage) return hub.say(`#${n} is already in ${stage}.`);
+          const details = [`From: ${cur || "?"}`, `To: ${stage}`];
+          if (stage === "Closed Lost") details.push(`Loss reason: ${b.lossReason === "Other" ? b.lossReasonOther || "Other" : b.lossReason}`);
+          if (stage === "Proposal Submitted") details.push("The proposal amount and date are set separately, from the send-off (Check sent & log).");
+          if (!(await approver.confirm(`Change the stage of Homebase #${n}?`, details))) return hub.say("Stage not changed.");
+          await hub.homebase.setStage(n, stage, cur, { lossReason: b.lossReason ? String(b.lossReason) : undefined, lossReasonOther: b.lossReasonOther ? String(b.lossReasonOther) : undefined });
+          if (hub.jobs.exists(n)) {
+            hub.jobs.log(n, `Homebase: stage ${cur} -> ${stage}`);
+            await pullJob(hub, n, { quiet: true, lookups: false }).catch(() => {});
+          }
+          hub.say(`#${n} moved to ${stage} in Homebase.`);
+        }, "job"));
+      }
       if (action === "selections/build") {
         return send(res, 202, task(`Set up selections for #${n}`, n, async () => {
           const { buildSelections } = await import("../agent/selections.js");
