@@ -2288,7 +2288,17 @@ async function renderLibrary() {
     <button class="sp-item ${spView.kind === "liked" ? "on" : ""}" data-spv="liked"><span class="ph" style="background:linear-gradient(135deg,#450af5,#c4efd9);color:#fff">♥</span><div><b>Liked Songs</b><span>Playlist</span></div></button>
     ${items.map((p) => `<button class="sp-item ${spView.id === p.id ? "on" : ""}" data-spv="playlist" data-id="${esc(p.id)}">${img(p.images)}<div><b>${esc(p.name)}</b><span>Playlist · ${esc(p.owner?.display_name || "")}</span></div></button>`).join("")}`;
 }
-async function renderView() {
+// Any failure shows a message with Try again, instead of sitting on "Loading…".
+async function renderView(...a) {
+  try { return await renderViewInner(...a); }
+  catch (e) {
+    const m = $("#sp-main"); if (!m) return;
+    m.innerHTML = `<div class="sp-msg">Spotify: ${esc(e.message || "couldn't load this")} <button class="sp-pill" id="sp-retry">Try again</button></div>`;
+    $("#sp-retry").onclick = () => renderView(...a);
+  }
+}
+const spSong = (i) => i?.item || i?.track || null;
+async function renderViewInner() {
   const m = $("#sp-main"); if (!m) return;
   const top = `<div class="sp-top"><input class="sp-search" id="sp-q" type="search" placeholder="What do you want to play?" value="${esc(spView.q || "")}"><button class="sp-pill" data-spv="home">Home</button><span style="margin-left:auto;color:#b3b3b3;font-size:13px">${esc(spMe?.display_name || "")}${spMe?.product && spMe.product !== "premium" ? " · Free account: controls other devices" : ""}</span></div>`;
   if (spView.kind === "home") {
@@ -2302,15 +2312,30 @@ async function renderView() {
   } else if (spView.kind === "playlist" || spView.kind === "liked") {
     m.innerHTML = top + `<div class="sp-msg">Loading…</div>`;
     let head, tracks = [], ctx = null;
-    if (spView.kind === "liked") { let url = "/me/tracks?limit=50"; while (url && tracks.length < 500) { const pg = await sp(url); tracks.push(...pg.items.map((i) => i.track).filter(Boolean)); url = pg.next; } head = { name: "Liked Songs", images: [], sub: `${spMe?.display_name || ""} · ${tracks.length} songs`, ph: "♥" }; }
-    else { const pl = await sp(`/playlists/${spView.id}`); ctx = pl.uri; let pg = pl.tracks; tracks = pg.items.map((i) => i.track).filter((t) => t && t.uri && !t.is_local); while (pg.next && tracks.length < 1000) { pg = await sp(pg.next); tracks.push(...pg.items.map((i) => i.track).filter((t) => t && t.uri && !t.is_local)); } head = { name: pl.name, images: pl.images, sub: `${pl.owner?.display_name || ""} · ${pl.tracks.total} songs`, desc: pl.description?.replace(/<[^>]+>/g, "") }; }
-    spView.tracks = tracks; spView.ctx = ctx;
+    let noList = false;
+    if (spView.kind === "liked") { let url = "/me/tracks?limit=50"; while (url && tracks.length < 500) { const pg = await sp(url); tracks.push(...(pg.items || []).map(spSong).filter(Boolean)); url = pg.next; } head = { name: "Liked Songs", images: [], sub: `${spMe?.display_name || ""} · ${tracks.length} songs`, ph: "♥" }; }
+    else {
+      // Spotify has been changing this reply: the song list may be "tracks" (each song in .track) or "items" (each
+      // in .item), and for playlists you don't own it may be left out. Ask for the list on its own when it's missing.
+      const pl = await sp(`/playlists/${spView.id}`); ctx = pl.uri;
+      const playable = (t) => t && t.uri && !t.is_local;
+      let pg = [pl.items, pl.tracks].find((x) => Array.isArray(x?.items)) || null;
+      if (!pg) pg = (await sp(`/playlists/${spView.id}/items?limit=100`).catch(() => null)) || (await sp(`/playlists/${spView.id}/tracks?limit=100`).catch(() => null));
+      if (Array.isArray(pg?.items)) {
+        tracks = pg.items.map(spSong).filter(playable);
+        while (pg?.next && tracks.length < 1000) { pg = await sp(pg.next).catch(() => null); tracks.push(...(pg?.items || []).map(spSong).filter(playable)); }
+      } else noList = true;
+      const total = pl.items?.total ?? pl.tracks?.total ?? tracks.length;
+      head = { name: pl.name, images: pl.images, sub: `${pl.owner?.display_name || ""}${total ? ` · ${total} songs` : ""}`, desc: pl.description?.replace(/<[^>]+>/g, "") };
+    }
+    spView.tracks = tracks; spView.ctx = ctx; spView.noList = noList;
     m.innerHTML = top + `<div class="sp-hero">${head.images?.length ? img(head.images) : `<span class="ph" style="background:linear-gradient(135deg,#450af5,#c4efd9)">${head.ph || "♪"}</span>`}<div style="min-width:0"><small>Playlist</small><h1>${esc(head.name)}</h1>${head.desc ? `<div class="meta">${esc(head.desc)}</div>` : ""}<div class="meta"><b style="color:#fff">${esc(head.sub)}</b></div></div></div>
       <div class="sp-actions"><button class="sp-play" id="sp-playall" aria-label="Play">${IC.play}</button><button class="sp-ic" id="sp-shufall" title="Shuffle play">${IC.shuffle}</button></div>
       <div class="sp-sec"><table class="sp-tracks"><thead><tr><th>#</th><th>Title</th><th>Album</th><th style="text-align:right">⏱</th></tr></thead><tbody>
       ${tracks.map((t, i) => `<tr class="tr ${spState?.item?.uri === t.uri ? "now" : ""}" data-uri="${esc(t.uri)}" data-i="${i}"><td>${i + 1}</td><td><div class="tt">${t.album?.images?.length ? `<img src="${esc(t.album.images.at(-1).url)}" alt="" loading="lazy">` : ""}<div style="min-width:0"><b>${esc(t.name)}</b>${esc(t.artists.map((a) => a.name).join(", "))}</div></div></td><td>${esc(t.album?.name || "")}</td><td>${fmtMs(t.duration_ms)}</td></tr>`).join("")}</tbody></table></div>`;
     $("#sp-playall").onclick = () => spPlayList(0);
-    $("#sp-shufall").onclick = async () => { await spCmd("/me/player/shuffle?state=true"); spPlayList(Math.floor(Math.random() * tracks.length)); };
+    $("#sp-shufall").onclick = async () => { await spCmd("/me/player/shuffle?state=true"); spPlayList(tracks.length ? Math.floor(Math.random() * tracks.length) : 0); };
+    if (noList) $(".sp-tracks tbody").innerHTML = `<tr><td colspan="4" style="padding:18px 8px;color:var(--sp-sub)">Spotify won't share this playlist's song list with Keystone (it only does for playlists you own or edit). Press Play to play the whole playlist.</td></tr>`;
   } else if (spView.kind === "search") {
     m.innerHTML = top + `<div class="sp-msg">Searching…</div>`;
     const r = await sp(`/search?${new URLSearchParams({ q: spView.q, type: "track,playlist,album,artist", limit: "10" })}`);
