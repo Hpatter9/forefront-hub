@@ -59,6 +59,8 @@
   .side-search { padding: 10px 16px 6px; }
   .side-search input { background: transparent; border: 1px solid color-mix(in srgb, var(--side-ink) 25%, transparent); color: var(--side-ink); border-radius: 4px; padding: 8px 10px; width: 100%; }
   .side-foot { padding: 6px 16px 0; display: flex; gap: 8px; }
+  .tsize { margin-left: auto; display: inline-flex; gap: 2px; }
+  .side-foot .tsize button { text-decoration: none; border: 1px solid color-mix(in srgb, var(--side-ink) 25%, transparent); border-radius: 4px; padding: 0 6px; font-size: 12px; color: var(--side-ink); }
   .side-foot button { background: transparent; border: 0; color: var(--side-muted); font-size: 12px; cursor: pointer; padding: 2px 0; text-decoration: underline; }
 
   .mainc { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
@@ -756,7 +758,7 @@
     <div class="navlabel" id="wherelabel" style="margin-top:auto">Where you were</div>
     <div class="recent" id="recent" style="margin-top:0"></div>
     <div class="side-search"><input type="search" id="globalq" placeholder="Search everything"></div>
-    <div class="side-foot"><button type="button" id="themebtn">Homebase colors</button></div>
+    <div class="side-foot"><button type="button" id="themebtn">Homebase colors</button><span class="tsize" title="Text size"><button type="button" data-tsize="-1" aria-label="Smaller text">A−</button><button type="button" data-tsize="1" aria-label="Larger text">A+</button></span></div>
   </nav>
   <div class="mainc">
   <div class="topbar">
@@ -994,6 +996,8 @@ const usd = (n) => (n || n === 0) && n !== "" ? "$" + Number(n).toLocaleString("
 const daysSince = (d) => d ? Math.max(0, Math.floor((Date.now() - Date.parse(d)) / 864e5)) : null;
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
 const fmtWhen = (d) => { if (!d) return ""; const t = new Date(d); const today = new Date(); return t.toDateString() === today.toDateString() ? t.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : t.toLocaleDateString("en-US", { month: "short", day: "numeric" }); };
+// Mouse positions are in screen pixels; with the text-size zoom, layout sizes are in zoomed pixels.
+const ZOOM = () => parseFloat(document.documentElement.style.zoom) || 1;
 const store = { get(k, d) { try { return JSON.parse(localStorage.getItem("hub:" + k)) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem("hub:" + k, JSON.stringify(v)); } catch {} } };
 
 let status = {}, meta = { fields: [], sections: [], vocab: {}, reminderGroups: [] }, jobs = [], selected = store.get("job", null), view = null, jobTab = store.get("jobtab", "overview");
@@ -1021,7 +1025,7 @@ $("#conclear").addEventListener("click", () => { $("#console").innerHTML = ""; $
 $("#congrip").addEventListener("pointerdown", (e) => {
   e.preventDefault(); const g = e.currentTarget; g.setPointerCapture(e.pointerId); g.classList.add("drag");
   const y0 = e.clientY, h0 = $("#console").getBoundingClientRect().height;
-  const move = (ev) => { const h = Math.round(Math.max(40, Math.min(window.innerHeight * 0.7, h0 + (y0 - ev.clientY)))); $("#conwrap").style.setProperty("--con-h", h + "px"); g.dataset.h = h; };
+  const move = (ev) => { const h = Math.round(Math.max(40, Math.min((window.innerHeight / ZOOM()) * 0.7, (h0 + (y0 - ev.clientY)) / ZOOM()))); $("#conwrap").style.setProperty("--con-h", h + "px"); g.dataset.h = h; };
   g.addEventListener("pointermove", move);
   g.addEventListener("pointerup", () => { g.removeEventListener("pointermove", move); g.classList.remove("drag"); if (g.dataset.h) { if (Number(g.dataset.h) < 60) { store.set("conOpen", false); } else store.set("conH", Number(g.dataset.h)); delete g.dataset.h; conApply(); } }, { once: true });
 });
@@ -2017,7 +2021,7 @@ $("#cal-body").addEventListener("click", async (e) => {
   const col = e.target.closest("[data-day]");
   if (!col) return;
   let s;
-  if (col.classList.contains("col")) { const r = col.getBoundingClientRect(); const mins = Math.round((((e.clientY - r.top) / HOUR_H) * 60) / 30) * 30; s = new Date(`${col.dataset.day}T00:00`); s.setMinutes(H0 * 60 + mins); }
+  if (col.classList.contains("col")) { const r = col.getBoundingClientRect(); const mins = Math.round((((e.clientY - r.top) / ZOOM() / HOUR_H) * 60) / 30) * 30; s = new Date(`${col.dataset.day}T00:00`); s.setMinutes(H0 * 60 + mins); }
   else { s = new Date(`${col.dataset.day}T09:00`); }
   openEvent({ start: s.toISOString(), end: new Date(s.getTime() + 3600e3).toISOString() });
 });
@@ -2623,7 +2627,7 @@ function zgrips() {
       e.preventDefault(); g.setPointerCapture(e.pointerId); g.classList.add("drag"); document.body.classList.add("zdragging");
       const r = panel.getBoundingClientRect(), box = $(z.box);
       const move = (ev) => {
-        let w = z.left ? r.right - ev.clientX : ev.clientX - r.left;
+        let w = (z.left ? r.right - ev.clientX : ev.clientX - r.left) / ZOOM();
         if (!z.noFold && w < z.min - 70) { box.classList.add("z-" + k); box.style.setProperty(z.v, (z.rail || 0) + "px"); g.dataset.fold = "1"; return; }
         delete g.dataset.fold; box.classList.remove("z-" + k);
         w = Math.max(z.min, Math.min(z.max, w)); g.dataset.w = Math.round(w); box.style.setProperty(z.v, Math.round(w) + "px");
@@ -2950,6 +2954,17 @@ async function goTo(n, place) {
   showTab("jobs"); openJob(n);
 }
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-go]"); if (!b) return; e.preventDefault(); goTo(Number(b.dataset.go), b.dataset.place); });
+
+// ---- text size: everything a bit bigger by default (about 12%), adjustable with A− / A+ (remembered)
+const TSIZES = [1, 1.06, 1.12, 1.2, 1.3, 1.4];
+function applyTextSize() { const z = store.get("textScale", 1.12); document.documentElement.style.zoom = String(z); }
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-tsize]"); if (!b) return;
+  const cur = store.get("textScale", 1.12); let i = TSIZES.findIndex((x) => Math.abs(x - cur) < 0.001); if (i < 0) i = 2;
+  i = Math.max(0, Math.min(TSIZES.length - 1, i + Number(b.dataset.tsize)));
+  store.set("textScale", TSIZES[i]); applyTextSize(); snack(`Text size ${Math.round(TSIZES[i] * 100)}%`);
+});
+applyTextSize();
 const es = new EventSource("/api/events");
 es.onmessage = (m) => {
   const e = JSON.parse(m.data);
