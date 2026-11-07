@@ -56,20 +56,20 @@ function findClientJson(): { id: string; secret: string; file: string } | null {
 
 export async function connectGmail() {
   const cfg = loadConfig();
-  console.log("Connecting Gmail (hunter@forefrontteam.com) for the hub's Mail tab: reading, drafts, archive/labels, and sending when you press Send.");
+  console.log("Connecting Gmail (hunter@forefrontteam.com) for Keystone's Mail tab: reading, drafts, archive/labels, and sending when you press Send.");
   if (!cfg.gmail.clientId) {
-    console.log("Google needs a one-time 'app' entry for the hub. Each page opens in your browser; sign in as hunter@forefrontteam.com.");
-    step(1, "Create a project named Forefront Hub (Create).");
+    console.log("Google needs a one-time 'app' entry for Keystone. Each page opens in your browser; sign in as hunter@forefrontteam.com.");
+    step(1, "Create a project named Keystone (Create).");
     openBrowser("https://console.cloud.google.com/projectcreate");
     await ask("   Press Enter when it's created... ");
-    step(2, "Make sure Forefront Hub is the selected project at the top, then click Enable on the Gmail API.");
+    step(2, "Make sure Keystone is the selected project at the top, then click Enable on the Gmail API.");
     openBrowser("https://console.cloud.google.com/apis/library/gmail.googleapis.com");
     await ask("   Press Enter when it says API enabled... ");
-    step(3, "Click Get started: app name Forefront Hub, your email, Audience = Internal, your email again, agree, Create.");
+    step(3, "Click Get started: app name Keystone, your email, Audience = Internal, your email again, agree, Create.");
     console.log("   (If Internal is greyed out, pick External and add hunter@forefrontteam.com as a test user.)");
     openBrowser("https://console.cloud.google.com/auth/overview");
     await ask("   Press Enter when it's done... ");
-    step(4, "Create client: Application type = Desktop app, name Forefront Hub, Create. Then click Download JSON.");
+    step(4, "Create client: Application type = Desktop app, name Keystone, Create. Then click Download JSON.");
     openBrowser("https://console.cloud.google.com/auth/clients/create");
     await ask("   Press Enter once the JSON file is downloaded (or if you'd rather paste the ID and secret)... ");
 
@@ -85,7 +85,7 @@ export async function connectGmail() {
   }
 
   // Calendar and Tasks are APIs of their own: each needs one Enable click in the same Google project.
-  step(5, "Turn on the Google Calendar API and the Google Tasks API: click Enable on each page that opens (check Forefront Hub is the project at the top).");
+  step(5, "Turn on the Google Calendar API and the Google Tasks API: click Enable on each page that opens (check Keystone is the project at the top).");
   openBrowser("https://console.cloud.google.com/apis/library/calendar-json.googleapis.com");
   openBrowser("https://console.cloud.google.com/apis/library/tasks.googleapis.com");
   await ask("   Press Enter when both say API enabled (or Manage)... ");
@@ -112,13 +112,13 @@ export async function connectGmail() {
   } catch (e) {
     console.log(`Google Tasks didn't answer: ${(e as Error).message}\n  If it says the API isn't enabled, enable it (step 5) and run Connect Gmail again.`);
   }
-  console.log("Restart the hub (close its window, open the desktop icon) to use it.");
+  console.log("Restart Keystone (close its window, open the desktop icon) to use it.");
 }
 
 export async function connectCompanyCam() {
   console.log("Connecting CompanyCam.");
   step(1, "In CompanyCam (signed in as an admin) open the menu > Company Settings > Integrations (or Access Tokens / API).");
-  console.log("   Create a new access token named Forefront Hub and copy it.");
+  console.log("   Create a new access token named Keystone and copy it.");
   console.log("   If there's no such page on your plan, ask CompanyCam support for 'a v2 API access token'.");
   openBrowser("https://app.companycam.com/");
   const token = await ask("\n2. Paste the token here and press Enter: ");
@@ -128,5 +128,5 @@ export async function connectCompanyCam() {
   const me: any = await res.json();
   setEnv({ COMPANYCAM_TOKEN: token });
   console.log(`\nCompanyCam is connected as ${[me.first_name, me.last_name].filter(Boolean).join(" ") || me.email_address || "you"}.`);
-  console.log("Restart the hub (close its window, open the desktop icon) to use it.");
+  console.log("Restart Keystone (close its window, open the desktop icon) to use it.");
 }

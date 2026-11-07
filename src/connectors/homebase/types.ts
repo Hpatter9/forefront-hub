@@ -1,5 +1,5 @@
 /**
- * Homebase (https://homebase.forefrontteam.com), Forefront's system of record. Everything else in the hub talks to
+ * Homebase (https://homebase.forefrontteam.com), Forefront's system of record. Everything else in Keystone talks to
  * Homebase only through this interface, so the browser-driven version can be swapped for an API version
  * (HOMEBASE_DRIVER=api) without touching anything else. See docs/homebase-api.md.
  */
@@ -148,7 +148,7 @@ export interface HomebaseDocument {
   fileName: string;
   mimeType: string;
   byteSize: number;
-  /** Content hash: how the hub tells which files are already on both sides. */
+  /** Content hash: how Keystone tells which files are already on both sides. */
   sha256: string;
   source: "homebase" | "archive";
   createdAt: string;

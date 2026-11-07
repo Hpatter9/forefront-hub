@@ -9,8 +9,8 @@ import type { Hub } from "../hub.js";
  *
  * Homebase -> hub (automatic, read-only): every document is mirrored into <job>/homebase/ (homebase/index.json maps
  * Homebase ids to files). The standard estimate files ("<Last> - Reconstruction Estimate.pdf" and friends) are also
- * copied into estimate/ when the hub has none of that name, so a send-off can use them. A file already in estimate/
- * is never overwritten from Homebase: the hub's copy wins.
+ * copied into estimate/ when Keystone has none of that name, so a send-off can use them. A file already in estimate/
+ * is never overwritten from Homebase: Keystone's copy wins.
  *
  * Hub -> Homebase (asks first): the standard estimate files in estimate/ whose content Homebase doesn't have yet
  * (compared by SHA-256) are offered for upload.

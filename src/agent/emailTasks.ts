@@ -10,7 +10,7 @@ import { isAutomated } from "../workflows/reminders.js";
  * Turns incoming email into Google Tasks on its own: Claude reads each new email from a person and, when it asks
  * Hunter to do something, adds a task (with the job number when the email is about a job, a due date from the email
  * or the next workday, and a link back to the email). FYI-only email gets no task, and a thread that already has an
- * open task from the hub gets no duplicate. Runs with the inbox check; switch off with HUB_EMAIL_TASKS=off.
+ * open task from Keystone gets no duplicate. Runs with the inbox check; switch off with HUB_EMAIL_TASKS=off.
  */
 interface State {
   since?: string;

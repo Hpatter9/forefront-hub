@@ -74,7 +74,7 @@ export async function travelFor(hub: Hub, events: CalEvent[], o: { max?: number;
       }
       const job = jobForEvent(e, jobs);
       if (!job) {
-        why[e.id] = "The hub can't tell which job this is. Put the job number in the title (e.g. #3226) or use the job's address as the location.";
+        why[e.id] = "Keystone can't tell which job this is. Put the job number in the title (e.g. #3226) or use the job's address as the location.";
         return null;
       }
       const place = routable(e.location) ? e.location! : job.address;

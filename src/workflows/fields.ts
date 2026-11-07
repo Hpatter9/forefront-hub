@@ -2,7 +2,7 @@ import type { FieldResult } from "../connectors/homebase/types.js";
 import type { Hub } from "../hub.js";
 
 /**
- * The job fields the hub edits, grouped the way the Homebase job page groups them. `key` is the name
+ * The job fields Keystone edits, grouped the way the Homebase job page groups them. `key` is the name
  * PATCH /api/v1/projects/:id takes; `read` finds the current value in the job read (GET /projects/:id), which keeps
  * some fields under `brief`, `money`, `loss` or `platform`.
  */

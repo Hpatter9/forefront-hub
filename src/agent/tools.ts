@@ -27,7 +27,7 @@ const wrap = <A>(fn: (a: A) => Promise<unknown>) => async (a: A) => {
 const jobNumber = z.number().int().describe("Homebase job number, e.g. 3226");
 
 /**
- * The hub's tools for the agent. Irreversible ones (Homebase writes) ask Hunter through hub.approver inside the
+ * Keystone's tools for the agent. Irreversible ones (Homebase writes) ask Hunter through hub.approver inside the
  * handler, so they're safe no matter how the agent calls them. There is no "send email" tool.
  */
 export function hubTools(hub: Hub) {

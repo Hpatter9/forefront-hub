@@ -5,8 +5,8 @@ import type { Config } from "../../core/config.js";
 import { GoogleAuth, SCOPES } from "../google/auth.js";
 
 /**
- * Google Tasks, read and write. The hub works on Hunter's real task lists, so a task made in the hub is on his phone
- * and in Chrome at once, and one made on his phone shows in the hub on its next refresh. Google keeps only a due
+ * Google Tasks, read and write. Keystone works on Hunter's real task lists, so a task made in Keystone is on his phone
+ * and in Chrome at once, and one made on his phone shows in Keystone on its next refresh. Google keeps only a due
  * DATE for tasks (no time of day).
  */
 export interface TaskList {
@@ -60,7 +60,7 @@ export class GoogleTasks implements TasksClient {
   }
 
   private t() {
-    if (!this.connected()) throw new Error("Google Tasks isn't connected yet: double-click Connect Gmail in the hub folder and click Allow (it covers Calendar and Tasks too).");
+    if (!this.connected()) throw new Error("Google Tasks isn't connected yet: double-click Connect Gmail in the Keystone folder (forefront-hub) and click Allow (it covers Calendar and Tasks too).");
     this.api ??= google.tasks({ version: "v1", auth: this.auth.client() });
     return this.api;
   }
@@ -138,7 +138,7 @@ export class GoogleTasks implements TasksClient {
   }
 }
 
-/** Tasks on disk with a few made-up ones, so the hub works without Google. */
+/** Tasks on disk with a few made-up ones, so Keystone works without Google. */
 export class MockTasks implements TasksClient {
   readonly kind = "mock" as const;
   private file: string;

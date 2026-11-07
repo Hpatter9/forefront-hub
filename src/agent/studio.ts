@@ -38,13 +38,13 @@ export const DOCS = [
 
 const STUDIO_PROMPT = `
 
-You are in the hub's Estimator tab. Hunter works with you here the way he does with the forefront-estimate skill in a chat: one running conversation per job, and he can see the job's documents next to the chat. Load the skill first and follow it exactly. Typical asks:
+You are in Keystone's Estimator tab. Hunter works with you here the way he does with the forefront-estimate skill in a chat: one running conversation per job, and he can see the job's documents next to the chat. Load the skill first and follow it exactly. Typical asks:
 - "New estimate": find the ESX in sketch/ (or mcp__${SERVER}__docusketch_find_sketch), look at the CompanyCam photos (mcp__${SERVER}__companycam_*), scope, price, write the customer wording, then render all three documents into the job's estimate/ folder.
 - "Convert" an Xactimate PDF (in files/ or estimate/) into the Reconstruction Estimate / Agreement per the skill.
 - "Agreement" with selections or allowances: fill selections in estimate.json per the skill and re-render.
 - "Selections sign-off": render the Material Selection Approval sheet with render.py --only selections.
 - "Photo report": pick the photos and captions and use mcp__${SERVER}__photo_report.
-- Revisions: edit estimate.json and re-render (the hub snapshots the old version first).
+- Revisions: edit estimate.json and re-render (Keystone snapshots the old version first).
 When the skill has questions for Hunter, ask them here in a short numbered list and wait for his answers; don't guess. Files he drops into this chat are saved in the job folder and named in his message. After rendering, say which files you wrote and the totals in two or three lines. Don't draft or send email from this tab unless he asks.`;
 
 export class Studio {
@@ -216,7 +216,7 @@ export function describeTool(name: string, input: Record<string, unknown>): stri
         tasks_list: "Checking your tasks",
         hub_today: "Looking at what needs you",
         homebase_get_job: `Reading${job || " a job"} in Homebase`,
-        ToolSearch: "Getting the hub's tools ready",
+        ToolSearch: "Getting Keystone's tools ready",
       };
       return plain[short] ?? short.replace(/_/g, " ");
     }

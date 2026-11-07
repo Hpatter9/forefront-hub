@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Forefront Hub</title>
+<title>Keystone</title>
+<link rel="icon" href="data:image/svg+xml,<svg viewBox='0 13 44 25' xmlns='http://www.w3.org/2000/svg'><path d='M3.00 37.00A19 19 0 0 1 5.89 26.93L13.10 31.44A10.5 10.5 0 0 0 11.50 37.00Z M6.25 26.38A19 19 0 0 1 11.93 20.89L16.44 28.10A10.5 10.5 0 0 0 13.30 31.13Z M12.50 20.55A19 19 0 0 1 17.40 18.56L19.46 26.81A10.5 10.5 0 0 0 16.75 27.91Z M26.60 18.56A19 19 0 0 1 31.50 20.55L27.25 27.91A10.5 10.5 0 0 0 24.54 26.81Z M32.07 20.89A19 19 0 0 1 37.75 26.38L30.70 31.13A10.5 10.5 0 0 0 27.56 28.10Z M38.11 26.93A19 19 0 0 1 41.00 37.00L32.50 37.00A10.5 10.5 0 0 0 30.90 31.44Z' fill='%230e1526' opacity='.55'/><path d='M17.59 16.26L26.41 16.26L23.72 27.25L20.28 27.25Z' fill='%230e1526'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=Figtree:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=block">
@@ -192,7 +193,7 @@
   .banner { background: var(--soft); border-left: 3px solid var(--ink); padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: 14px; }
 
   /* ---- Gmail tab: laid out and colored like Gmail (dark), scoped here */
-  .gm { /* Gmail's layout in the hub's own colors (follows the theme switch) */
+  .gm { /* Gmail's layout in Keystone's own colors (follows the theme switch) */
     --g-bg: var(--bg); --g-panel: var(--panel); --g-row: color-mix(in srgb, var(--panel) 55%, var(--bg)); --g-unread: color-mix(in srgb, var(--link) 14%, var(--panel-2)); --g-new: var(--link); --g-hover: var(--soft); --g-line: var(--line); --g-tx: var(--ink); --g-sub: color-mix(in srgb, var(--ink) 78%, var(--muted)); --g-mut: var(--muted);
     --g-compose: var(--accent); --g-compose-tx: var(--accent-ink); --g-sel: var(--panel-2); --g-sel-tx: var(--ink); --g-blue: var(--link); --g-star: #e8b931; --g-field: var(--panel-2); --g-chip: var(--soft);
     background: var(--g-bg); color: var(--g-tx); height: 100%; display: grid; grid-template-columns: var(--w-gm, 256px) minmax(0, 1fr); grid-template-rows: 64px minmax(0, 1fr); font: 14px/1.4 var(--sans); }
@@ -740,7 +741,7 @@
 <body>
 <div class="app">
   <nav class="side-nav" aria-label="Hub">
-    <a class="logo" href="#" id="logo"><svg viewBox="0 0 44 40" aria-hidden="true"><path d="M22 3 3 19h5v18h28V19h5L22 3zm0 5.5L33 18v15H11V18l11-9.5z" fill="currentColor"/></svg><b>HUB</b><span>BY FOREFRONT</span></a>
+    <a class="logo" href="#" id="logo"><svg viewBox="0 13 44 25" aria-hidden="true"><path d="M3.00 37.00A19 19 0 0 1 5.89 26.93L13.10 31.44A10.5 10.5 0 0 0 11.50 37.00Z M6.25 26.38A19 19 0 0 1 11.93 20.89L16.44 28.10A10.5 10.5 0 0 0 13.30 31.13Z M12.50 20.55A19 19 0 0 1 17.40 18.56L19.46 26.81A10.5 10.5 0 0 0 16.75 27.91Z M26.60 18.56A19 19 0 0 1 31.50 20.55L27.25 27.91A10.5 10.5 0 0 0 24.54 26.81Z M32.07 20.89A19 19 0 0 1 37.75 26.38L30.70 31.13A10.5 10.5 0 0 0 27.56 28.10Z M38.11 26.93A19 19 0 0 1 41.00 37.00L32.50 37.00A10.5 10.5 0 0 0 30.90 31.44Z" fill="currentColor" opacity=".55"/><path d="M17.59 16.26L26.41 16.26L23.72 27.25L20.28 27.25Z" fill="currentColor"/></svg><b>KEYSTONE</b><span>BY FOREFRONT</span></a>
     <nav class="tabs" id="tabs">
       <button data-tab="today" class="active" title="Dashboard"><span class="ms">space_dashboard</span><span class="nm">Dashboard</span> <span class="count" id="todaycount" hidden></span></button>
       <button data-tab="brief" title="Today's brief"><span class="ms">checklist</span><span class="nm">Brief</span> <span class="count" id="briefcount" hidden></span></button>
@@ -885,7 +886,7 @@
 
   <footer class="askbar">
     <form id="askform">
-      <button type="button" class="btn" id="addfiles" title="Add files to a job (or drag them anywhere onto the hub)">Add files</button>
+      <button type="button" class="btn" id="addfiles" title="Add files to a job (or drag them anywhere onto Keystone)">Add files</button>
       <textarea id="prompt" rows="1" placeholder="Ask Claude, or drop files here, e.g. “who's waiting on me?”, “draft a follow-up to the Wegener homeowner”"></textarea>
       <button class="btn primary">Ask</button>
     </form>
@@ -939,7 +940,7 @@
   <div class="more">
     <div class="row"><input type="text" id="pl-link" placeholder="Paste a Spotify playlist, album, podcast or song link" style="flex:1"><button class="btn small primary" id="pl-play" type="button">Play</button></div>
     <div class="row small" id="pl-saved"></div>
-    <div class="row"><button class="btn small" id="pl-audible" type="button">Open Audible</button><span class="small muted">Audible plays in its own small window (it can't be shown inside the hub).</span></div>
+    <div class="row"><button class="btn small" id="pl-audible" type="button">Open Audible</button><span class="small muted">Audible plays in its own small window (it can't be shown inside Keystone).</span></div>
     <span class="small muted">Sign in to Spotify in this browser for full songs; otherwise Spotify plays previews.</span>
   </div>
 </div>
@@ -962,7 +963,7 @@
   </div>
   <div class="small muted" id="ev-meta"></div>
   <input type="hidden" id="ev-id"><input type="hidden" id="ev-calid">
-  </div><div class="foot"><button class="btn" value="delete" id="ev-del">Delete</button><button class="btn" type="button" id="ev-hide" style="margin-right:auto" title="Hide it in the hub only. Google Calendar and everyone who looks at your calendar still see it.">Hide on my screen</button><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="save">Save</button></div></form></dialog>
+  </div><div class="foot"><button class="btn" value="delete" id="ev-del">Delete</button><button class="btn" type="button" id="ev-hide" style="margin-right:auto" title="Hide it in Keystone only. Google Calendar and everyone who looks at your calendar still see it.">Hide on my screen</button><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="save">Save</button></div></form></dialog>
 
 <dialog id="taskdlg"><form method="dialog"><div class="in">
   <h4 id="tk-h">Task</h4>
@@ -1060,7 +1061,7 @@ async function loadStatus() {
   const chip = (label, on, title) => `<span class="chip ${on ? "" : "off"}" title="${esc(title)}">${on ? "●" : "○"} ${label}</span>`;
   $("#chips").innerHTML = [
     chip("Homebase", status.homebase !== "mock", `Homebase: ${status.homebase}`),
-    chip("Gmail", status.gmail === "google", status.gmail === "google" ? (status.gmailFull ? "Connected" : "Connected for drafts only; reconnect to send from the hub") : "Not connected (test inbox)"),
+    chip("Gmail", status.gmail === "google", status.gmail === "google" ? (status.gmailFull ? "Connected" : "Connected for drafts only; reconnect to send from Keystone") : "Not connected (test inbox)"),
     chip("CompanyCam", status.companycam === "rest", status.companycam === "rest" ? "Connected" : "Not connected"),
     chip("Claude", status.agent, status.agent ? "On" : "Off: no Anthropic API key on this machine"),
   ].join("");
@@ -1107,7 +1108,7 @@ async function loadToday() {
   $("#today").innerHTML = `
     <div class="todayhead"><div style="flex:1;min-width:240px"><h2>Dashboard</h2><div class="dateline">${esc(longDate)} · ${t.open} open jobs${d.lastSync ? ` · synced ${fmtWhen(d.lastSync)}` : ""}</div></div>
       <button class="btn primary" id="plan" ${status.agent ? "" : "disabled title='Claude is off on this machine'"}>Plan my day with Claude</button></div>
-    ${!d.autoFiling ? `<div class="banner">Incoming job emails file themselves to Homebase once Gmail is fully connected${status.gmail === "google" ? ": double-click <b>Connect Gmail</b> in the hub folder once more and click Allow" : ""}.</div>` : ""}
+    ${!d.autoFiling ? `<div class="banner">Incoming job emails file themselves to Homebase once Gmail is fully connected${status.gmail === "google" ? ": double-click <b>Connect Gmail</b> in the Keystone folder (forefront-hub) once more and click Allow" : ""}.</div>` : ""}
     <div id="brief"></div>
     <div class="strip">
       ${tile("reply", t.waiting, "waiting on your reply", true)}
@@ -1138,7 +1139,7 @@ async function loadToday() {
         <div class="card"><h3><span><span class="muted small">02</span> Proposals out</span><span class="small muted">largest first</span></h3>
           ${d.proposals.length ? `<table class="tbl"><tbody>${d.proposals.map((x) => `<tr><td><a href="#" data-do="open" data-n="${x.jobNumber}">#${x.jobNumber} ${esc(x.name)}</a>${x.waiting ? ` <span class="tag in">reply</span>` : ""}<div class="small muted">${x.lastTouch ? esc(x.lastTouch) : "no activity"}</div></td><td class="num">${usd(x.amount) || "—"}<div class="small muted">${daysSince(x.lastTouchAt) ?? "?"}d quiet</div></td></tr>`).join("")}</tbody></table>` : `<p class="muted">None out.</p>`}</div>
         <div class="card"><h3><span><span class="muted small">03</span> Recent activity</span></h3>
-          ${d.activity.length ? `<ul class="items">${d.activity.map((a) => `<li><a href="#" data-do="open" data-n="${a.jobNumber}">#${a.jobNumber} ${esc(a.name)}</a> <span class="small muted">${fmtWhen(a.at)}</span><div class="small">${esc(a.what)}</div></li>`).join("")}</ul>` : `<p class="muted">Nothing yet. Activity from the hub shows here.</p>`}</div>
+          ${d.activity.length ? `<ul class="items">${d.activity.map((a) => `<li><a href="#" data-do="open" data-n="${a.jobNumber}">#${a.jobNumber} ${esc(a.name)}</a> <span class="small muted">${fmtWhen(a.at)}</span><div class="small">${esc(a.what)}</div></li>`).join("")}</ul>` : `<p class="muted">Nothing yet. Activity from Keystone shows here.</p>`}</div>
       </div>
     </div>`;
   $("#plan")?.addEventListener("click", startPlan);
@@ -1443,10 +1444,10 @@ function renderFiles(el) {
       ${hb.docs.length ? `<ul class="items">${hb.docs.map((d) => `<li><span class="tag">${esc(d.kind)}</span> <a href="${d.localFile ? fileUrl(d.localFile) : `/api/jobs/${n}/hbdoc/${d.id}`}" target="_blank">${esc(d.title || d.fileName)}</a><div class="small muted">${fmtDate(d.createdAt)}${d.createdBy ? " · " + esc(d.createdBy) : ""}</div></li>`).join("")}</ul>` : `<p class="muted">No files on the job in Homebase.</p>`}
       ${hb.toUpload.length ? `<p class="small muted" style="margin:10px 0 0">Not in Homebase yet: ${hb.toUpload.map((f) => esc(f.name)).join(", ")}</p>` : ""}</div>
     <div class="card"><h3>Added files <button class="btn small" data-act="addfiles">Add files</button></h3>
-      ${(files.files || []).length || (files.photosAdded || []).length ? `<ul class="items">${(files.files || []).map((f) => `<li><a href="${fileUrl("files/" + f.name)}" target="_blank">${esc(f.name)}</a> <span class="small muted">${fmtDate(f.modified)}</span></li>`).join("")}${(files.photosAdded || []).slice(0, 12).map((f) => `<li><a href="${fileUrl("photos/" + f.name)}" target="_blank">${esc(f.name)}</a> <span class="tag">photo</span></li>`).join("")}</ul>` : `<p class="muted">Drag files anywhere onto the hub, or use Add files.</p>`}</div>
+      ${(files.files || []).length || (files.photosAdded || []).length ? `<ul class="items">${(files.files || []).map((f) => `<li><a href="${fileUrl("files/" + f.name)}" target="_blank">${esc(f.name)}</a> <span class="small muted">${fmtDate(f.modified)}</span></li>`).join("")}${(files.photosAdded || []).slice(0, 12).map((f) => `<li><a href="${fileUrl("photos/" + f.name)}" target="_blank">${esc(f.name)}</a> <span class="tag">photo</span></li>`).join("")}</ul>` : `<p class="muted">Drag files anywhere onto Keystone, or use Add files.</p>`}</div>
     <div class="card"><h3>Email attachments</h3>
       ${(files.attachments || []).length ? `<ul class="items">${files.attachments.slice(0, 40).map((f) => `<li><a href="${fileUrl("email/attachments/" + f.name)}" target="_blank">${esc(f.name.split("/").pop())}</a><div class="small muted">${esc(f.name.split("/")[0])}</div></li>`).join("")}</ul>` : `<p class="muted">Attachments from emails filed to this job land here.</p>`}</div>
-    <div class="card"><h3>Sketch</h3>${(files.sketch || []).length ? `<ul class="items">${files.sketch.map((f) => `<li><a href="${fileUrl("sketch/" + f.name)}">${esc(f.name)}</a></li>`).join("")}</ul>` : `<p class="muted">No ESX yet. Download it from DocuSketch; the hub picks it up from Downloads.</p>`}</div>
+    <div class="card"><h3>Sketch</h3>${(files.sketch || []).length ? `<ul class="items">${files.sketch.map((f) => `<li><a href="${fileUrl("sketch/" + f.name)}">${esc(f.name)}</a></li>`).join("")}</ul>` : `<p class="muted">No ESX yet. Download it from DocuSketch; Keystone picks it up from Downloads.</p>`}</div>
   </div>`;
 }
 
@@ -1495,11 +1496,11 @@ async function loadMail() {
   const inbox = labels.find((l) => l.id === "INBOX");
   $("#mailcount").textContent = inbox?.unread || ""; $("#mailcount").hidden = !inbox?.unread;
   $("#labels").innerHTML = `<button class="gm-compose" id="compose" type="button">${msI("edit")}<span class="nm">Compose</span></button>` +
-    GLABELS.filter(([id]) => labels.some((l) => l.id === id) || ["INBOX", "STARRED", "SENT", "DRAFT", "HUB_DRAFTS"].includes(id)).map(([id, nm, ic]) => `<button class="gm-lab ${id === mailLabel ? "on" : ""} ${id === "HUB_DRAFTS" ? "gen" : ""}" data-label="${id}" type="button" ${id === "HUB_DRAFTS" ? 'title="Drafts Claude and the hub made for you. Review, then send."' : ""}>${msI(ic, id === mailLabel)}<span class="nm">${nm}</span>${id === "INBOX" && inbox?.unread ? `<b>${inbox.unread}</b>` : id === "HUB_DRAFTS" && genCount ? `<b class="gc">${genCount}</b>` : ""}</button>`).join("") +
+    GLABELS.filter(([id]) => labels.some((l) => l.id === id) || ["INBOX", "STARRED", "SENT", "DRAFT", "HUB_DRAFTS"].includes(id)).map(([id, nm, ic]) => `<button class="gm-lab ${id === mailLabel ? "on" : ""} ${id === "HUB_DRAFTS" ? "gen" : ""}" data-label="${id}" type="button" ${id === "HUB_DRAFTS" ? 'title="Drafts Claude and Keystone made for you. Review, then send."' : ""}>${msI(ic, id === mailLabel)}<span class="nm">${nm}</span>${id === "INBOX" && inbox?.unread ? `<b>${inbox.unread}</b>` : id === "HUB_DRAFTS" && genCount ? `<b class="gc">${genCount}</b>` : ""}</button>`).join("") +
     (user.length ? `<div class="gm-labh">Labels</div>` + user.map((l) => `<button class="gm-lab ${l.id === mailLabel ? "on" : ""}" data-label="${esc(l.id)}" type="button">${msI("label")}<span class="nm">${esc(l.name)}</span></button>`).join("") : "");
   if (typeof zgrips === "function") zgrips(); // the folder list was redrawn: put its resize edge back
   $("#compose").addEventListener("click", () => openCompose({}));
-  if (status.gmail === "google" && !status.gmailFull) $("#gm-main").insertAdjacentHTML("afterbegin", `<div class="gm-banner" style="margin-top:12px">Gmail is connected for drafts only. To read, send and archive here, double-click <b>Connect Gmail</b> in the hub folder once more and click Allow.</div>`);
+  if (status.gmail === "google" && !status.gmailFull) $("#gm-main").insertAdjacentHTML("afterbegin", `<div class="gm-banner" style="margin-top:12px">Gmail is connected for drafts only. To read, send and archive here, double-click <b>Connect Gmail</b> in the Keystone folder (forefront-hub) once more and click Allow.</div>`);
   if (status.gmail === "mock") $("#gm-main").insertAdjacentHTML("afterbegin", `<div class="gm-banner" style="margin-top:12px">This is a test inbox: Gmail isn't connected on this machine.</div>`);
   showList();
   loadThreads();
@@ -1894,7 +1895,7 @@ $("#pl-play").addEventListener("click", () => { const l = $("#pl-link").value.tr
 $("#pl-link").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("#pl-play").click(); } });
 $("#pl-audible").addEventListener("click", () => {
   const w = window.open("https://www.audible.com/library/titles", "audible", "width=460,height=780");
-  if (!w) log("Your browser blocked the Audible window. Allow pop-ups for the hub, or open audible.com/library.", "t-err");
+  if (!w) log("Your browser blocked the Audible window. Allow pop-ups for Keystone, or open audible.com/library.", "t-err");
 });
 (() => { renderSaved(); const now = store.get("spotifyNow", null); if (now && spotifyEmbed(now)) { $("#pl-spotify").src = spotifyEmbed(now); $("#pl-spotify").hidden = false; } if (store.get("playerOpen", false)) $("#player").hidden = false; })();
 
@@ -1912,7 +1913,7 @@ function calRange() {
   const first = new Date(calDate.getFullYear(), calDate.getMonth(), 1); const s = startOfWeek(first); return { start: s, end: new Date(s.getTime() + 42 * 864e5), days: 42 };
 }
 async function loadCal() {
-  if (status.gmail === "google" && !status.calendarConnected) $("#cal-body").innerHTML = `<div class="empty">Google Calendar isn't connected yet. Double-click <b>Connect Gmail</b> in the hub folder: it turns on Calendar and Tasks and asks you to Allow.</div>`;
+  if (status.gmail === "google" && !status.calendarConnected) $("#cal-body").innerHTML = `<div class="empty">Google Calendar isn't connected yet. Double-click <b>Connect Gmail</b> in the Keystone folder (forefront-hub): it turns on Calendar and Tasks and asks you to Allow.</div>`;
   try { cals = await api("/api/cal/calendars"); } catch (e) { cals = []; }
   try { taskLists = status.tasksConnected === false ? [] : await api("/api/tasks/lists"); } catch { taskLists = []; }
   $("#ev-cal").innerHTML = cals.filter((c) => c.writable).map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
@@ -2160,11 +2161,11 @@ async function spLogin() {
   sessionStorage.setItem("sp:verifier", verifier); sessionStorage.setItem("sp:state", state);
   location.href = `https://accounts.spotify.com/authorize?${new URLSearchParams({ client_id: spClientId, response_type: "code", redirect_uri: SP_REDIRECT, code_challenge_method: "S256", code_challenge: challenge, scope: SP_SCOPES, state })}`;
 }
-// The Client ID comes from the hub's .env. Load it before any token call: the sign-in redirect lands before the
+// The Client ID comes from Keystone's .env. Load it before any token call: the sign-in redirect lands before the
 // Music tab has been drawn, and a blank client_id makes Spotify answer "invalid_client".
 async function spEnsureClient() {
   if (!spClientId) { try { spClientId = (await api("/api/settings/spotify")).clientId || ""; } catch {} }
-  if (!spClientId) throw new Error("No Spotify Client ID saved in the hub yet. Open Music to set it up.");
+  if (!spClientId) throw new Error("No Spotify Client ID saved in Keystone yet. Open Music to set it up.");
   return spClientId;
 }
 async function spTokenRequest(params) {
@@ -2172,8 +2173,8 @@ async function spTokenRequest(params) {
   const r = await fetch("https://accounts.spotify.com/api/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id, ...params }) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) {
-    if (j.error === "invalid_client") throw new Error("Spotify doesn't recognize the Client ID saved in the hub. In Music, click \"Change Client ID\" and paste it again from your app's Settings on developer.spotify.com.");
-    if (j.error === "invalid_grant" && params.grant_type === "refresh_token") { spTok.clear(); throw new Error("Spotify signed the hub out. Log in again in Music."); }
+    if (j.error === "invalid_client") throw new Error("Spotify doesn't recognize the Client ID saved in Keystone. In Music, click \"Change Client ID\" and paste it again from your app's Settings on developer.spotify.com.");
+    if (j.error === "invalid_grant" && params.grant_type === "refresh_token") { spTok.clear(); throw new Error("Spotify signed Keystone out. Log in again in Music."); }
     throw new Error(j.error_description || j.error || "Spotify sign-in failed");
   }
   const old = spTok.get() || {};
@@ -2206,11 +2207,11 @@ async function sp(path, opts = {}) {
 function spLoadSDK() {
   if (spSDK || document.getElementById("sp-sdk")) return;
   window.onSpotifyWebPlaybackSDKReady = () => {
-    spSDK = new Spotify.Player({ name: "Forefront Hub", getOAuthToken: async (cb) => cb(await spToken()), volume: store.get("spvol", 0.6) });
+    spSDK = new Spotify.Player({ name: "Keystone", getOAuthToken: async (cb) => cb(await spToken()), volume: store.get("spvol", 0.6) });
     spSDK.addListener("ready", ({ device_id }) => { spDevice = device_id; spRefreshState(); });
     spSDK.addListener("not_ready", () => { spDevice = null; });
     spSDK.addListener("player_state_changed", () => spRefreshState());
-    spSDK.addListener("account_error", () => log("Playing inside the hub needs Spotify Premium. You can still control Spotify on your phone or computer from here.", "t-err"));
+    spSDK.addListener("account_error", () => log("Playing inside Keystone needs Spotify Premium. You can still control Spotify on your phone or computer from here.", "t-err"));
     spSDK.addListener("authentication_error", () => { spTok.clear(); renderMusic(); });
     spSDK.addListener("initialization_error", ({ message }) => log(`Spotify player: ${message}`, "t-err"));
     spSDK.connect();
@@ -2236,22 +2237,22 @@ async function renderMusic() {
   const root = $("#sp");
   if (!spForceSetup) { try { spClientId = (await api("/api/settings/spotify")).clientId; } catch {} }
   if (location.hostname === "localhost") {
-    root.innerHTML = `<div class="sp-main" style="grid-column:1/-1;grid-row:1/-1"><div class="sp-setup"><h1>Music</h1><p>Spotify only signs in at <code>127.0.0.1</code>, not <code>localhost</code>. Open the hub at <a href="http://127.0.0.1:${location.port}/">http://127.0.0.1:${location.port}</a> (the desktop icon does from now on).</p></div></div>`; return;
+    root.innerHTML = `<div class="sp-main" style="grid-column:1/-1;grid-row:1/-1"><div class="sp-setup"><h1>Music</h1><p>Spotify only signs in at <code>127.0.0.1</code>, not <code>localhost</code>. Open Keystone at <a href="http://127.0.0.1:${location.port}/">http://127.0.0.1:${location.port}</a> (the desktop icon does from now on).</p></div></div>`; return;
   }
   if (!spClientId) {
     root.innerHTML = `<div class="sp-main" style="grid-column:1/-1;grid-row:1/-1"><div class="sp-setup"><h1>Connect Spotify</h1>
       <p>One time, about 2 minutes. Spotify asks every app to register itself; this registration is yours alone.</p>
       <ol><li>Open <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a> and log in with your Spotify account. Click <b>Create app</b>.</li>
-      <li>App name <b>Forefront Hub</b>, any description. Redirect URI: <code>${esc(SP_REDIRECT)}</code> (click <b>Add</b>). Tick <b>Web API</b> and <b>Web Playback SDK</b>, agree, <b>Save</b>.</li>
+      <li>App name <b>Keystone</b>, any description. Redirect URI: <code>${esc(SP_REDIRECT)}</code> (click <b>Add</b>). Tick <b>Web API</b> and <b>Web Playback SDK</b>, agree, <b>Save</b>.</li>
       <li>Open the app's <b>Settings</b>, copy the <b>Client ID</b>, and paste it here:</li></ol>
       <input type="text" id="sp-cid" placeholder="Client ID (32 letters and numbers)">
       <button class="sp-green" id="sp-save">Save and sign in</button>
-      <p style="color:#b3b3b3;font-size:13px">Playing music inside the hub needs Spotify Premium. Without it, the hub still shows your library and controls Spotify on your phone or computer.</p></div></div>`;
+      <p style="color:#b3b3b3;font-size:13px">Playing music inside Keystone needs Spotify Premium. Without it, Keystone still shows your library and controls Spotify on your phone or computer.</p></div></div>`;
     $("#sp-save").onclick = async () => { try { await api("/api/settings/spotify", { method: "POST", body: { clientId: $("#sp-cid").value } }); spClientId = $("#sp-cid").value.trim(); spForceSetup = false; spTok.clear(); await spLogin(); } catch (e) { log(e.message, "t-err"); } };
     return;
   }
   if (!spTok.get()) {
-    root.innerHTML = `<div class="sp-main" style="grid-column:1/-1;grid-row:1/-1"><div class="sp-setup"><h1>Music</h1><p>Sign in to Spotify to bring your playlists and library into the hub.</p>${spLastErr ? `<p style="color:#f3727f">${esc(spLastErr)}</p>` : ""}<button class="sp-green" id="sp-login">Log in to Spotify</button><p style="margin-top:18px"><button class="sp-pill" id="sp-cidchange" type="button">Change Client ID</button></p></div></div>`;
+    root.innerHTML = `<div class="sp-main" style="grid-column:1/-1;grid-row:1/-1"><div class="sp-setup"><h1>Music</h1><p>Sign in to Spotify to bring your playlists and library into Keystone.</p>${spLastErr ? `<p style="color:#f3727f">${esc(spLastErr)}</p>` : ""}<button class="sp-green" id="sp-login">Log in to Spotify</button><p style="margin-top:18px"><button class="sp-pill" id="sp-cidchange" type="button">Change Client ID</button></p></div></div>`;
     $("#sp-login").onclick = () => spLogin().catch((e) => log(`Spotify: ${e.message}`, "t-err"));
     $("#sp-cidchange").onclick = () => { spClientId = ""; spForceSetup = true; renderMusic(); }; return;
   }
@@ -2508,7 +2509,7 @@ function renderEstSide() {
 function renderEstLog() {
   const d = estData, log = $("#est-log");
   if (!d) { log.innerHTML = `<div class="hello"><h3>Estimator</h3>Pick a job on the left, then ask Claude for an estimate, agreement, selections sign-off or photo report, the same way you would in chat.</div>`; $("#est-quick").innerHTML = ""; return; }
-  if (!d.claude) log.innerHTML = `<div class="hello"><h3>Claude is off on this machine</h3>Add your Anthropic API key (ANTHROPIC_API_KEY in the hub's .env, or save it in the Estimator app's Settings), then restart the hub.</div>`;
+  if (!d.claude) log.innerHTML = `<div class="hello"><h3>Claude is off on this machine</h3>Add your Anthropic API key (ANTHROPIC_API_KEY in Keystone's .env, or save it in the Estimator app's Settings), then restart Keystone.</div>`;
   else if (!d.turns.length) log.innerHTML = `<div class="hello"><h3>#${d.job.jobNumber} ${esc(d.job.name)}</h3>What do you need for this job? Pick one below or just type. Claude uses the Forefront estimating skill and saves everything in the job's estimate folder.</div>`;
   else log.innerHTML = d.turns.map(estTurnHtml).join("");
   if (d.running) log.insertAdjacentHTML("beforeend", `<div class="msg assistant" id="est-live">${estStream ? md(estStream) : ""}</div><div class="msg typing" id="est-typing">Claude is working</div>`);

@@ -1,12 +1,12 @@
 @echo off
 setlocal
-title Forefront Hub setup
-rem Double-click this. It can sit anywhere (Downloads is fine): it puts the hub in C:\Games\forefront-hub,
-rem next to the Estimator, sets it up, and adds a "Forefront Hub" icon to your desktop. Safe to run again.
+title Keystone setup
+rem Double-click this. It can sit anywhere (Downloads is fine): it puts Keystone in C:\Games\forefront-hub,
+rem next to the Estimator, sets it up, and adds a "Keystone" icon to your desktop. Safe to run again.
 
 set "HUB=C:\Games\forefront-hub"
 
-rem ---- Git (to download the hub and keep it up to date)
+rem ---- Git (to download Keystone and keep it up to date)
 where git >nul 2>nul
 if errorlevel 1 (
   echo Installing Git...
@@ -21,12 +21,12 @@ if errorlevel 1 (
   exit /b 1
 )
 
-rem ---- Download (first time) or update the hub
+rem ---- Download (first time) or update Keystone
 if exist "%HUB%\.git" (
-  echo Updating the hub in %HUB%...
+  echo Updating Keystone in %HUB%...
   git -C "%HUB%" pull --ff-only
 ) else (
-  echo Downloading the hub to %HUB%. If a GitHub sign-in window opens, sign in as Hpatter9.
+  echo Downloading Keystone to %HUB%. If a GitHub sign-in window opens, sign in as Hpatter9.
   if not exist "C:\Games" mkdir "C:\Games"
   git clone https://github.com/Hpatter9/forefront-hub.git "%HUB%"
 )
@@ -46,7 +46,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo Starting the hub now...
+echo Starting Keystone now...
 timeout /t 3 /nobreak >nul
-start "" "%HUB%\Start Hub.bat"
+start "" "%HUB%\Start Keystone.bat"
 exit /b 0

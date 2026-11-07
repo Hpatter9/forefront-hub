@@ -27,7 +27,7 @@ import { allContacts, findContacts, noteAddresses, noteMessages } from "../workf
 import { BRIEF, briefDue } from "../workflows/brief.js";
 
 /**
- * The hub's screen: a local web app on 127.0.0.1 (the desktop window will load the same thing). Every action runs the
+ * Keystone's screen: a local web app on 127.0.0.1 (the desktop window will load the same thing). Every action runs the
  * same workflows as the CLI; anything that changes Homebase, sends an email or overwrites an estimate asks first.
  */
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -155,7 +155,7 @@ async function photosView(n: number) {
   const job = hub.jobs.exists(n) ? hub.jobs.get(n) : null;
   if (!job?.companycamProjectId) return { linked: false, photos: [] };
   const [project, photos] = await Promise.all([hub.photos.project?.(job.companycamProjectId).catch(() => null) ?? Promise.resolve(null), hub.photos.listPhotos(job.companycamProjectId)]);
-  // Mock photos are local files; serve those through the hub. Real ones load straight from CompanyCam.
+  // Mock photos are local files; serve those through Keystone. Real ones load straight from CompanyCam.
   const src = (u: string) => (/^https?:/.test(u) ? u : `/api/fixture-photo/${encodeURIComponent(path.basename(u))}`);
   return {
     linked: true,
@@ -225,7 +225,7 @@ const server = http.createServer(async (req, res) => {
         jobsRoot: cfg.jobsRoot,
       });
     }
-    // ---- Spotify: only the app's client ID lives on the hub (in .env); sign-in tokens stay in the browser.
+    // ---- Spotify: only the app's client ID lives on Keystone (in .env); sign-in tokens stay in the browser.
     if (p === "/api/settings/spotify" && req.method === "GET") return send(res, 200, { clientId: cfg.spotify.clientId });
     if (p === "/api/settings/spotify" && req.method === "POST") {
       const b = await body(req);
@@ -564,7 +564,7 @@ const server = http.createServer(async (req, res) => {
         bus.emit({ type: "changed", what: "mail" });
         return send(res, 200, { ok: true });
       }
-      if (hub.gmail.fullAccess && !hub.gmail.fullAccess()) return send(res, 400, { error: "Gmail needs to be reconnected once to send from the hub: double-click Connect Gmail." });
+      if (hub.gmail.fullAccess && !hub.gmail.fullAccess()) return send(res, 400, { error: "Gmail needs to be reconnected once to send from Keystone: double-click Connect Gmail." });
       return send(res, 202, task(`Send draft "${m?.subject ?? ""}"`, undefined, async () => {
         const lines = m ? [`To: ${m.to.join(", ")}`, m.cc.length ? `Cc: ${m.cc.join(", ")}` : "", `Subject: ${m.subject}`, m.attachments.length ? `Attached: ${m.attachments.map((a) => a.filename).join(", ")}` : ""].filter(Boolean) : [];
         if (!(await approver.confirm("Send this draft now?", lines))) return hub.say("Not sent. It's still a draft.");
@@ -584,7 +584,7 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/mail/send" && req.method === "POST") {
       const b = await body(req);
       if (!hub.gmail.send) return send(res, 400, { error: "This Gmail connection can't send." });
-      if (hub.gmail.fullAccess && !hub.gmail.fullAccess()) return send(res, 400, { error: "Gmail needs to be reconnected once to send from the hub: double-click Connect Gmail." });
+      if (hub.gmail.fullAccess && !hub.gmail.fullAccess()) return send(res, 400, { error: "Gmail needs to be reconnected once to send from Keystone: double-click Connect Gmail." });
       const split = (s: unknown) => String(s ?? "").split(/[,;]/).map((x) => x.trim()).filter(Boolean);
       const d = { to: split(b.to), cc: split(b.cc), bcc: split(b.bcc), subject: String(b.subject ?? ""), body: String(b.body ?? ""), attachments: resolveAttachments(b.attachments), threadId: b.threadId || undefined, inReplyTo: b.inReplyTo || undefined };
       if (!d.to.length) return send(res, 400, { error: "Add at least one recipient." });
@@ -605,7 +605,7 @@ const server = http.createServer(async (req, res) => {
     // ---- calendar
     if (p === "/api/cal/calendars") return send(res, 200, await hub.calendar.calendars());
     if (p === "/api/mail/generated") {
-      // The Gmail tab's "Claude drafts" folder: drafts the hub made, shaped like the thread list.
+      // The Gmail tab's "Claude drafts" folder: drafts Keystone made, shaped like the thread list.
       const { openGeneratedDrafts } = await import("../workflows/generated.js");
       const list = await openGeneratedDrafts(hub);
       const qq = q("q").toLowerCase();
@@ -733,7 +733,7 @@ const server = http.createServer(async (req, res) => {
       const b = await body(req);
       if (!cfg.anthropicApiKey) return send(res, 400, { error: "Claude is off on this machine (no Anthropic API key). Set ANTHROPIC_API_KEY in .env, or save it in the Estimator app." });
       const job = b.job ? Number(b.job) : undefined;
-      // The answer comes back as an "answer" event with what the hub should show: the drafts made (to open in Gmail),
+      // The answer comes back as an "answer" event with what Keystone should show: the drafts made (to open in Gmail),
       // the jobs and contacts Claude looked at (for buttons on the popup), and Claude's reply.
       const id = crypto.randomUUID();
       const prompt = String(b.prompt);
@@ -776,7 +776,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-// ---- background sync: every 15 minutes while the hub is open (read-only toward Homebase and Gmail)
+// ---- background sync: every 15 minutes while Keystone is open (read-only toward Homebase and Gmail)
 let lastSync: SyncAllResult | null = null;
 let syncRunning = false;
 function runSyncAll() {
@@ -883,7 +883,7 @@ function startPlan(trigger: "button" | "morning"): { taskId: string } | { error:
   if (!cfg.anthropicApiKey) return { error: "Claude is off on this machine (no Anthropic API key).", code: 400 };
   if (readPlan().state === "running") return { error: "Claude is already planning your day.", code: 409 };
   const list = reminders(hub, { needsUpload: new Set((lastSync?.needsUpload ?? []).map((x) => x.jobNumber)) });
-  const buildPrompt = (myDayNote: string) => `Plan my day. Here is everything the hub thinks needs me, as JSON (kind, job, title, detail, days waiting):\n${JSON.stringify(list.slice(0, 60))}\n\n${myDayNote}\n\nThis brief is only for me and my time. Rules:\n- Use ONLY the calendar events and tasks listed above. They are mine: my own calendar (not shared team calendars) and my own Google Tasks. Don't look up other calendars or tasks with the hub tools, and leave out other people's meetings and to-dos.\n- Every line in the brief is something I do. If something waits on someone else, either write it as my action (\"Ask Shannon whether the selections went out\") or leave it out.\n\nFor the top replies and follow-ups, read the thread or the job (hub tools) and draft the email in Gmail for me (drafts only; I'll send).\n\nEmail buttons: whenever a line is about a specific email conversation and you know its Gmail thread id (the threadId in the JSON above, a thread you read or searched, or the threadId a draft you made returned), end that line with {email:THREAD_ID}, e.g. \"1. #3184 Wegener: reply to Andrew about the revised scope {email:18c2f0a9b7e1d234}\". The hub turns it into a View email button. Never invent an id; leave it off when you don't have one.\n\nGo buttons: end every line that's about a job with {go:JOB#:PLACE}, where PLACE is where I'd start the work: estimator (writing, pricing or revising an estimate, agreement, photo report), selections (the owner's finish picks and budgets), notes (team notes), photos, files (documents), or job (anything else). E.g. \"2. #3226 Augustine: start the estimate from the ESX {go:3226:estimator}\". The hub turns it into a button that takes me there.\n\nYour final reply is my brief for the day, shown at the top of my dashboard. Write it in this shape, in markdown, and nothing else:\n**Today at a glance:** one or two sentences (what's booked, how many things are waiting, the one thing that matters most).\n\n**Do in this order**\n1. #<job> <Name>: what to do (one line each, most urgent first: an adjuster or homeowner waiting on me beats a stale job; money-heavy proposals before small ones).\n\n**On the calendar:** the day's appointments, one line each (skip if none).\n\n**Drafts ready in Gmail:** one line per draft you made (skip if none).`;
+  const buildPrompt = (myDayNote: string) => `Plan my day. Here is everything Keystone thinks needs me, as JSON (kind, job, title, detail, days waiting):\n${JSON.stringify(list.slice(0, 60))}\n\n${myDayNote}\n\nThis brief is only for me and my time. Rules:\n- Use ONLY the calendar events and tasks listed above. They are mine: my own calendar (not shared team calendars) and my own Google Tasks. Don't look up other calendars or tasks with Keystone's tools, and leave out other people's meetings and to-dos.\n- Every line in the brief is something I do. If something waits on someone else, either write it as my action (\"Ask Shannon whether the selections went out\") or leave it out.\n\nFor the top replies and follow-ups, read the thread or the job (Keystone's tools) and draft the email in Gmail for me (drafts only; I'll send).\n\nEmail buttons: whenever a line is about a specific email conversation and you know its Gmail thread id (the threadId in the JSON above, a thread you read or searched, or the threadId a draft you made returned), end that line with {email:THREAD_ID}, e.g. \"1. #3184 Wegener: reply to Andrew about the revised scope {email:18c2f0a9b7e1d234}\". Keystone turns it into a View email button. Never invent an id; leave it off when you don't have one.\n\nGo buttons: end every line that's about a job with {go:JOB#:PLACE}, where PLACE is where I'd start the work: estimator (writing, pricing or revising an estimate, agreement, photo report), selections (the owner's finish picks and budgets), notes (team notes), photos, files (documents), or job (anything else). E.g. \"2. #3226 Augustine: start the estimate from the ESX {go:3226:estimator}\". Keystone turns it into a button that takes me there.\n\nYour final reply is my brief for the day, shown at the top of my dashboard. Write it in this shape, in markdown, and nothing else:\n**Today at a glance:** one or two sentences (what's booked, how many things are waiting, the one thing that matters most).\n\n**Do in this order**\n1. #<job> <Name>: what to do (one line each, most urgent first: an adjuster or homeowner waiting on me beats a stale job; money-heavy proposals before small ones).\n\n**On the calendar:** the day's appointments, one line each (skip if none).\n\n**Drafts ready in Gmail:** one line per draft you made (skip if none).`;
   const plan: Plan = { state: "running", startedAt: new Date().toISOString(), text: "", steps: [], trigger };
   savePlan(plan);
 
@@ -914,7 +914,7 @@ function startPlan(trigger: "button" | "morning"): { taskId: string } | { error:
 }
 
 // ---- the morning brief: on its own at 7:00 AM Denver time on weekdays (HUB_BRIEF_TIME=off stops it,
-// HUB_BRIEF_DAYS=0-6 for every day). If the hub wasn't open at 7, it runs as soon as it opens, until 5 PM.
+// HUB_BRIEF_DAYS=0-6 for every day). If Keystone wasn't open at 7, it runs as soon as it opens, until 5 PM.
 function checkBrief() {
   const last = readPlan();
   if (!cfg.anthropicApiKey || last.state === "running" || !briefDue(new Date(), "startedAt" in last ? last : null)) return;
@@ -929,7 +929,7 @@ const planFile = () => path.join(cfg.stateDir, "plan.json");
 function readPlan(): Plan | { state: "none" } {
   try {
     const p: Plan = JSON.parse(readFileSync(planFile(), "utf8"));
-    // A run that was going when the hub closed never finished.
+    // A run that was going when Keystone closed never finished.
     if (p.state === "running" && Date.now() - Date.parse(p.startedAt) > 20 * 60_000) return { ...p, state: "error", error: "That plan didn't finish. Try again." };
     return p;
   } catch {

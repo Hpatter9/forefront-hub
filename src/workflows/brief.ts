@@ -1,7 +1,7 @@
 /**
  * When the morning brief (Plan my day) runs on its own: 7:00 AM Denver time on weekdays by default.
  * HUB_BRIEF_TIME=08:30 moves it, HUB_BRIEF_TIME=off stops it, HUB_BRIEF_DAYS=0-6 (or "1,3,5") picks the days
- * (0 = Sunday). If the hub wasn't open at that time, it runs as soon as the hub opens, until 5 PM (HUB_BRIEF_UNTIL). One a day:
+ * (0 = Sunday). If Keystone wasn't open at that time, it runs as soon as Keystone opens, until 5 PM (HUB_BRIEF_UNTIL). One a day:
  * a Plan my day you ran yourself that morning counts.
  */
 export const BRIEF = { at: (process.env.HUB_BRIEF_TIME ?? "07:00").trim(), days: (process.env.HUB_BRIEF_DAYS ?? "1-5").trim(), until: (process.env.HUB_BRIEF_UNTIL ?? "17:00").trim() };

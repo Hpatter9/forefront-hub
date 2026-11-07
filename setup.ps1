@@ -1,8 +1,8 @@
-# Forefront Hub setup (Windows). Run by "Setup Forefront Hub.bat"; safe to run again any time.
+# Keystone setup (Windows). Run by "Setup Keystone.bat"; safe to run again any time.
 $ErrorActionPreference = "Stop"
 $Hub = $PSScriptRoot
 Set-Location $Hub
-Write-Host "Setting up Forefront Hub in $Hub" -ForegroundColor Cyan
+Write-Host "Setting up Keystone in $Hub" -ForegroundColor Cyan
 
 function Step($t) { Write-Host ""; Write-Host "== $t" -ForegroundColor Cyan }
 function Refresh-Path { $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User") }
@@ -32,9 +32,9 @@ if ($App) {
   if ((Test-Path (Join-Path $App ".git")) -and (Get-Command git -ErrorAction SilentlyContinue)) {
     try { & git -C $App pull --ff-only --quiet *> $null } catch { }
   }
-} else { Write-Host "Didn't find the Estimator app on this PC; the hub keeps its own copy of the skill." }
+} else { Write-Host "Didn't find the Estimator app on this PC; Keystone keeps its own copy of the skill." }
 
-# The skill: the app's copy when it is current, else the hub's own copy of the estimator repo (kept up to date).
+# The skill: the app's copy when it is current, else Keystone's own copy of the estimator repo (kept up to date).
 $Est = if ($App -and (Test-Path (Join-Path $App $Skill))) { $App } else { Join-Path $Hub "estimator" }
 if ($Est -eq (Join-Path $Hub "estimator")) {
   if (Test-Path (Join-Path $Est ".git")) { try { & git -C $Est pull --ff-only --quiet *> $null } catch { } }
@@ -46,7 +46,7 @@ if ($Est -eq (Join-Path $Hub "estimator")) {
 if (-not (Test-Path (Join-Path $Est $Skill))) { throw "Couldn't get the estimating skill from GitHub (Hpatter9/estimator). Check the GitHub sign-in and run setup again." }
 Write-Host "Skill: $Est\skill\forefront-estimate"
 
-# Python for the skill's scripts: the Estimator app's own, else a small one for the hub.
+# Python for the skill's scripts: the Estimator app's own, else a small one for Keystone.
 $Py = if ($App) { Join-Path $App ".venv\Scripts\python.exe" } else { "" }
 if (-not ($Py -and (Test-Path $Py))) {
   $Py = Join-Path $Hub ".venv-py\Scripts\python.exe"
@@ -65,8 +65,8 @@ if (-not ($Py -and (Test-Path $Py))) {
 }
 Write-Host "Python: $Py"
 
-# ---- 3. The hub's packages
-Step "Installing the hub (the first time takes a few minutes)"
+# ---- 3. Keystone's packages
+Step "Installing Keystone (the first time takes a few minutes)"
 npm install --no-audit --no-fund --loglevel=error | Out-Host
 if ($LASTEXITCODE -ne 0) { throw "npm install failed. Check your internet connection and run setup again." }
 
@@ -96,16 +96,17 @@ New-Item -ItemType Directory -Force -Path (Get-Setting "JOBS_ROOT") | Out-Null
 # ---- 5. Desktop icon
 Step "Desktop icon"
 $ws = New-Object -ComObject WScript.Shell
-$lnk = $ws.CreateShortcut([IO.Path]::Combine([Environment]::GetFolderPath("Desktop"), "Forefront Hub.lnk"))
-$lnk.TargetPath = Join-Path $Hub "Start Hub.bat"
+$lnk = $ws.CreateShortcut([IO.Path]::Combine([Environment]::GetFolderPath("Desktop"), "Keystone.lnk"))
+$lnk.TargetPath = Join-Path $Hub "Start Keystone.bat"
 $lnk.WorkingDirectory = $Hub
-$lnk.IconLocation = Join-Path $Hub "assets\icon.ico"
+$lnk.IconLocation = Join-Path $Hub "assets\keystone.ico"
 $lnk.WindowStyle = 7
 $lnk.Save()
-Write-Host "Added 'Forefront Hub' to your desktop."
+Remove-Item ([IO.Path]::Combine([Environment]::GetFolderPath("Desktop"), "Forefront Hub.lnk")) -ErrorAction SilentlyContinue
+Write-Host "Added 'Keystone' to your desktop."
 
 # ---- 6. Check
 Step "Check"
 npm run -s hub -- doctor | Out-Host
 Write-Host ""
-Write-Host "All set. From now on open the hub with the Forefront Hub icon on your desktop." -ForegroundColor Green
+Write-Host "All set. From now on open Keystone with the Keystone icon on your desktop." -ForegroundColor Green

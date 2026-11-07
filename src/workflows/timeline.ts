@@ -3,7 +3,7 @@ import type { Hub } from "../hub.js";
 
 /**
  * One timeline per job, newest first, that fills itself in: Homebase notes, the Activity log (calls, texts,
- * meetings), every email Homebase filed via the office+<job#> BCC, the job's Gmail conversations, and the hub's own
+ * meetings), every email Homebase filed via the office+<job#> BCC, the job's Gmail conversations, and Keystone's own
  * drafts. Read-only; nothing here writes anywhere.
  */
 export interface TimelineItem {

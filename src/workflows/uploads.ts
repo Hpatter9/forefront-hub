@@ -5,7 +5,7 @@ import type { Hub } from "../hub.js";
 import { STANDARD_FILES } from "./files.js";
 
 /**
- * Files Hunter adds by hand (dragged onto the hub or picked with Add files): saved in the job folder where they
+ * Files Hunter adds by hand (dragged onto Keystone or picked with Add files): saved in the job folder where they
  * belong, then, after an OK, added to the job's Documents in Homebase.
  */
 export function placeFor(name: string): { sub: "sketch" | "photos" | "estimate" | "files"; kind: DocumentKind } {

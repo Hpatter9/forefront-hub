@@ -6,8 +6,8 @@ import path from "node:path";
 import { google } from "googleapis";
 
 /**
- * One Google sign-in for the hub: Gmail (read, label, send, drafts) and Google Calendar (read and write events).
- * The token lives in auth/google-token.json (never committed). Signing in again adds any scope the hub gained since.
+ * One Google sign-in for Keystone: Gmail (read, label, send, drafts) and Google Calendar (read and write events).
+ * The token lives in auth/google-token.json (never committed). Signing in again adds any scope Keystone gained since.
  */
 export const SCOPES = {
   gmailModify: "https://www.googleapis.com/auth/gmail.modify",
@@ -47,7 +47,7 @@ export class GoogleAuth {
   client(): OAuth {
     const hit = shared.get(this.opts.tokenFile);
     if (hit) return hit;
-    if (!existsSync(this.opts.tokenFile)) throw new Error("Google isn't connected yet. Double-click Connect Gmail in the hub folder.");
+    if (!existsSync(this.opts.tokenFile)) throw new Error("Google isn't connected yet. Double-click Connect Gmail in the Keystone folder (forefront-hub).");
     const oauth = new google.auth.OAuth2(this.opts.clientId, this.opts.clientSecret);
     oauth.setCredentials(JSON.parse(readFileSync(this.opts.tokenFile, "utf8")));
     oauth.on("tokens", (t) => {

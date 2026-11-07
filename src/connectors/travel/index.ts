@@ -5,7 +5,7 @@ import type { Config } from "../../core/config.js";
 /**
  * Drive times between addresses, for "leave by" times on calendar events. Free, no account or key:
  * OpenStreetMap's Nominatim finds the address and the public OSRM router times the drive. OSRM assumes empty
- * roads, so the hub pads it, more at rush hour (see padFor). Light use only: one look-up per new address and
+ * roads, so Keystone pads it, more at rush hour (see padFor). Light use only: one look-up per new address and
  * per pair of addresses, kept in .hub/travel.json.
  */
 export interface Drive {

@@ -30,7 +30,7 @@ export interface PhotoClient {
   readonly kind: "mock" | "rest";
   findProjects(query: string): Promise<CCProject[]>;
   project?(projectId: string): Promise<CCProject>;
-  /** Photos stay in CompanyCam; the hub shows them from their CompanyCam addresses. */
+  /** Photos stay in CompanyCam; Keystone shows them from their CompanyCam addresses. */
   listPhotos(projectId: string): Promise<CCPhoto[]>;
   /** Downloads photos into destDir as cc_<capturedAt>_<id>.jpg (skipping ones already there): only for a photo report. */
   download(photos: CCPhoto[], destDir: string, size?: "original" | "web"): Promise<string[]>;

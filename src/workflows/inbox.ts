@@ -7,7 +7,7 @@ import { isAutomated } from "./reminders.js";
 import { noteMessages } from "./contacts.js";
 
 /**
- * Files every incoming job email in Homebase on its own: the hub forwards it to the job's office+<job#> address, the
+ * Files every incoming job email in Homebase on its own: Keystone forwards it to the job's office+<job#> address, the
  * same mailbox your BCCs go to, and Homebase files it under the original sender and date and keeps its attachments
  * on the job's Documents. The attachments are also saved in the job folder (email/attachments/).
  *

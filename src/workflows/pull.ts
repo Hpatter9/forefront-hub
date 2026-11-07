@@ -82,7 +82,7 @@ export async function pullJob(hub: Hub, jobNumber: number, opts: { quiet?: boole
 }
 
 /**
- * Photos stay in CompanyCam and the hub shows them from there. This copies them down only when a file is needed:
+ * Photos stay in CompanyCam and Keystone shows them from there. This copies them down only when a file is needed:
  * small previews for Claude to pick report photos from, and full size for the photos that go in a report.
  * `only`: just these file names (cc_<date>_<id>.jpg). Writes index.json (dates, descriptions) next to them.
  */

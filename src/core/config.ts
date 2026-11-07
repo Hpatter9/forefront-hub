@@ -29,7 +29,7 @@ export interface Config {
   stateDir: string;
 }
 
-/** Reads .env from the hub folder (never committed) and fills in defaults. Mock wherever credentials are missing. */
+/** Reads .env from the Keystone folder (never committed) and fills in defaults. Mock wherever credentials are missing. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT): Config {
   if (env === process.env) dotenv.config({ path: path.join(root, ".env"), quiet: true } as dotenv.DotenvConfigOptions);
   const e = (k: string, d = "") => (env[k] ?? "").trim() || d;

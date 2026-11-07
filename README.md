@@ -1,11 +1,11 @@
-# Forefront Work Hub
+# Keystone
 
 One place to run a reconstruction job end to end: Homebase, Gmail, CompanyCam and DocuSketch behind a Claude agent
 that uses the **forefront-estimate** skill for all estimating. This is phase 1: a command-line tool. The desktop app
 comes next and uses the same code.
 
 ```
-npm run app                                the hub's screen at http://localhost:4317: Dashboard, Jobs, Estimator, Gmail, Calendar (+ Google Tasks), Music
+npm run app                                Keystone's screen at http://localhost:4317: Dashboard, Jobs, Estimator, Gmail, Calendar (+ Google Tasks), Music
 hub jobs --mine                            my open recon jobs: stage, days in stage, proposal $, estimator
 hub pull 3226                              Homebase -> C:\Jobs\3226 Augustine\job.json, link CompanyCam + DocuSketch
 hub photos 3226                            CompanyCam photos -> photos\
@@ -15,20 +15,20 @@ hub log 3226 call "Left VM" --who Eileen   call on the job's Activity tab, or a 
 hub ask -j 3226 "estimate this from the ESX and photos"     anything else, through the agent
 ```
 
-Nothing is ever emailed by the hub: it only makes **drafts**. Anything that changes Homebase, or overwrites an
+Nothing is ever emailed by Keystone: it only makes **drafts**. Anything that changes Homebase, or overwrites an
 estimate, asks you first; old estimates are kept in `estimate\revisions\vN`.
 
 ## Setup (Windows)
 
-Double-click **Setup Forefront Hub.bat** (it can sit in Downloads). It:
+Double-click **Setup Keystone.bat** (it can sit in Downloads). It:
 - installs Git and Node.js if they're missing;
-- downloads the hub to `C:\Games\forefront-hub` (sign in to GitHub if asked);
+- downloads Keystone to `C:\Games\forefront-hub` (sign in to GitHub if asked);
 - updates the Estimator;
-- installs the hub;
+- installs Keystone;
 - asks once for your Homebase API key;
-- adds a **Forefront Hub** icon to your desktop.
+- adds a **Keystone** icon to your desktop.
 
-Run it again any time; it only fills in what's missing. The icon starts the hub and opens http://localhost:4317, and
+Run it again any time; it only fills in what's missing. The icon starts Keystone and opens http://localhost:4317, and
 it picks up the latest version each time.
 
 Settings live in `C:\Games\forefront-hub\.env` (never uploaded). The Claude key is read from the Estimator app's
@@ -36,40 +36,40 @@ saved key. Gmail and CompanyCam are connected later (below); until then those pa
 
 ### Gmail: a Google OAuth client (one time, ~10 minutes)
 
-The hub talks to Gmail directly, so it needs its own Google "OAuth client". Claude's Gmail connector can't be used
+Keystone talks to Gmail directly, so it needs its own Google "OAuth client". Claude's Gmail connector can't be used
 from a program on your PC.
 
 1. Go to https://console.cloud.google.com, signed in as hunter@forefrontteam.com. Create a project named
-   "Forefront Hub".
+   "Keystone".
 2. **APIs & Services → Library**: search for **Gmail API** and click **Enable**.
 3. **APIs & Services → OAuth consent screen** (also called "Google Auth Platform → Branding/Audience"):
-   - App name "Forefront Hub", your email as the support and contact address.
+   - App name "Keystone", your email as the support and contact address.
    - Audience/User type: **Internal**. This is only offered on Google Workspace accounts, and it means no Google
      review and no 7-day token expiry. If Internal is greyed out, ask whoever runs Forefront's Google Workspace.
      The fallback is External plus yourself as a test user, but then you'll redo `gmail login` every 7 days.
-4. **Credentials → Create credentials → OAuth client ID → Application type: Desktop app**, named "Forefront Hub".
+4. **Credentials → Create credentials → OAuth client ID → Application type: Desktop app**, named "Keystone".
    Copy the **Client ID** and **Client secret** into `.env`.
-5. Run `npm run hub -- gmail login`. The hub asks only for *compose* (create drafts) and *read* access. It has
+5. Run `npm run hub -- gmail login`. Keystone asks only for *compose* (create drafts) and *read* access. It has
    no permission to send.
 
 ### CompanyCam token
 
-Your CompanyCam connector in Claude works in claude.ai, but the hub needs its own token. In the CompanyCam web
+Your CompanyCam connector in Claude works in claude.ai, but Keystone needs its own token. In the CompanyCam web
 app, an admin can create an **access token** (Company settings → Integrations / API → Access Tokens; the exact
 menu name varies with the plan). Paste it into `COMPANYCAM_TOKEN`. If you can't find it, ask CompanyCam support
 for "a v2 API access token".
 
 ### DocuSketch
 
-DocuSketch has no API. The hub finds the "Sketch request … delivered" email for the job to learn the DocuSketch
-project ID. You download the ESX from the portal as usual, and the hub picks `<project id>*.ESX` up from your
+DocuSketch has no API. Keystone finds the "Sketch request … delivered" email for the job to learn the DocuSketch
+project ID. You download the ESX from the portal as usual, and Keystone picks `<project id>*.ESX` up from your
 Downloads folder (`DOWNLOADS_DIR`) into the job's `sketch\` folder.
 
 ## Job folders
 
 ```
 C:\Jobs\3226 Augustine\
-  job.json        Homebase facts + CompanyCam/DocuSketch links + send-off drafts + log (the hub and agent both use it)
+  job.json        Homebase facts + CompanyCam/DocuSketch links + send-off drafts + log (Keystone and agent both use it)
   sketch\         *.ESX
   photos\         CompanyCam photos + index.json (dates, descriptions) + report-picks.json
   estimate\       estimate.json, "<Last> - Reconstruction Estimate / Agreement / Xactimate Estimate / Photo Report.pdf"
@@ -84,11 +84,11 @@ C:\Jobs\3226 Augustine\
   `index.ts`), a **mock** and a live version. Homebase uses its real API ([docs/homebase-api.md](docs/homebase-api.md));
   a browser driver (`HOMEBASE_DRIVER=browser`) remains as a fallback.
 - `src/connectors/skill`: runs the forefront-estimate skill's own scripts (totals, photo report). The agent loads
-  the skill itself from `ESTIMATOR_DIR\skill\forefront-estimate`, linked into `.claude\skills`. The hub never
+  the skill itself from `ESTIMATOR_DIR\skill\forefront-estimate`, linked into `.claude\skills`. Keystone never
   prices or scopes anything.
 - `src/workflows`: the send-off and sync, as plain code with two judgment calls (email wording, photo picks) made
   by Claude with the skill (`src/agent/writer.ts`).
-- `src/agent`: the Claude Agent SDK setup. `tools.ts` holds the hub tools (Homebase writes ask first, and there is
+- `src/agent`: the Claude Agent SDK setup. `tools.ts` holds Keystone's tools (Homebase writes ask first, and there is
   no send tool). `guard.ts` limits file writes to job folders and asks before an estimate is overwritten.
 
 - The **Estimator** tab (`src/agent/studio.ts`) is a chat with Claude per job, like using the skill in a chat:
@@ -98,7 +98,7 @@ C:\Jobs\3226 Augustine\
   beside the chat with a preview.
 
 - **Morning brief**: Plan my day runs on its own at 7:00 AM Denver time on weekdays and shows as Today's brief on
-  the dashboard (`src/workflows/brief.ts`). If the hub opens later, it runs then (until 5 PM). Change it in `.env`:
+  the dashboard (`src/workflows/brief.ts`). If Keystone opens later, it runs then (until 5 PM). Change it in `.env`:
   `HUB_BRIEF_TIME=08:00`, `HUB_BRIEF_DAYS=0-6` (every day), or `HUB_BRIEF_TIME=off`.
 
 - **Drive times**: calendar events with an address show a "leave by" block, the drive time from the previous

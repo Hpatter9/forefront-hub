@@ -28,7 +28,7 @@ export class GoogleGmail implements MailClient {
 
   /**
    * Every Gmail request goes through a pacer and a retry: Google allows a limited number of quota units per user
-   * per minute (and per second), and the hub's background checks plus the Gmail tab can add up. Calls wait their
+   * per minute (and per second), and Keystone's background checks plus the Gmail tab can add up. Calls wait their
    * turn instead of failing, and a "slow down" answer is retried after a pause.
    */
   private gmail(): gmail_v1.Gmail {
@@ -74,7 +74,7 @@ export class GoogleGmail implements MailClient {
     await this.gmail().users.drafts.send({ userId: "me", requestBody: { id: draftId } });
   }
 
-  /** keepMessageId: the draft's Message-ID header, kept so the hub still recognizes it once it's sent. */
+  /** keepMessageId: the draft's Message-ID header, kept so Keystone still recognizes it once it's sent. */
   async updateDraft(draftId: string, d: DraftInput, keepMessageId?: string) {
     for (const f of d.attachments) if (!existsSync(f)) throw new Error(`Attachment not found: ${f}`);
     const { html, from } = await this.sendAs();

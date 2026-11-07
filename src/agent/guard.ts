@@ -15,14 +15,14 @@ export function makeGuard(hub: Hub): CanUseTool {
   return async (toolName, input) => {
     if (toolName.startsWith("mcp__hub__")) return allow(input);
     if (["Read", "Glob", "Grep", "Skill", "TodoWrite", "WebFetch", "WebSearch", "ToolSearch"].includes(toolName)) return allow(input);
-    if (toolName.startsWith("mcp__")) return deny("Only the hub's own tools are available here.");
+    if (toolName.startsWith("mcp__")) return deny("Only Keystone's own tools are available here.");
 
     if (toolName === "Write" || toolName === "Edit" || toolName === "MultiEdit" || toolName === "NotebookEdit") {
       const file = String(input.file_path ?? input.notebook_path ?? "");
       if (!inside(file, hub.cfg.jobsRoot) && !inside(file, path.join(hub.cfg.hubRoot, ".hub")) && !inside(file, osTmp())) {
         return deny(`Writes are limited to the job folders (${hub.cfg.jobsRoot}).`);
       }
-      if (inside(file, hub.cfg.skillDir)) return deny("The forefront-estimate skill isn't edited from the hub.");
+      if (inside(file, hub.cfg.skillDir)) return deny("The forefront-estimate skill isn't edited from Keystone.");
       if (path.basename(file) === "estimate.json" && existsSync(file)) return estimateOverwrite(hub, file, input, "Change estimate.json");
       return allow(input);
     }
@@ -30,7 +30,7 @@ export function makeGuard(hub: Hub): CanUseTool {
     if (toolName === "Bash" || toolName === "PowerShell") {
       const cmd = String(input.command ?? "");
       if (/\b(rm\s+-rf|Remove-Item\b.*-Recurse|rmdir\s+\/s|del\s+\/s|format\s+[a-z]:|git\s+push|curl\b.*-X\s*(POST|PUT|DELETE))/i.test(cmd)) {
-        return deny("That command isn't allowed from the hub agent.");
+        return deny("That command isn't allowed from Keystone agent.");
       }
       const out = cmd.match(/render\.py\b[^\n]*?--out\s+("([^"]+)"|'([^']+)'|(\S+))/);
       // --only selections writes just the sign-off sheet, so it doesn't touch the estimate PDFs.

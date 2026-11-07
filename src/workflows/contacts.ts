@@ -6,7 +6,7 @@ import type { Hub } from "../hub.js";
 import { isAutomated } from "./reminders.js";
 
 /**
- * Hunter's contacts, built up on their own: every person who shows up on an email the hub reads (from, to, cc), the
+ * Hunter's contacts, built up on their own: every person who shows up on an email Keystone reads (from, to, cc), the
  * people on each job in Homebase (with their role on the job), and Homebase's own contact records when he looks
  * someone up. Each person fills out as more turns up: phones from email signatures, title and company from
  * Homebase, the jobs they're on, when they last emailed. Kept in .hub/contacts.json.

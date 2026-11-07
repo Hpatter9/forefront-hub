@@ -26,7 +26,7 @@ export interface CalEvent {
   link?: string; // open in Google Calendar
   meet?: string;
   attendees?: { email: string; name?: string; response?: string }[];
-  /** A job number the event mentions (#3226), so the hub can link it. */
+  /** A job number the event mentions (#3226), so Keystone can link it. */
   jobNumber?: number;
   /** The series a repeating event belongs to (Google's recurringEventId). */
   recurringId?: string;
@@ -75,7 +75,7 @@ export class GoogleCalendar implements CalendarClient {
   }
 
   private cal() {
-    if (!this.connected()) throw new Error("Google Calendar isn't connected yet: double-click Connect Gmail in the hub folder and click Allow (it now covers Calendar too).");
+    if (!this.connected()) throw new Error("Google Calendar isn't connected yet: double-click Connect Gmail in the Keystone folder (forefront-hub) and click Allow (it now covers Calendar too).");
     this.api ??= google.calendar({ version: "v3", auth: this.auth.client() });
     return this.api;
   }

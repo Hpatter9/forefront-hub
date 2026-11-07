@@ -5,7 +5,7 @@ import path from "node:path";
 
 /**
  * The forefront-estimate skill (in the estimator repo) does all the estimating. The agent runs it through the Skill
- * tool; the hub's own code only calls its standalone scripts for deterministic steps (totals, the photo report).
+ * tool; Keystone's own code only calls its standalone scripts for deterministic steps (totals, the photo report).
  * Nothing here prices or scopes anything.
  */
 export interface ScriptResult {
@@ -70,7 +70,7 @@ export class EstimateSkill {
 
   /**
    * Makes the skill visible to the agent: <hub>/.claude/skills/forefront-estimate -> the estimator repo's copy
-   * (a junction on Windows, so no admin rights are needed). Pulling the estimator repo updates the hub at once.
+   * (a junction on Windows, so no admin rights are needed). Pulling the estimator repo updates Keystone at once.
    */
   link(hubRoot: string): string {
     const dest = path.join(hubRoot, ".claude", "skills", "forefront-estimate");

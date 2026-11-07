@@ -18,8 +18,6 @@ rem Get the latest version (skipped quietly when offline).
 set GIT_TERMINAL_PROMPT=0
 where git >nul 2>nul && git pull --ff-only --quiet >nul 2>nul && call npm install --no-audit --no-fund --loglevel=error >nul 2>nul
 
-start "" /min powershell -NoProfile -WindowStyle Hidden -Command "Start-Sleep -Seconds 5; Start-Process 'http://127.0.0.1:4317'"
-echo Forefront Hub is running at http://127.0.0.1:4317
-echo Close this window to stop it.
-call npm run -s app
-pause
+rem Forefront Hub is now Keystone: swap the desktop icon for the new one, then start it.
+powershell -NoProfile -Command "$d=[Environment]::GetFolderPath('Desktop'); $k=Join-Path $d 'Keystone.lnk'; if (-not (Test-Path $k)) { $l=(New-Object -ComObject WScript.Shell).CreateShortcut($k); $l.TargetPath='%~dp0Start Keystone.bat'; $l.WorkingDirectory='%~dp0'; $l.IconLocation='%~dp0assets\keystone.ico'; $l.WindowStyle=7; $l.Save() }; Remove-Item (Join-Path $d 'Forefront Hub.lnk') -ErrorAction SilentlyContinue" >nul 2>nul
+call "%~dp0Start Keystone.bat"

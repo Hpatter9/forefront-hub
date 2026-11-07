@@ -11,7 +11,7 @@ import { sendoff } from "../workflows/sendoff.js";
 import { sync } from "../workflows/sync.js";
 import { TemplateWriter, type Recipient } from "../workflows/writer.js";
 
-const program = new Command("hub").description("Forefront Work Hub").option("--yes", "answer yes to every confirmation (careful)");
+const program = new Command("hub").description("Keystone").option("--yes", "answer yes to every confirmation (careful)");
 
 function hub(): Hub {
   const cfg = loadConfig();
@@ -30,7 +30,7 @@ const num = (s: string) => {
 
 program
   .command("doctor")
-  .description("Show how the hub is configured and which connectors are live or mocked")
+  .description("Show how Keystone is configured and which connectors are live or mocked")
   .action(() => {
     const h = hub();
     for (const l of describe(h)) console.log(l);
