@@ -1,4 +1,5 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import { claudeEnv } from "./env.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Message } from "../connectors/gmail/types.js";
@@ -142,7 +143,7 @@ ${m.body.slice(0, 6000)}`;
   let picks: any[] = [];
   for await (const r of query({
     prompt,
-    options: { model: hub.cfg.model, maxTurns: 2, allowedTools: [], settingSources: [], outputFormat: { type: "json_schema", schema: PICK_SCHEMA }, canUseTool: async () => ({ behavior: "deny", message: "No tools needed." }), systemPrompt: "You read customer emails about construction material selections and pull out the products they picked.", env: { ...(process.env as Record<string, string>), ANTHROPIC_API_KEY: hub.cfg.anthropicApiKey } },
+    options: { model: hub.cfg.model, maxTurns: 2, allowedTools: [], settingSources: [], outputFormat: { type: "json_schema", schema: PICK_SCHEMA }, canUseTool: async () => ({ behavior: "deny", message: "No tools needed." }), systemPrompt: "You read customer emails about construction material selections and pull out the products they picked.", env: claudeEnv(hub) },
   })) {
     if (r.type === "result" && r.subtype === "success") picks = ((r as any).structured_output ?? JSON.parse(r.result.match(/\{[\s\S]*\}/)?.[0] ?? '{"picks":[]}')).picks ?? [];
   }

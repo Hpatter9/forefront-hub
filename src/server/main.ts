@@ -210,7 +210,9 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === "/api/events") return bus.attach(res);
     if (p === "/api/status") {
+      const ce = await import("../agent/env.js");
       return send(res, 200, {
+        claude: { endpoint: ce.claudeEndpoint(), ignored: ce.ignoredRedirects() },
         lines: describe(hub),
         homebase: hub.homebase.kind,
         gmail: hub.gmail.kind,
@@ -862,8 +864,12 @@ if (INBOX_MINUTES > 0 && hub.gmail.kind === "google") {
 const port = Number(process.env.HUB_PORT || 4317);
 const host = process.env.HUB_HOST || "127.0.0.1";
 server.listen(port, host, () => {
-  console.log(`Forefront hub running at http://${host === "0.0.0.0" ? "localhost" : host}:${port}`);
+  console.log(`Keystone running at http://${host === "0.0.0.0" ? "localhost" : host}:${port}`);
   for (const l of describe(hub)) console.log(`  ${l}`);
+  void import("../agent/env.js").then((ce) => {
+    console.log(`  claude      requests go to ${ce.claudeEndpoint()}`);
+    for (const r of ce.ignoredRedirects()) console.log(`  NOTE: ignored ${r.name}${r.host ? ` (${r.host})` : ""} set on this PC; it would send Keystone's Claude requests somewhere else. Set HUB_CLAUDE_BASE_URL in .env if you really want that.`);
+  });
 });
 
 // ---- Homebase Notes across every job folder (saved by the background sync), for the dashboard

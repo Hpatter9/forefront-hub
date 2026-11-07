@@ -1,4 +1,5 @@
 import { query, type Options, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { claudeEnv } from "./env.js";
 import path from "node:path";
 import { STAGES } from "../core/job.js";
 import type { Hub } from "../hub.js";
@@ -35,7 +36,7 @@ export function agentOptions(hub: Hub, extra: Partial<Options> = {}, jobNumber?:
     canUseTool: makeGuard(hub),
     permissionMode: "default",
     systemPrompt: { type: "preset", preset: "claude_code", append: systemPrompt(hub, jobNumber) },
-    env: { ...(process.env as Record<string, string>), ...(hub.cfg.anthropicApiKey ? { ANTHROPIC_API_KEY: hub.cfg.anthropicApiKey } : {}) },
+    env: claudeEnv(hub),
     ...extra,
   };
 }
