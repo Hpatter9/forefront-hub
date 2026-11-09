@@ -8,13 +8,13 @@ import { MockTasks } from "../src/connectors/tasks/index.js";
 describe("calendar", () => {
   it("creates, moves and deletes events, and links job numbers", async () => {
     const cal = new MockCalendar(mkdtempSync(path.join(os.tmpdir(), "cal-")));
-    const ev = await cal.create({ title: "Scope walk #3226 Augustine", start: "2026-11-10T16:00:00.000Z", end: "2026-11-10T17:00:00.000Z", location: "1071 Acapulco Ct" });
+    const ev = await cal.create({ title: "Scope walk #3226 Augustine", start: "2027-03-10T16:00:00.000Z", end: "2027-03-10T17:00:00.000Z", location: "1071 Acapulco Ct" });
     expect(ev.jobNumber).toBe(3226);
-    await cal.update(ev.calendarId, ev.id, { start: "2026-11-10T18:00:00.000Z", end: "2026-11-10T19:00:00.000Z" });
-    const got = await cal.events({ start: "2026-11-10T00:00:00Z", end: "2026-11-11T00:00:00Z" });
-    expect(got.map((e) => [e.title, e.start])).toEqual([["Scope walk #3226 Augustine", "2026-11-10T18:00:00.000Z"]]);
+    await cal.update(ev.calendarId, ev.id, { start: "2027-03-10T18:00:00.000Z", end: "2027-03-10T19:00:00.000Z" });
+    const got = await cal.events({ start: "2027-03-10T00:00:00Z", end: "2027-03-11T00:00:00Z" });
+    expect(got.map((e) => [e.title, e.start])).toEqual([["Scope walk #3226 Augustine", "2027-03-10T18:00:00.000Z"]]);
     await cal.remove(ev.calendarId, ev.id);
-    expect(await cal.events({ start: "2026-11-10T00:00:00Z", end: "2026-11-11T00:00:00Z" })).toEqual([]);
+    expect(await cal.events({ start: "2027-03-10T00:00:00Z", end: "2027-03-11T00:00:00Z" })).toEqual([]);
   });
 
   it("finds open weekday time around busy blocks", () => {
