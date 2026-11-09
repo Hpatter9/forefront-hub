@@ -341,6 +341,12 @@ const server = http.createServer(async (req, res) => {
       if (req.method === "GET") {
         if (action === "") return send(res, 200, await jobView(n));
         if (action === "timeline") return send(res, 200, await timeline(hub, n));
+        if (action === "claude-prompt") {
+          const { handoffPrompt, HANDOFF_ACTIONS } = await import("../workflows/claudeHandoff.js");
+          const act = (q("action") in HANDOFF_ACTIONS ? q("action") : "estimate") as keyof typeof HANDOFF_ACTIONS;
+          if (!hub.jobs.exists(n)) await pullJob(hub, n, { quiet: true, lookups: false }).catch(() => {});
+          return send(res, 200, handoffPrompt(hub, n, act, q("note")));
+        }
         if (action === "selections") {
           const sl = await import("../workflows/selections.js");
           const s = hub.jobs.exists(n) ? sl.loadSelections(hub, n) : { updatedAt: "", categories: [] };
@@ -384,6 +390,19 @@ const server = http.createServer(async (req, res) => {
         return send(res, 202, task(`Add ${name} to #${n}`, n, () => addFile(hub, n, name, bytes, { toHomebase: q("homebase") !== "0" }), "job"));
       }
       const b = await body(req);
+      if (action === "open-folder") {
+        // Opens the job's folder on this PC (to drag its files into Claude). Only runs on the PC Keystone runs on.
+        if (!hub.jobs.exists(n)) await pullJob(hub, n, { quiet: true, lookups: false }).catch(() => {});
+        const dir = hub.jobs.folder(n);
+        const { spawn } = await import("node:child_process");
+        const [cmd, args] = process.platform === "win32" ? ["explorer.exe", [dir]] : process.platform === "darwin" ? ["open", [dir]] : ["xdg-open", [dir]];
+        try {
+          spawn(cmd, args as string[], { detached: true, stdio: "ignore" }).on("error", () => {}).unref();
+        } catch {
+          // no file manager here
+        }
+        return send(res, 200, { folder: dir });
+      }
       if (action === "stage") {
         // Move the job to another Homebase stage, after an OK. Homebase refuses it if the stage moved meanwhile.
         const stage = String(b.stage ?? "");

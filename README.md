@@ -109,8 +109,10 @@ C:\Jobs\3226 Augustine\
 - **Which AI**: `HUB_AI=gemini | claude | off` in `.env` (`src/agent/llm.ts`). With a `GEMINI_API_KEY` (double-click
   **Connect Gemini**) Keystone's AI features run on Google's Gemini: summaries and tasks from email on the lite
   model, the brief and Ask on `GEMINI_MODEL` (gemini-3.5-flash) using Keystone's own tools by function calling,
-  with fallback models when one is busy. The Estimator tab and setting up selections need Claude (the estimating
-  skill is Claude-only). On Gemini's free tier Google may use requests to improve its products.
+  with fallback models when one is busy. Estimating work (the Estimator tab, setting up selections, the send-off
+  wording) runs on Claude whenever there's an `ANTHROPIC_API_KEY` (sk-ant-...), whichever AI runs the rest. Keystone
+  takes that key from its own `.env` first, then the Estimator app, then the PC, and ignores PC-wide redirects
+  such as `ANTHROPIC_BASE_URL` set by ChatGPT bridges (`src/agent/env.ts`; `HUB_ALLOW_CLAUDE_REDIRECT=1` keeps them). On Gemini's free tier Google may use requests to improve its products.
 
 `npm test` runs everything on mocks, including the skill's real Python scripts (it expects the estimator repo
 next to this one, or `ESTIMATOR_DIR`). `npm run typecheck` checks types.

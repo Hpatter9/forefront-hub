@@ -47,9 +47,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
   const skillDir = e("SKILL_DIR", path.join(estimatorDir, "skill", "forefront-estimate"));
   const stateDir = path.join(root, ".hub");
 
-  let anthropicApiKey = e("ANTHROPIC_API_KEY");
+  // Claude's key, in this order: Keystone's own .env, the Estimator app's saved key, then a key set on the PC.
+  // Only real Anthropic keys (sk-ant-...) count: add-ons that send Claude to ChatGPT set fake ones on the PC.
   const keyFile = path.join(estimatorDir, "data", "api_key.txt");
-  if (!anthropicApiKey && existsSync(keyFile)) anthropicApiKey = readFileSync(keyFile, "utf8").trim();
+  const fromDotEnv = (() => {
+    try {
+      const f = path.join(root, ".env");
+      return env === process.env && existsSync(f) ? (dotenv.parse(readFileSync(f)).ANTHROPIC_API_KEY ?? "").trim() : "";
+    } catch {
+      return "";
+    }
+  })();
+  const candidates = env === process.env ? [fromDotEnv, existsSync(keyFile) ? readFileSync(keyFile, "utf8").trim() : "", (process.env.ANTHROPIC_API_KEY ?? "").trim()] : [e("ANTHROPIC_API_KEY")];
+  const anthropicApiKey = candidates.find((k) => k && (env !== process.env || k.startsWith("sk-ant-"))) ?? "";
 
   const hbDriver = e("HOMEBASE_DRIVER", e("HOMEBASE_API_TOKEN") ? "api" : "browser") as Config["homebase"]["driver"];
   const gmailReady = !!(e("GOOGLE_CLIENT_ID") && e("GOOGLE_CLIENT_SECRET"));

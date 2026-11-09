@@ -512,6 +512,7 @@
   .est-quick { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 28px 8px; max-width: 816px; width: 100%; margin: 0 auto; box-sizing: border-box; }
   .est-quick button { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 12.5px; cursor: pointer; }
   .est-quick button:hover { background: var(--panel-2); }
+  .est-comp[hidden] { display: none; }
   .est-comp { padding: 0 28px 16px; max-width: 816px; width: 100%; margin: 0 auto; box-sizing: border-box; }
   .est-box { border: 1px solid var(--line); background: var(--panel); border-radius: 14px; padding: 10px 12px 8px; display: grid; gap: 6px; }
   .est-box:focus-within { border-color: var(--muted); }
@@ -748,6 +749,17 @@
   .bgo { border: 1px solid color-mix(in srgb, var(--ok) 50%, transparent); background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); border-radius: 999px; padding: 1px 10px; font: inherit; font-size: 12.5px; cursor: pointer; margin-left: 6px; display: inline-block; text-indent: 0; white-space: nowrap; }
   .bgo:hover { background: color-mix(in srgb, var(--ok) 22%, transparent); }
   .brief li.done .bgo { opacity: .6; }
+
+  /* ---- Estimator: hand off to the Claude app */
+  .handoff { max-width: 760px; margin: 0 auto; width: 100%; display: grid; gap: 12px; }
+  .handoff h3 { margin: 0; font-size: 22px; font-weight: 600; }
+  .handoff p { margin: 0; }
+  .hacts { display: flex; gap: 6px; flex-wrap: wrap; }
+  .hacts button { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 6px 13px; font: inherit; font-size: 13.5px; cursor: pointer; }
+  .hacts button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .hsteps { margin: 4px 0 0; padding-left: 20px; color: var(--muted); display: grid; gap: 4px; font-size: 14px; }
+  .hsteps b { color: var(--ink); }
+  #ho-prompt { white-space: pre-wrap; background: var(--soft); padding: 10px 12px; border-radius: 8px; margin: 6px 0 0; }
 </style>
 </head>
 <body>
@@ -870,7 +882,7 @@
       <div class="est-chat" id="est-chat">
         <div class="est-log" id="est-log"></div>
         <div class="est-quick" id="est-quick"></div>
-        <div class="est-comp">
+        <div class="est-comp" id="est-comp">
           <div class="est-box">
             <div class="est-files" id="est-files"></div>
             <textarea id="est-input" rows="2" placeholder="Message Claude about this job… (drop an ESX, Xactimate PDF or photos here)"></textarea>
@@ -1077,7 +1089,7 @@ async function loadStatus() {
     chip("Homebase", status.homebase !== "mock", `Homebase: ${status.homebase}`),
     chip("Gmail", status.gmail === "google", status.gmail === "google" ? (status.gmailFull ? "Connected" : "Connected for drafts only; reconnect to send from Keystone") : "Not connected (test inbox)"),
     chip("CompanyCam", status.companycam === "rest", status.companycam === "rest" ? "Connected" : "Not connected"),
-    chip(status.ai?.name && status.ai.provider !== "off" ? status.ai.name : "AI", status.agent, status.agent ? `${status.ai?.name || "Claude"} is on (${status.ai?.model || ""})${status.ai?.provider === "gemini" ? ". The Estimator tab needs Claude and is off." : ""}` : status.ai?.offReason || "Off: no AI key on this machine"),
+    chip(status.ai?.name && status.ai.provider !== "off" ? status.ai.name : "AI", status.agent, status.agent ? `${status.ai?.name || "Claude"} is on (${status.ai?.model || ""})${status.ai?.provider === "gemini" ? (status.estimator ? ". Estimating (Estimator tab, selections, send-off wording) runs on Claude." : ". The Estimator tab needs Claude: add ANTHROPIC_API_KEY to Keystone's .env.") : ""}` : status.ai?.offReason || "Off: no AI key on this machine"),
   ].join("");
 }
 async function loadSyncState() {
@@ -2548,8 +2560,9 @@ function renderEstSide() {
 function renderEstLog() {
   const d = estData, log = $("#est-log");
   if (!d) { log.innerHTML = `<div class="hello"><h3>Estimator</h3>Pick a job on the left, then ask Claude for an estimate, agreement, selections sign-off or photo report, the same way you would in chat.</div>`; $("#est-quick").innerHTML = ""; return; }
-  if (!d.claude) log.innerHTML = `<div class="hello"><h3>Claude is off on this machine</h3>Add your Anthropic API key (ANTHROPIC_API_KEY in Keystone's .env, or save it in the Estimator app's Settings), then restart Keystone.</div>`;
-  else if (!d.turns.length) log.innerHTML = `<div class="hello"><h3>#${d.job.jobNumber} ${esc(d.job.name)}</h3>What do you need for this job? Pick one below or just type. Claude uses the Forefront estimating skill and saves everything in the job's estimate folder.</div>`;
+  $("#est-comp").hidden = !d.claude;
+  if (!d.claude) { renderHandoff(d); $("#est-quick").innerHTML = ""; return; }
+  if (!d.turns.length) log.innerHTML = `<div class="hello"><h3>#${d.job.jobNumber} ${esc(d.job.name)}</h3>What do you need for this job? Pick one below or just type. Claude uses the Forefront estimating skill and saves everything in the job's estimate folder.</div>`;
   else log.innerHTML = d.turns.map(estTurnHtml).join("");
   if (d.running) log.insertAdjacentHTML("beforeend", `<div class="msg assistant" id="est-live">${estStream ? md(estStream) : ""}</div><div class="msg typing" id="est-typing">Claude is working</div>`);
   const have = new Set(d.docs.filter((x) => x.file).map((x) => x.key));
@@ -3033,6 +3046,46 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("#stagebtn")) { const pop = $("#stagepop"); if (pop.hidden) openStagePicker(); else pop.hidden = true; return; }
   if (!e.target.closest("#stagepop") && $("#stagepop") && !$("#stagepop").hidden) $("#stagepop").hidden = true;
 });
+
+// ---- Estimates in the Claude app (your subscription + your forefront-estimate skill), handed off from Keystone
+let handoffAct = store.get("handoffAct", "estimate");
+const HANDOFF = [["estimate", "New estimate"], ["convert", "Convert Xactimate PDF"], ["agreement", "Agreement + selections"], ["selections", "Selections sign-off"], ["photos", "Photo report"], ["revise", "Revise"]];
+function renderHandoff(d) {
+  const box = $("#est-log");
+  box.innerHTML = `<div class="handoff">
+    <h3>Write it in Claude</h3>
+    <p class="muted">Keystone writes the request with everything it knows about #${d.job.jobNumber} ${esc(d.job.name)}. Claude does the estimate with your forefront-estimate skill on your Claude subscription (no API cost). Then drop the PDFs back here.</p>
+    <div class="hacts">${HANDOFF.map(([k, v]) => `<button type="button" class="${k === handoffAct ? "on" : ""}" data-hact="${k}">${esc(v)}</button>`).join("")}</div>
+    <textarea id="ho-note" rows="2" placeholder="${handoffAct === "revise" ? "What to change (e.g. make the hallway LVP instead of carpet)" : "Anything to add for Claude (optional)"}"></textarea>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" id="ho-go">Copy &amp; open Claude</button><button class="btn" type="button" id="ho-folder">Show the job's files</button><button class="btn" type="button" id="ho-back">Add the PDFs Claude made</button></div>
+    <ol class="hsteps">
+      <li>Press <b>Copy &amp; open Claude</b>. Claude opens in your browser with the request copied (if the box is empty, paste with Ctrl+V).</li>
+      <li id="ho-attach">Attach the job's files (<b>Show the job's files</b> opens the folder; drag them into Claude).</li>
+      <li>Answer Claude's questions; it writes the estimate with your skill.</li>
+      <li>Download the PDFs and estimate.json, then drop them here (or press <b>Add the PDFs Claude made</b>). They go in the job's estimate folder.</li>
+    </ol>
+    <details><summary class="small muted">See the request</summary><pre id="ho-prompt" class="small"></pre></details>
+  </div>`;
+  const refresh = async () => {
+    try {
+      const r = await api(`/api/jobs/${d.job.jobNumber}/claude-prompt?${new URLSearchParams({ action: handoffAct, note: $("#ho-note")?.value || "" })}`);
+      $("#ho-prompt").textContent = r.prompt;
+      $("#ho-attach").innerHTML = r.attach.length ? `Attach: <b>${r.attach.map((a) => esc(a.split("/").pop())).join(", ")}</b> (<b>Show the job's files</b> opens the folder; drag them into Claude).` : `Attach the ESX or the Xactimate PDF if you have them (<b>Show the job's files</b> opens the folder). Claude can pull the photos with your CompanyCam connector.`;
+      return r.prompt;
+    } catch (e) { log(e.message, "t-err"); return ""; }
+  };
+  refresh();
+  box.querySelectorAll("[data-hact]").forEach((b) => b.addEventListener("click", () => { handoffAct = b.dataset.hact; store.set("handoffAct", handoffAct); renderHandoff(d); }));
+  let t; $("#ho-note").addEventListener("input", () => { clearTimeout(t); t = setTimeout(refresh, 300); });
+  $("#ho-go").addEventListener("click", async () => {
+    const prompt = await refresh(); if (!prompt) return;
+    let copied = false; try { await navigator.clipboard.writeText(prompt); copied = true; } catch {}
+    window.open(`https://claude.ai/new?q=${encodeURIComponent(prompt)}`, "_blank", "noopener");
+    snack(copied ? "Request copied. In Claude, attach the files and send (paste with Ctrl+V if the box is empty)." : "Claude opened. Copy the request from \"See the request\" if it isn't filled in.");
+  });
+  $("#ho-folder").addEventListener("click", async () => { try { const r = await api(`/api/jobs/${d.job.jobNumber}/open-folder`, { method: "POST", body: {} }); snack(`Opened ${r.folder}`); } catch (e) { log(e.message, "t-err"); } });
+  $("#ho-back").addEventListener("click", () => $("#est-pick").click());
+}
 const es = new EventSource("/api/events");
 es.onmessage = (m) => {
   const e = JSON.parse(m.data);

@@ -1,4 +1,5 @@
 import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { claudeEnv } from "./env.js";
 import { z } from "zod";
 import type { FunctionDecl, Turn } from "../connectors/gemini/index.js";
 import type { Hub } from "../hub.js";
@@ -15,8 +16,11 @@ export type Provider = "claude" | "gemini" | "off";
 export const aiProvider = (hub: Hub): Provider => (hub.cfg.ai?.provider === "gemini" && !hub.gemini ? "off" : hub.cfg.ai?.provider ?? (hub.cfg.anthropicApiKey ? "claude" : "off"));
 export const aiReady = (hub: Hub) => aiProvider(hub) !== "off";
 export const aiName = (hub: Hub) => ({ claude: "Claude", gemini: "Gemini", off: "AI" })[aiProvider(hub)];
-/** The estimating skill only runs on Claude. */
-export const claudeOnlyReady = (hub: Hub) => aiProvider(hub) === "claude";
+/**
+ * The estimating work (Estimator tab, setting up selections, send-off wording) runs on Claude with the estimating
+ * skill whenever there's an Anthropic key, even when Gemini runs the everyday features.
+ */
+export const claudeOnlyReady = (hub: Hub) => !!hub.cfg.anthropicApiKey;
 
 export function aiOffReason(hub: Hub): string {
   if (hub.cfg.ai?.provider === "gemini" || process.env.HUB_AI === "gemini") return "Gemini is off: add GEMINI_API_KEY to Keystone's .env (aistudio.google.com/apikey) and restart.";
@@ -50,7 +54,7 @@ export async function complete<T = string>(hub: Hub, o: { system: string; prompt
       ...(o.schema ? { outputFormat: { type: "json_schema" as const, schema: o.schema } } : {}),
       canUseTool: async () => ({ behavior: "deny" as const, message: "No tools needed." }),
       systemPrompt: o.system,
-      env: { ...(process.env as Record<string, string>), ...(hub.cfg.anthropicApiKey ? { ANTHROPIC_API_KEY: hub.cfg.anthropicApiKey } : {}) },
+      env: claudeEnv(hub),
     },
   })) {
     if (m.type === "result") {
