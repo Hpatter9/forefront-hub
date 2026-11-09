@@ -351,7 +351,7 @@ const server = http.createServer(async (req, res) => {
           const sl = await import("../workflows/selections.js");
           const s = hub.jobs.exists(n) ? sl.loadSelections(hub, n) : { updatedAt: "", categories: [] };
           const hasEstimate = hub.jobs.exists(n) && (hub.jobs.files(n, "estimate", /\.(json|pdf)$/i).length > 0 || hub.jobs.files(n, "files", /\.pdf$/i).length > 0);
-          return send(res, 200, { ...s, categories: s.categories.map((c) => ({ ...c, picks: c.picks.map((p) => ({ ...p, cmp: sl.compare(c, p) })) })), summary: sl.summary(s), hasEstimate, claude: claudeOnlyReady(hub) });
+          return send(res, 200, { ...s, categories: s.categories.map((c) => ({ ...c, picks: c.picks.map((p) => ({ ...p, cmp: sl.compare(c, p) })) })), summary: sl.summary(s), hasEstimate, claude: aiProvider(hub) === "gemini" || claudeOnlyReady(hub) });
         }
         if (action === "notes") {
           let notes: HbNote[] = [], live = false;

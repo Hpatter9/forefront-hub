@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { LiveGemini, MockGemini } from "../src/connectors/gemini/index.js";
 import { agentAsk, aiProvider, complete } from "../src/agent/llm.js";
@@ -110,8 +111,47 @@ describe("send-off email on Gemini", () => {
     expect(req.system).toContain("## 6.");
     expect(req.system).not.toContain("## Company details");
     expect(skillStep6(t.hub.cfg.skillDir)).toMatch(/^## 6\. Send-off email/);
-    // Photo picks without a Claude key fall back to the plain list (no paid API).
-    const picks = await new SendoffWriter(t.hub).pickPhotos(job, [{ file: "a.jpg", description: "Kitchen", capturedAt: "" }], "/tmp");
+  });
+
+  it("picks the report photos with Gemini from the skill's contact sheets", async () => {
+    const { SendoffWriter } = await import("../src/agent/emailWriter.js");
+    const t = geminiHub(() => JSON.stringify({ photos: [{ number: 3, caption: "Wet drywall at the tub wall", room: "Bath" }, { number: 1, caption: "Overview" }, { number: 3, caption: "dup" }, { number: 99, caption: "no such photo" }] }));
+    const dir = path.resolve("fixtures/photos");
+    const photos = ["mock_1.jpg", "mock_2.jpg", "mock_3.jpg"].map((file) => ({ file, description: "", capturedAt: "" }));
+    const picks = await new SendoffWriter(t.hub).pickPhotos({ jobNumber: 4100, address: "12 Elm St" } as any, photos, dir);
+    expect(picks).toEqual([{ file: "mock_3.jpg", caption: "Wet drywall at the tub wall", room: "Bath" }, { file: "mock_1.jpg", caption: "Overview" }]);
+    const parts = (t.hub.gemini as MockGemini).requests[0].contents[0].parts;
+    expect(parts.some((x) => (x.inlineData as any)?.mimeType === "image/jpeg")).toBe(true);
+  });
+
+  it("without Gemini the photo picks fall back to the plain list (never the paid Claude API)", async () => {
+    const { SendoffWriter } = await import("../src/agent/emailWriter.js");
+    const t = testHub();
+    t.hub.cfg.anthropicApiKey = "sk-ant-x";
+    const picks = await new SendoffWriter(t.hub).pickPhotos({ jobNumber: 1 } as any, [{ file: "a.jpg", description: "Kitchen", capturedAt: "" }], "/tmp");
     expect(picks).toEqual([{ file: "a.jpg", caption: "Kitchen" }]);
+  });
+});
+
+describe("selections setup on Gemini", () => {
+  it("lists finishes from estimate.json and fills missing budgets from the skill's component costs", async () => {
+    const { buildSelections } = await import("../src/agent/selections.js");
+    const { loadSelections } = await import("../src/workflows/selections.js");
+    const t = geminiHub((req, i) =>
+      i === 0
+        ? JSON.stringify({ categories: [{ name: "Laminate flooring", room: "Living", quantity: 220, unit: "SF", budgetPerUnit: 0, lookupWords: "laminate" }, { name: "Vanity", room: "Bath", quantity: 1, unit: "EA", budgetPerUnit: 400, basis: "estimate allowance" }] })
+        : JSON.stringify({ categories: [{ name: "Laminate flooring", room: "Living", quantity: 220, unit: "SF", budgetPerUnit: 2.51, basis: "LAMSNAP" }, { name: "Vanity", room: "Bath", quantity: 1, unit: "EA", budgetPerUnit: 400, basis: "estimate allowance" }] }),
+    );
+    t.hub.cfg.anthropicApiKey = "";
+    t.hub.jobs.upsert(4200, { name: "Doe" });
+    const dir = t.hub.jobs.path(4200, "estimate");
+    (await import("node:fs")).mkdirSync(dir, { recursive: true });
+    (await import("node:fs")).copyFileSync(path.resolve("fixtures/estimate-sample.json"), path.join(dir, "estimate.json"));
+    expect(await buildSelections(t.hub, 4200, () => {})).toBe(2);
+    const reqs = (t.hub.gemini as MockGemini).requests;
+    expect(reqs).toHaveLength(2);
+    expect(reqs[1].contents[0].parts[0].text).toMatch(/--- laminate ---[\s\S]*LAMSNAP/);
+    const cats = loadSelections(t.hub, 4200).categories;
+    expect(cats.find((c) => c.name === "Laminate flooring")?.budgetTotal).toBe(552.2);
   });
 });

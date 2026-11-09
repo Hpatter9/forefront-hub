@@ -1089,7 +1089,7 @@ async function loadStatus() {
     chip("Homebase", status.homebase !== "mock", `Homebase: ${status.homebase}`),
     chip("Gmail", status.gmail === "google", status.gmail === "google" ? (status.gmailFull ? "Connected" : "Connected for drafts only; reconnect to send from Keystone") : "Not connected (test inbox)"),
     chip("CompanyCam", status.companycam === "rest", status.companycam === "rest" ? "Connected" : "Not connected"),
-    chip(status.ai?.name && status.ai.provider !== "off" ? status.ai.name : "AI", status.agent, status.agent ? `${status.ai?.name || "Claude"} is on (${status.ai?.model || ""})${status.ai?.provider === "gemini" ? (status.estimator ? ". Only estimating (Estimator tab, setting up selections, report photo picks) uses the Claude API; everything else is on Gemini." : ". The Estimator tab needs Claude: add ANTHROPIC_API_KEY to Keystone's .env.") : ""}` : status.ai?.offReason || "Off: no AI key on this machine"),
+    chip(status.ai?.name && status.ai.provider !== "off" ? status.ai.name : "AI", status.agent, status.agent ? `${status.ai?.name || "Claude"} is on (${status.ai?.model || ""})${status.ai?.provider === "gemini" ? (status.estimator ? ". Only the Estimator tab uses the Claude API; everything else is on Gemini (free)." : ". The Estimator tab needs Claude: add ANTHROPIC_API_KEY to Keystone's .env.") : ""}` : status.ai?.offReason || "Off: no AI key on this machine"),
   ].join("");
 }
 async function loadSyncState() {
@@ -2936,7 +2936,7 @@ async function renderSelections(el) {
         <div><span class="k">Difference</span><b class="${sm.diff > 0 ? "over" : sm.diff < 0 ? "under" : ""}">${sm.pickedBudget ? `${sm.diff > 0 ? "+" : sm.diff < 0 ? "−" : ""}${usd0(Math.abs(sm.diff))}` : "—"}</b><small>${sm.over ? `${sm.over} over budget` : sm.pickedBudget ? "within budget" : ""}</small></div>
         <div><span class="k">Still to pick</span><b>${sm.open} of ${sm.count}</b></div>
       </div>
-      <div class="row" style="gap:8px;flex-wrap:wrap">${d.claude ? `<button class="btn ${d.categories.length ? "" : "primary"}" data-sel="build" ${d.hasEstimate ? "" : "disabled title='No estimate in the job folder yet'"}>${d.categories.length ? "Rebuild from the estimate" : "Set up from the estimate with Claude"}</button>` : ""}<button class="btn" data-sel="addcat">Add a category</button>
+      <div class="row" style="gap:8px;flex-wrap:wrap">${d.claude ? `<button class="btn ${d.categories.length ? "" : "primary"}" data-sel="build" ${d.hasEstimate ? "" : "disabled title='No estimate in the job folder yet'"}>${d.categories.length ? "Rebuild from the estimate" : "Set up from the estimate"}</button>` : ""}<button class="btn" data-sel="addcat">Add a category</button>
         <span class="small muted">Customer emails with picks (links or photos) are added here on their own.</span></div>
     </div>`;
   const body = d.categories.length ? d.categories.map((c) => `<div class="card selcat" data-cat="${esc(c.id)}">

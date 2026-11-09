@@ -1,5 +1,5 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { aiReady, claudeOnlyReady, complete } from "./llm.js";
+import { aiProvider, aiReady, claudeOnlyReady, complete } from "./llm.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Message } from "../connectors/gmail/types.js";
@@ -10,7 +10,8 @@ import { addCategory, addPick, compare, loadSelections, productFromUrl, setCateg
 import { agentOptions, systemPrompt } from "./run.js";
 
 /**
- * Claude's two jobs for selections:
+ * The two AI jobs for selections (on Gemini, free; setting up falls back to Claude with the skill only when there's
+ * no Gemini key):
  * 1. buildSelections: read the job's estimate with the forefront-estimate skill and list the finishes the owner has
  *    to pick, with quantities and the MATERIAL budget for each (the skill's component costs, not installed prices).
  * 2. selectionsFromInbox: when a customer emails a pick (a product link or a photo), file it under the right
@@ -42,7 +43,67 @@ const PLAN_SCHEMA = {
   additionalProperties: false,
 };
 
+type PlanCategory = Omit<Category, "id" | "status" | "picks" | "budgetTotal">;
+
+const SELECTION_RULES = `List every finish the owner has to choose that this estimate replaces or installs: flooring (LVP, laminate, carpet and pad, tile, hardwood), wall and shower tile, cabinets and vanities, countertops, interior doors, trim/baseboard profile if it isn't matched to existing, plumbing fixtures and faucets, light fixtures, hardware, appliances. One category per finish per room (combine rooms that get the same finish into one category and name the rooms). Skip things that are matched to existing (texture, paint matched to existing, drywall) and anything with no owner choice.
+For each: the quantity with waste in the estimate's unit, and the MATERIAL budget per unit the estimate allows (never the installed line-item price).`;
+
+/**
+ * Selections on Gemini (free): it reads the estimate (estimate.json, or the estimate PDFs), lists the finishes,
+ * and takes material budgets from the estimate's own allowances or from the skill's component costs
+ * (price_lookup.py --components, run here and handed back to it).
+ */
+async function planWithGemini(hub: Hub, n: number, say: (m: string) => void): Promise<{ source: string; categories: PlanCategory[] }> {
+  const job = hub.jobs.get(n);
+  const json = hub.jobs.path(n, "estimate", "estimate.json");
+  const pdfs = [...hub.jobs.files(n, "estimate", /\.pdf$/i).filter((f) => /Reconstruction Estimate|Xactimate/i.test(path.basename(f))), ...hub.jobs.files(n, "files", /\.pdf$/i).filter((f) => /xactimate|estimate/i.test(path.basename(f)))];
+  const useJson = existsSync(json);
+  if (!useJson && !pdfs.length) throw new Error("No estimate on this job yet (estimate/estimate.json or an estimate PDF). Write the estimate first, or add categories by hand.");
+  const source = useJson ? "estimate/estimate.json" : path.basename(pdfs[0]);
+  const estimateText = useJson ? readFileSync(json, "utf8").slice(0, 60000) : "";
+  const images = useJson ? [] : [{ mimeType: "application/pdf", data: readFileSync(pdfs[0]).toString("base64") }];
+  const system = "You set up the owner's selections list for Forefront Building + Restoration reconstruction jobs. Work only from the estimate given; never invent quantities.";
+  say(`  selections #${n}: reading ${source}`);
+  const first = await complete<{ categories: (PlanCategory & { lookupWords?: string })[] }>(hub, {
+    system,
+    prompt: `Job #${n}, ${job.address}, market ${job.market || "unknown"}.\n${SELECTION_RULES}\nWhen the estimate states a selection allowance for a finish, use it as budgetPerUnit and say so in basis. Otherwise set budgetPerUnit to 0 and give lookupWords: 1–3 plain words to search Forefront's material cost list (e.g. "laminate", "carpet pad", "vanity").\n${useJson ? `The estimate (estimate.json):\n${estimateText}` : "The estimate is the attached PDF."}`,
+    images,
+    schema: {
+      type: "object",
+      properties: { categories: { type: "array", items: { type: "object", properties: { ...PLAN_SCHEMA.properties.categories.items.properties, lookupWords: { type: "string" } }, required: ["name", "quantity", "unit", "budgetPerUnit"] } } },
+      required: ["categories"],
+    },
+  });
+  const cats = first?.categories ?? [];
+  const need = cats.filter((c) => !(c.budgetPerUnit > 0) && c.lookupWords);
+  if (!need.length) return { source, categories: cats.map(({ lookupWords: _w, ...c }) => c) };
+  const lookups: Record<string, string> = {};
+  for (const c of need) {
+    const words = String(c.lookupWords).split(/\s+/).filter(Boolean).slice(0, 3);
+    if (lookups[words.join(" ")] !== undefined) continue;
+    say(`  selections #${n}: looking up ${words.join(" ")} costs`);
+    const r = await hub.skill.run("price_lookup.py", ["--components", ...words, "--limit", "25"]);
+    lookups[words.join(" ")] = (r.stdout || r.stderr).slice(0, 4000);
+  }
+  const second = await complete<{ categories: PlanCategory[] }>(hub, {
+    system,
+    prompt: `Here is a selections list for job #${n} (market ${job.market || "unknown"}: CODE8X = Denver, COBO8X = Boulder). Fill in budgetPerUnit for every category that has 0: the MATERIAL cost per unit from Forefront's component costs below (pick the closest standard/average-grade match, in the category's unit, from the job's market list when there is one). Never use an installed line-item price. Put the code or description you used in basis. If nothing below fits, leave 0 and set basis to "Not in Forefront's cost list: set the budget by hand". Keep everything else as it is and return the whole list.
+List: ${JSON.stringify(cats)}
+Component costs found:
+${Object.entries(lookups).map(([w, out]) => `--- ${w} ---\n${out}`).join("\n")}`,
+    schema: PLAN_SCHEMA,
+  });
+  return { source, categories: second?.categories?.length ? second.categories : cats.map(({ lookupWords: _w, ...c }) => c) };
+}
+
 export async function buildSelections(hub: Hub, n: number, say: (m: string) => void = hub.say): Promise<number> {
+  if (aiProvider(hub) === "gemini") {
+    const out = await planWithGemini(hub, n, say);
+    if (!out.categories.length) throw new Error("Gemini didn't find any finishes to select in this job's estimate.");
+    setCategories(hub, n, out.categories.map((c) => ({ ...c, budgetTotal: Math.round((c.budgetPerUnit || 0) * c.quantity * 100) / 100 })), out.source);
+    hub.jobs.log(n, `Selections list set up from the estimate (${out.categories.length} categories)`);
+    return out.categories.length;
+  }
   if (!claudeOnlyReady(hub)) throw new Error("Setting up selections uses the Claude estimating skill, so it needs a Claude API key (ANTHROPIC_API_KEY in Keystone's .env). You can add categories by hand.");
   const folder = hub.jobs.folder(n);
   const prompt = `Set up the selections list for job #${n} (folder: ${folder}).
