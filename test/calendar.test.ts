@@ -18,8 +18,8 @@ describe("calendar", () => {
   });
 
   it("finds open weekday time around busy blocks", () => {
-    const from = new Date(2026, 10, 9, 6, 0); // Mon Nov 9, 6am local
-    const busy = [{ start: new Date(2026, 10, 9, 9, 0).toISOString(), end: new Date(2026, 10, 9, 12, 0).toISOString() }];
+    const from = new Date(2027, 2, 8, 6, 0); // Mon Mar 8 2027, 6am local
+    const busy = [{ start: new Date(2027, 2, 8, 9, 0).toISOString(), end: new Date(2027, 2, 8, 12, 0).toISOString() }];
     const slots = freeSlots(busy, { from, days: 1, minutes: 60 });
     expect(slots.map((s) => [new Date(s.start).getHours(), new Date(s.end).getHours()])).toEqual([[7, 9], [12, 17]]);
   });

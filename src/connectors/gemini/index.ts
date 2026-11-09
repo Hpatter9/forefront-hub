@@ -48,6 +48,8 @@ const URL_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 export class LiveGemini implements GeminiClient {
   readonly kind = "gemini" as const;
+  /** How long to wait out a per-minute limit before retrying (tests make it short). */
+  minuteWaitMs = 20_000;
   constructor(private key: string, private fetchFn: typeof fetch = (...a) => fetch(...a)) {}
 
   async generate(req: GenerateRequest): Promise<GenerateResult> {
@@ -59,7 +61,7 @@ export class LiveGemini implements GeminiClient {
       } catch (e) {
         last = e as Error;
         // A bad key or a malformed request won't get better on another model.
-        if (!/busy|unavailable|no longer available|not found|high demand|overloaded/i.test(last.message)) throw last;
+        if (!/busy|unavailable|no longer available|not found|high demand|overloaded|quota|rate limit/i.test(last.message)) throw last;
       }
     }
     throw last ?? new Error("Gemini: no model to use.");
@@ -80,9 +82,19 @@ export class LiveGemini implements GeminiClient {
       const j: any = await r.json().catch(() => ({}));
       if (r.ok) return toResult(j);
       const msg = j?.error?.message ?? `HTTP ${r.status}`;
-      if ((r.status === 429 || r.status >= 500) && attempt < (r.status === 429 ? 3 : 1)) {
-        const hint = String(j?.error?.details?.find?.((d: any) => d.retryDelay)?.retryDelay ?? "").match(/([\d.]+)s/)?.[1];
-        await new Promise((res) => setTimeout(res, Math.min(60_000, (hint ? Number(hint) : 5 * (attempt + 1)) * 1000)));
+      if (r.status === 429) {
+        // Free-tier limits are per minute (requests or input tokens) and per day. A per-minute limit clears within
+        // the minute, whatever "retry in 0.2s" says: wait it out once, then let the next model (its own quota) try.
+        const daily = /per ?day|PerDay|daily/i.test(JSON.stringify(j));
+        if (!daily && attempt < 1) {
+          const hint = Number(String(j?.error?.details?.find?.((d: any) => d.retryDelay)?.retryDelay ?? "").match(/([\d.]+)s/)?.[1] ?? 0);
+          await new Promise((res) => setTimeout(res, Math.min(65_000, Math.max(this.minuteWaitMs, hint * 1000))));
+          continue;
+        }
+        throw new Error(`Gemini: ${req.model} hit its ${daily ? "daily" : "per-minute"} quota (${msg.split("\n")[0]})`);
+      }
+      if (r.status >= 500 && attempt < 1) {
+        await new Promise((res) => setTimeout(res, 3000));
         continue;
       }
       if (r.status === 400 && /api key not valid|API_KEY_INVALID/i.test(msg)) throw new Error("Google didn't accept the Gemini API key (GEMINI_API_KEY in Keystone's .env).");

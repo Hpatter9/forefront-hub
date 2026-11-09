@@ -51,10 +51,44 @@ describe("Gemini as Keystone's AI", () => {
         ? new Response(JSON.stringify({ error: { code: 429, message: "quota", details: [{ retryDelay: "0.01s" }] } }), { status: 429 })
         : new Response(JSON.stringify({ candidates: [{ content: { role: "model", parts: [{ text: '{"ok":true}' }] } }] }), { status: 200 });
     }) as typeof fetch;
-    const r = await new LiveGemini("k", fake).generate({ model: "gemini-flash-latest", system: "s", contents: [{ role: "user", parts: [{ text: "hi" }] }], jsonSchema: { type: "object" }, tools: [{ name: "job_list", description: "d" }] });
+    const g = new LiveGemini("k", fake);
+    g.minuteWaitMs = 5;
+    const r = await g.generate({ model: "gemini-flash-latest", system: "s", contents: [{ role: "user", parts: [{ text: "hi" }] }], jsonSchema: { type: "object" }, tools: [{ name: "job_list", description: "d" }] });
     expect(r.text).toBe('{"ok":true}');
     expect(sent).toHaveLength(2);
     expect(sent[1]).toMatchObject({ systemInstruction: { parts: [{ text: "s" }] }, generationConfig: { responseMimeType: "application/json", responseJsonSchema: { type: "object" } }, tools: [{ functionDeclarations: [{ name: "job_list" }] }] });
+  });
+
+  it("moves to the next model when one hits its quota", async () => {
+    const asked: string[] = [];
+    const fake = (async (url: string) => {
+      const model = String(url).match(/models\/([^:]+):/)![1];
+      asked.push(model);
+      return model === "busy-model"
+        ? new Response(JSON.stringify({ error: { code: 429, message: "You exceeded your current quota", details: [{ retryDelay: "0.2s" }] } }), { status: 429 })
+        : new Response(JSON.stringify({ candidates: [{ content: { role: "model", parts: [{ text: "ok" }] } }] }), { status: 200 });
+    }) as typeof fetch;
+    const g = new LiveGemini("k", fake);
+    g.minuteWaitMs = 5;
+    const r = await g.generate({ model: "busy-model", fallbackModels: ["spare-model"], contents: [{ role: "user", parts: [{ text: "hi" }] }] });
+    expect(r.text).toBe("ok");
+    expect(asked).toEqual(["busy-model", "busy-model", "spare-model"]); // waited once, then switched
+  });
+
+  it("keeps what it sends small: no email HTML, long text cut, older results trimmed", async () => {
+    const { slim, compactOlder } = await import("../src/agent/llm.js");
+    const thread = JSON.stringify({ messages: [{ subject: "S", body: "x".repeat(9000), html: "<div>".repeat(5000) }] }, null, 2);
+    const s = slim(thread);
+    expect(s).not.toContain("<div>");
+    expect(s.length).toBeLessThan(2700);
+    const contents: any[] = [
+      { role: "user", parts: [{ text: "q" }] },
+      { role: "user", parts: [{ functionResponse: { name: "a", response: { result: "y".repeat(5000) } } }] },
+      { role: "user", parts: [{ functionResponse: { name: "b", response: { result: "z".repeat(5000) } } }] },
+    ];
+    compactOlder(contents);
+    expect(contents[1].parts[0].functionResponse.response.result.length).toBeLessThan(1600);
+    expect(contents[2].parts[0].functionResponse.response.result.length).toBe(5000); // the latest round stays whole
   });
 
   it("is off without a key", () => {
