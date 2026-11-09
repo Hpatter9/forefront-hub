@@ -1077,7 +1077,7 @@ async function loadStatus() {
     chip("Homebase", status.homebase !== "mock", `Homebase: ${status.homebase}`),
     chip("Gmail", status.gmail === "google", status.gmail === "google" ? (status.gmailFull ? "Connected" : "Connected for drafts only; reconnect to send from Keystone") : "Not connected (test inbox)"),
     chip("CompanyCam", status.companycam === "rest", status.companycam === "rest" ? "Connected" : "Not connected"),
-    chip("Claude", status.agent, status.agent ? "On" : "Off: no Anthropic API key on this machine"),
+    chip(status.ai?.name && status.ai.provider !== "off" ? status.ai.name : "AI", status.agent, status.agent ? `${status.ai?.name || "Claude"} is on (${status.ai?.model || ""})${status.ai?.provider === "gemini" ? ". The Estimator tab needs Claude and is off." : ""}` : status.ai?.offReason || "Off: no AI key on this machine"),
   ].join("");
 }
 async function loadSyncState() {

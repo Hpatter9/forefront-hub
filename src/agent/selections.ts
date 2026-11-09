@@ -1,4 +1,5 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import { aiReady, claudeOnlyReady, complete } from "./llm.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Message } from "../connectors/gmail/types.js";
@@ -42,7 +43,7 @@ const PLAN_SCHEMA = {
 };
 
 export async function buildSelections(hub: Hub, n: number, say: (m: string) => void = hub.say): Promise<number> {
-  if (!hub.cfg.anthropicApiKey) throw new Error("Claude is off on this machine (no Anthropic API key).");
+  if (!claudeOnlyReady(hub)) throw new Error("Setting up selections uses the Claude estimating skill, so it needs Claude (ANTHROPIC_API_KEY and HUB_AI=claude). You can add categories by hand.");
   const folder = hub.jobs.folder(n);
   const prompt = `Set up the selections list for job #${n} (folder: ${folder}).
 
@@ -140,12 +141,7 @@ Attachments: ${m.attachments.map((a) => a.filename).join(", ") || "(none)"}
 
 ${m.body.slice(0, 6000)}`;
   let picks: any[] = [];
-  for await (const r of query({
-    prompt,
-    options: { model: hub.cfg.model, maxTurns: 2, allowedTools: [], settingSources: [], outputFormat: { type: "json_schema", schema: PICK_SCHEMA }, canUseTool: async () => ({ behavior: "deny", message: "No tools needed." }), systemPrompt: "You read customer emails about construction material selections and pull out the products they picked.", env: { ...(process.env as Record<string, string>), ANTHROPIC_API_KEY: hub.cfg.anthropicApiKey } },
-  })) {
-    if (r.type === "result" && r.subtype === "success") picks = ((r as any).structured_output ?? JSON.parse(r.result.match(/\{[\s\S]*\}/)?.[0] ?? '{"picks":[]}')).picks ?? [];
-  }
+  picks = (await complete<{ picks?: any[] }>(hub, { system: "You read customer emails about construction material selections and pull out the products they picked.", prompt, schema: PICK_SCHEMA }))?.picks ?? [];
   let added = 0;
   for (const p of picks) {
     if (!p.product?.trim()) continue;
@@ -189,7 +185,7 @@ ${m.body.slice(0, 6000)}`;
 
 /** Looks at the last few days of incoming email for selections and files them. Runs with the inbox check. */
 export async function selectionsFromInbox(hub: Hub): Promise<{ jobNumber: number; added: number; subject: string }[]> {
-  if (!hub.cfg.anthropicApiKey || hub.gmail.kind !== "google" || !hub.gmail.listThreads || (process.env.HUB_SELECTIONS_FROM_EMAIL ?? "on") === "off") return [];
+  if (!aiReady(hub) || hub.gmail.kind !== "google" || !hub.gmail.listThreads || (process.env.HUB_SELECTIONS_FROM_EMAIL ?? "on") === "off") return [];
   const s = loadState(hub);
   s.since ??= new Date().toISOString();
   saveState(hub, s);

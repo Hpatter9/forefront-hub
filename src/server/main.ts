@@ -23,6 +23,7 @@ import { addFile } from "../workflows/uploads.js";
 import { freeSlots } from "../connectors/calendar/index.js";
 import { EventBus, WebApprover } from "./events.js";
 import { Studio } from "../agent/studio.js";
+import { aiName, aiOffReason, aiProvider, aiReady, claudeOnlyReady } from "../agent/llm.js";
 import { allContacts, findContacts, noteAddresses, noteMessages } from "../workflows/contacts.js";
 import { BRIEF, briefDue } from "../workflows/brief.js";
 
@@ -110,7 +111,7 @@ function inside(file: string, dir: string) {
 }
 
 async function noteAfter(n: number, kind: "email" | "call" | "send-off", text: string) {
-  if (!cfg.anthropicApiKey) return;
+  if (!aiReady(hub)) return;
   const { suggestNote } = await import("../agent/summarize.js");
   await suggestNote(hub, n, { kind, text });
   bus.emit({ type: "changed", job: n, what: "timeline" });
@@ -220,7 +221,9 @@ const server = http.createServer(async (req, res) => {
         calendarConnected: hub.calendar.connected(),
         tasksConnected: hub.tasks.connected(),
         emailTasks: (await import("../agent/emailTasks.js")).enabled(hub),
-        agent: !!cfg.anthropicApiKey,
+        agent: aiReady(hub),
+        ai: { provider: aiProvider(hub), name: aiName(hub), model: aiProvider(hub) === "gemini" ? cfg.ai.geminiModel : cfg.model, offReason: aiReady(hub) ? "" : aiOffReason(hub) },
+        estimator: claudeOnlyReady(hub),
         me: cfg.homebase.me,
         jobsRoot: cfg.jobsRoot,
       });
@@ -342,7 +345,7 @@ const server = http.createServer(async (req, res) => {
           const sl = await import("../workflows/selections.js");
           const s = hub.jobs.exists(n) ? sl.loadSelections(hub, n) : { updatedAt: "", categories: [] };
           const hasEstimate = hub.jobs.exists(n) && (hub.jobs.files(n, "estimate", /\.(json|pdf)$/i).length > 0 || hub.jobs.files(n, "files", /\.pdf$/i).length > 0);
-          return send(res, 200, { ...s, categories: s.categories.map((c) => ({ ...c, picks: c.picks.map((p) => ({ ...p, cmp: sl.compare(c, p) })) })), summary: sl.summary(s), hasEstimate, claude: !!cfg.anthropicApiKey });
+          return send(res, 200, { ...s, categories: s.categories.map((c) => ({ ...c, picks: c.picks.map((p) => ({ ...p, cmp: sl.compare(c, p) })) })), summary: sl.summary(s), hasEstimate, claude: claudeOnlyReady(hub) });
         }
         if (action === "notes") {
           let notes: HbNote[] = [], live = false;
@@ -469,7 +472,7 @@ const server = http.createServer(async (req, res) => {
         case "sendoff": {
           const to: Recipient[] = b.to?.length ? b.to : ["homeowner"];
           return send(res, 202, task(`Draft send-off for #${n} (${to.join(" + ")})`, n, async () => {
-            const useTemplate = b.template || cfg.mode === "mock" || !cfg.anthropicApiKey;
+            const useTemplate = b.template || cfg.mode === "mock" || !claudeOnlyReady(hub);
             const writer = useTemplate ? new TemplateWriter() : new (await import("../agent/writer.js")).AgentWriter(hub);
             if (useTemplate) hub.say("Using plain template wording (no Claude API key on this machine).");
             await sendoff(hub, n, { to, writer, cc: b.cc ? String(b.cc).split(",").map((s: string) => s.trim()) : undefined });
@@ -732,7 +735,7 @@ const server = http.createServer(async (req, res) => {
       if (!hub.jobs.exists(n)) await pullJob(hub, n, { quiet: true });
       const j = hub.jobs.get(n);
       const job = { jobNumber: n, name: j.name, address: j.address, stage: j.stage, insurance: j.insurance, customer: j.customer.name, carrier: j.carrier, claimNumber: j.claimNumber, estimate: j.estimate };
-      if (!st[2] && req.method === "GET") return send(res, 200, { job, claude: !!cfg.anthropicApiKey, ...studio.view(n) });
+      if (!st[2] && req.method === "GET") return send(res, 200, { job, claude: claudeOnlyReady(hub), ...studio.view(n) });
       if (req.method !== "POST") return send(res, 405, { error: "method" });
       if (st[2] === "upload") {
         const name = decodeURIComponent(String(req.headers["x-filename"] ?? "file"));
@@ -744,14 +747,14 @@ const server = http.createServer(async (req, res) => {
       const b = await body(req);
       const text = String(b.text ?? "").trim();
       if (!text) return send(res, 400, { error: "Say what you want Claude to do." });
-      if (!cfg.anthropicApiKey) return send(res, 400, { error: "Claude is off on this machine (no Anthropic API key). Set ANTHROPIC_API_KEY in .env, or save it in the Estimator app." });
+      if (!claudeOnlyReady(hub)) return send(res, 400, { error: "The Estimator uses the Claude estimating skill, so it needs Claude: ANTHROPIC_API_KEY in Keystone's .env and HUB_AI=claude." });
       if (studio.running(n)) return send(res, 409, { error: "Claude is still working on this job." });
       studio.send(n, text).then(() => bus.emit({ type: "changed", job: n, what: "job" })).catch((e) => console.error(e));
       return send(res, 202, { ok: true });
     }
     if (p === "/api/ask" && req.method === "POST") {
       const b = await body(req);
-      if (!cfg.anthropicApiKey) return send(res, 400, { error: "Claude is off on this machine (no Anthropic API key). Set ANTHROPIC_API_KEY in .env, or save it in the Estimator app." });
+      if (!aiReady(hub)) return send(res, 400, { error: aiOffReason(hub) });
       const job = b.job ? Number(b.job) : undefined;
       // The answer comes back as an "answer" event with what Keystone should show: the drafts made (to open in Gmail),
       // the jobs and contacts Claude looked at (for buttons on the popup), and Claude's reply.
@@ -763,7 +766,7 @@ const server = http.createServer(async (req, res) => {
         const { withDraftSource } = await import("../workflows/generated.js");
         let text = "", error: string | undefined;
         try {
-          text = await withDraftSource("Claude", async () => (await import("../agent/run.js")).ask(hub, prompt, {
+          text = await withDraftSource("Claude", async () => (await import("../agent/llm.js")).agentAsk(hub, prompt, {
             jobNumber: job,
             onMessage: (m) => {
               if (m.type !== "assistant") return;
@@ -900,7 +903,7 @@ function teamPeople() {
 interface Plan { state: "running" | "done" | "error"; startedAt: string; finishedAt?: string; text: string; steps: string[]; error?: string; trigger?: "button" | "morning"; /** Items ticked off on the Brief tab, by item key. */ done?: Record<string, boolean> }
 
 function startPlan(trigger: "button" | "morning"): { taskId: string } | { error: string; code: number } {
-  if (!cfg.anthropicApiKey) return { error: "Claude is off on this machine (no Anthropic API key).", code: 400 };
+  if (!aiReady(hub)) return { error: aiOffReason(hub), code: 400 };
   if (readPlan().state === "running") return { error: "Claude is already planning your day.", code: 409 };
   const list = reminders(hub, { needsUpload: new Set((lastSync?.needsUpload ?? []).map((x) => x.jobNumber)) });
   const buildPrompt = (myDayNote: string) => `Plan my day. Here is everything Keystone thinks needs me, as JSON (kind, job, title, detail, days waiting):\n${JSON.stringify(list.slice(0, 60))}\n\n${myDayNote}\n\nThis brief is only for me and my time. Rules:\n- Use ONLY the calendar events and tasks listed above. They are mine: my own calendar (not shared team calendars) and my own Google Tasks. Don't look up other calendars or tasks with Keystone's tools, and leave out other people's meetings and to-dos.\n- Every line in the brief is something I do. If something waits on someone else, either write it as my action (\"Ask Shannon whether the selections went out\") or leave it out.\n\nFor the top replies and follow-ups, read the thread or the job (Keystone's tools) and draft the email in Gmail for me (drafts only; I'll send).\n\nEmail buttons: whenever a line is about a specific email conversation and you know its Gmail thread id (the threadId in the JSON above, a thread you read or searched, or the threadId a draft you made returned), end that line with {email:THREAD_ID}, e.g. \"1. #3184 Wegener: reply to Andrew about the revised scope {email:18c2f0a9b7e1d234}\". Keystone turns it into a View email button. Never invent an id; leave it off when you don't have one.\n\nGo buttons: end every line that's about a job with {go:JOB#:PLACE}, where PLACE is where I'd start the work: estimator (writing, pricing or revising an estimate, agreement, photo report), selections (the owner's finish picks and budgets), notes (team notes), photos, files (documents), or job (anything else). E.g. \"2. #3226 Augustine: start the estimate from the ESX {go:3226:estimator}\". Keystone turns it into a button that takes me there.\n\nYour final reply is my brief for the day, shown at the top of my dashboard. Write it in this shape, in markdown, and nothing else:\n**Today at a glance:** one or two sentences (what's booked, how many things are waiting, the one thing that matters most).\n\n**Do in this order**\n1. #<job> <Name>: what to do (one line each, most urgent first: an adjuster or homeowner waiting on me beats a stale job; money-heavy proposals before small ones).\n\n**On the calendar:** the day's appointments, one line each (skip if none).\n\n**Drafts ready in Gmail:** one line per draft you made (skip if none).`;
@@ -914,7 +917,7 @@ function startPlan(trigger: "button" | "morning"): { taskId: string } | { error:
       const { withDraftSource } = await import("../workflows/generated.js");
       const note = await travelNote();
       const prompt = buildPrompt(await myDay());
-      plan.text = await withDraftSource(trigger === "morning" ? "Morning brief" : "Plan my day", async () => (await import("../agent/run.js")).ask(hub, prompt + note, {
+      plan.text = await withDraftSource(trigger === "morning" ? "Morning brief" : "Plan my day", async () => (await import("../agent/llm.js")).agentAsk(hub, prompt + note, {
         onMessage: (m) => {
           if (m.type !== "assistant") return;
           for (const b of m.message.content) if (b.type === "tool_use") { plan.steps.push(describeTool(b.name, b.input as Record<string, unknown>)); savePlan(plan); bus.emit({ type: "changed", what: "plan" }); }
@@ -937,7 +940,7 @@ function startPlan(trigger: "button" | "morning"): { taskId: string } | { error:
 // HUB_BRIEF_DAYS=0-6 for every day). If Keystone wasn't open at 7, it runs as soon as it opens, until 5 PM.
 function checkBrief() {
   const last = readPlan();
-  if (!cfg.anthropicApiKey || last.state === "running" || !briefDue(new Date(), "startedAt" in last ? last : null)) return;
+  if (!aiReady(hub) || last.state === "running" || !briefDue(new Date(), "startedAt" in last ? last : null)) return;
   const r = startPlan("morning");
   if (!("error" in r)) hub.say("Making this morning's brief…");
 }

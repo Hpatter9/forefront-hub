@@ -170,8 +170,8 @@ program
   .option("-j, --job <n>", "the job this is about")
   .action(async (words, o) => {
     const h = hub();
-    const { ask } = await import("../agent/run.js");
-    await ask(h, words.join(" "), { jobNumber: o.job ? num(o.job) : undefined });
+    const { agentAsk } = await import("../agent/llm.js");
+    await agentAsk(h, words.join(" "), { jobNumber: o.job ? num(o.job) : undefined });
     await done(h);
   });
 
@@ -203,8 +203,9 @@ program
     await new GoogleGmail({ clientId: c.gmail.clientId, clientSecret: c.gmail.clientSecret, tokenFile: c.gmail.tokenFile, address: c.gmail.address }).login();
   });
 
-const connect = program.command("connect").description("Guided set-up for a connection: gmail | companycam");
+const connect = program.command("connect").description("Guided set-up for a connection: gmail | companycam | gemini");
 connect.command("gmail").description("Connect Gmail step by step").action(async () => (await import("./connect.js")).connectGmail());
+connect.command("gemini").description("Use Gemini (Google) for Keystone's AI features").action(async () => (await import("./connect.js")).connectGemini());
 connect.command("companycam").description("Connect CompanyCam with an access token").action(async () => (await import("./connect.js")).connectCompanyCam());
 
 program

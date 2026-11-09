@@ -1,3 +1,4 @@
+import { makeGemini, type GeminiClient } from "./connectors/gemini/index.js";
 import { makeTravel, type TravelClient } from "./connectors/travel/index.js";
 import path from "node:path";
 import { CliApprover, type Approver } from "./core/approval.js";
@@ -20,6 +21,8 @@ export interface Hub {
   calendar: CalendarClient;
   tasks: TasksClient;
   travel: TravelClient;
+  /** Gemini, when it's Keystone's AI (null otherwise). */
+  gemini: GeminiClient | null;
   photos: PhotoClient;
   sketches: SketchSource;
   skill: EstimateSkill;
@@ -37,6 +40,7 @@ export function makeHub(cfg: Config = loadConfig(), approver: Approver = new Cli
     calendar: makeCalendar(cfg),
     tasks: makeTasks(cfg),
     travel: makeTravel(cfg),
+    gemini: makeGemini(cfg),
     photos: makeCompanyCam(cfg),
     sketches: new DocuSketch(gmail, cfg.docusketch.downloadsDir),
     skill: new EstimateSkill(cfg.skillDir, cfg.python),
@@ -52,7 +56,7 @@ export function describe(hub: Hub): string[] {
     `jobs        ${c.jobsRoot}`,
     `skill       ${c.skillDir}${hub.skill.check() ? `  (!) ${hub.skill.check()}` : ""}`,
     `python      ${c.python}`,
-    `claude      ${c.anthropicApiKey ? `API key set (${c.model})` : "(!) no ANTHROPIC_API_KEY and no Estimator data/api_key.txt"}`,
+    `ai          ${c.ai.provider === "gemini" ? `Gemini (${c.ai.geminiModel}; quick jobs ${c.ai.geminiFastModel})` : c.ai.provider === "claude" ? `Claude (${c.model})` : "off: add GEMINI_API_KEY or ANTHROPIC_API_KEY to .env"}`,
     `homebase    ${hub.homebase.kind}${hub.homebase.kind === "browser" ? `  login: ${path.relative(c.hubRoot, c.homebase.authFile)}` : ""}`,
     `gmail       ${hub.gmail.kind}${hub.gmail.kind === "mock" ? `  (drafts go to ${path.join(c.stateDir, "outbox")})` : ` ${c.gmail.address}`}`,
     `companycam  ${hub.photos.kind}`,

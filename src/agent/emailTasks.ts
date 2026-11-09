@@ -1,4 +1,5 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import { aiReady, complete } from "./llm.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Message } from "../connectors/gmail/types.js";
@@ -28,7 +29,7 @@ function save(hub: Hub, s: State) {
 export function enabled(hub: Hub) {
   return (
     (process.env.HUB_EMAIL_TASKS ?? "on") !== "off" &&
-    !!hub.cfg.anthropicApiKey &&
+    aiReady(hub) &&
     hub.gmail.kind === "google" &&
     !!hub.gmail.listThreads &&
     (hub.gmail.fullAccess?.() ?? false) &&
@@ -86,24 +87,8 @@ Subject: ${m.subject}
 
 ${m.body.slice(0, 8000)}`;
   let out: ProposedTask[] = [];
-  for await (const msg of query({
-    prompt,
-    options: {
-      model: hub.cfg.model,
-      maxTurns: 2,
-      allowedTools: [],
-      settingSources: [],
-      outputFormat: { type: "json_schema", schema: SCHEMA },
-      canUseTool: async () => ({ behavior: "deny", message: "No tools needed." }),
-      systemPrompt: "You extract action items from email into short to-do titles. Be strict: no task unless the email needs Hunter to act.",
-      env: { ...(process.env as Record<string, string>), ANTHROPIC_API_KEY: hub.cfg.anthropicApiKey },
-    },
-  })) {
-    if (msg.type === "result" && msg.subtype === "success") {
-      const so = (msg as any).structured_output ?? JSON.parse(msg.result.match(/\{[\s\S]*\}/)?.[0] ?? '{"tasks":[]}');
-      out = (so.tasks ?? []).slice(0, 3);
-    }
-  }
+  const so = await complete<{ tasks?: ProposedTask[] }>(hub, { system: "You extract action items from email into short to-do titles. Be strict: no task unless the email needs Hunter to act.", prompt, schema: SCHEMA, fast: hub.cfg.ai.provider === "gemini" });
+  out = (so?.tasks ?? []).slice(0, 3);
   return out.filter((t) => t.title?.trim());
 }
 

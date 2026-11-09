@@ -1,4 +1,5 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import { aiReady, complete } from "./llm.js";
 import { confirmText } from "../core/approval.js";
 import type { Hub } from "../hub.js";
 
@@ -13,27 +14,13 @@ export interface NoteEvent {
 }
 
 export async function draftNote(hub: Hub, jobNumber: number, e: NoteEvent): Promise<string | null> {
-  if (!hub.cfg.anthropicApiKey) return null;
+  if (!aiReady(hub)) return null;
   const job = hub.jobs.exists(jobNumber) ? hub.jobs.get(jobNumber) : null;
   const prompt = `Write ONE line (under 200 characters) for the Notes feed of Homebase job #${jobNumber}${job ? ` (${job.name}, ${job.address})` : ""}, saying what just happened so anyone at Forefront Building + Restoration can follow the job. Write it the way an estimator jots a job note: past tense, plain, who and what, the dollar figure or next step when there is one. No greeting, no quotes, no sign-off.
 
 What happened (${e.kind}):
 ${e.text.slice(0, 6000)}`;
-  let out = "";
-  for await (const m of query({
-    prompt,
-    options: {
-      model: hub.cfg.model,
-      maxTurns: 1,
-      allowedTools: [],
-      settingSources: [],
-      canUseTool: async () => ({ behavior: "deny", message: "No tools for a note." }),
-      systemPrompt: "You write short, factual job notes for a restoration contractor's CRM.",
-      env: { ...(process.env as Record<string, string>), ANTHROPIC_API_KEY: hub.cfg.anthropicApiKey },
-    },
-  })) {
-    if (m.type === "result" && m.subtype === "success") out = m.result;
-  }
+  const out = await complete<string>(hub, { system: "You write short, factual job notes for a restoration contractor's CRM.", prompt });
   return out.trim().replace(/^["']|["']$/g, "").split("\n")[0] || null;
 }
 

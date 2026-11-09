@@ -34,6 +34,7 @@ export function testHub(answer = true) {
     calendar: new MockCalendar(cfg.stateDir),
     tasks: new MockTasks(cfg.stateDir),
     travel: new MockTravel(),
+    gemini: null,
     photos: new MockCompanyCam(),
     sketches: new DocuSketch(gmail, cfg.docusketch.downloadsDir),
     skill: new EstimateSkill(cfg.skillDir, PYTHON),

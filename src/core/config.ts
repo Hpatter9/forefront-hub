@@ -15,6 +15,12 @@ export interface Config {
   jobsRoot: string;
   python: string;
   anthropicApiKey: string;
+  /**
+   * Which AI runs Keystone's AI features. HUB_AI=gemini | claude | off; when it isn't set: Gemini if there's a
+   * GEMINI_API_KEY, else Claude if there's an Anthropic key, else off. The Estimator tab and setting up
+   * selections use the Claude-only estimating skill, so they need Claude.
+   */
+  ai: { provider: "claude" | "gemini" | "off"; geminiKey: string; geminiModel: string; geminiFastModel: string; geminiFallbacks?: string[] };
   model: string;
   /** A fast, cheaper model for small jobs like one-line email summaries. */
   fastModel: string;
@@ -57,6 +63,20 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
     jobsRoot: e("JOBS_ROOT", live ? (isWin ? "C:\\Jobs" : path.join(root, "jobs")) : path.join(stateDir, "jobs")),
     python: e("PYTHON", isWin ? "py" : "python3"),
     anthropicApiKey,
+    ai: (() => {
+      const geminiKey = e("GEMINI_API_KEY", e("GOOGLE_API_KEY"));
+      const want = e("HUB_AI").toLowerCase();
+      const provider: Config["ai"]["provider"] =
+        want === "off" ? "off" : want === "gemini" ? (geminiKey ? "gemini" : "off") : want === "claude" ? (anthropicApiKey ? "claude" : "off") : geminiKey ? "gemini" : anthropicApiKey ? "claude" : "off";
+      return {
+        provider,
+        geminiKey,
+        geminiModel: e("GEMINI_MODEL", "gemini-3.5-flash"),
+        geminiFastModel: e("GEMINI_FAST_MODEL", "gemini-flash-lite-latest"),
+        // Tried in turn when a model is busy or retired.
+        geminiFallbacks: e("GEMINI_FALLBACK_MODELS", "gemini-flash-latest,gemini-flash-lite-latest").split(",").map((x) => x.trim()).filter(Boolean),
+      };
+    })(),
     model: e("HUB_MODEL", "claude-opus-5-5"),
     fastModel: e("HUB_FAST_MODEL", "claude-haiku-5-5"),
     homebase: {

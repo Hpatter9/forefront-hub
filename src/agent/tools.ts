@@ -30,7 +30,8 @@ const jobNumber = z.number().int().describe("Homebase job number, e.g. 3226");
  * Keystone's tools for the agent. Irreversible ones (Homebase writes) ask Hunter through hub.approver inside the
  * handler, so they're safe no matter how the agent calls them. There is no "send email" tool.
  */
-export function hubTools(hub: Hub) {
+/** Keystone's tools as plain definitions (name, description, input shape, handler), for any AI to call. */
+export function hubToolDefs(hub: Hub) {
   const tools = [
     // ---------------------------------------------------------------- job folder
     tool("job_list", "List the local job folders (job.json summaries).", {}, wrap(async () =>
@@ -369,5 +370,9 @@ export function hubTools(hub: Hub) {
       }),
     ),
   ];
-  return createSdkMcpServer({ name: SERVER, version: "0.1.0", tools });
+  return tools;
+}
+
+export function hubTools(hub: Hub) {
+  return createSdkMcpServer({ name: SERVER, version: "0.1.0", tools: hubToolDefs(hub) });
 }

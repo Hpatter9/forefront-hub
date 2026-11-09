@@ -1,4 +1,5 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import { aiReady, complete } from "./llm.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Hub } from "../hub.js";
@@ -31,7 +32,7 @@ function save(hub: Hub) {
   writeFileSync(file(hub), JSON.stringify(c));
 }
 
-export const enabled = (hub: Hub) => !!hub.cfg.anthropicApiKey && (process.env.HUB_MAIL_SUMMARIES ?? "on") !== "off";
+export const enabled = (hub: Hub) => aiReady(hub) && (process.env.HUB_MAIL_SUMMARIES ?? "on") !== "off";
 
 /** Summaries already written for these threads (only those still current). */
 export function summariesFor(hub: Hub, threads: { id: string; historyId?: string }[]): Record<string, string> {
@@ -94,24 +95,8 @@ async function summarizeBatch(hub: Hub, batch: { id: string; historyId?: string;
 
 ${items.map((x, i) => `#${i + 1}\n${x.text}`).join("\n\n---\n\n")}`;
   let out: { n: number; summary: string }[] = [];
-  for await (const m of query({
-    prompt,
-    options: {
-      model: hub.cfg.fastModel,
-      maxTurns: 2,
-      allowedTools: [],
-      settingSources: [],
-      outputFormat: { type: "json_schema", schema: SCHEMA },
-      canUseTool: async () => ({ behavior: "deny", message: "No tools needed." }),
-      systemPrompt: "You write very short, specific one-line email summaries.",
-      env: { ...(process.env as Record<string, string>), ANTHROPIC_API_KEY: hub.cfg.anthropicApiKey },
-    },
-  })) {
-    if (m.type === "result" && m.subtype === "success") {
-      const so = (m as any).structured_output ?? JSON.parse(m.result.match(/\{[\s\S]*\}/)?.[0] ?? '{"items":[]}');
-      out = so.items ?? [];
-    }
-  }
+  const so = await complete<{ items?: { n: number; summary: string }[] }>(hub, { system: "You write very short, specific one-line email summaries.", prompt, schema: SCHEMA, fast: true });
+  out = so?.items ?? [];
   const c = load(hub);
   let n = 0;
   for (const r of out) {

@@ -130,3 +130,25 @@ export async function connectCompanyCam() {
   console.log(`\nCompanyCam is connected as ${[me.first_name, me.last_name].filter(Boolean).join(" ") || me.email_address || "you"}.`);
   console.log("Restart Keystone (close its window, open the desktop icon) to use it.");
 }
+
+/** Gemini as Keystone's AI (free key from Google AI Studio): saves GEMINI_API_KEY and HUB_AI=gemini in .env. */
+export async function connectGemini() {
+  console.log("Connecting Gemini (Google's AI) to run Keystone's AI features: email summaries, tasks from email,");
+  console.log("the daily brief, drafts and Ask. The Estimator tab still needs Claude.");
+  step(1, "On the page that opens, sign in with your Google account and click Create API key. Copy the key.");
+  console.log("   Free keys work. On the free tier Google may use what Keystone sends (customer emails, job details)");
+  console.log("   to improve its products. Turning on billing for the key's project (pay as you go) stops that.");
+  openBrowser("https://aistudio.google.com/apikey");
+  const key = (await ask("\n2. Paste the key here and press Enter: ")).trim();
+  if (!key) throw new Error("No key; run Connect Gemini again when you have one.");
+  const { LiveGemini } = await import("../connectors/gemini/index.js");
+  const cfg = loadConfig();
+  const r = await new LiveGemini(key)
+    .generate({ model: cfg.ai.geminiFastModel, fallbackModels: [cfg.ai.geminiModel, ...(cfg.ai.geminiFallbacks ?? [])], contents: [{ role: "user", parts: [{ text: "Reply with just: OK" }] }] })
+    .catch((e: Error) => {
+      throw new Error(/key/i.test(e.message) ? "Google didn't accept that key. Copy it again (all of it) and run Connect Gemini again." : e.message);
+    });
+  setEnv({ GEMINI_API_KEY: key, HUB_AI: "gemini" });
+  console.log(`\nGemini is connected (test answer: ${r.text.slice(0, 20) || "OK"}). Keystone's AI now runs on Gemini, not the Claude API.`);
+  console.log("Restart Keystone (close its black window, then open the Keystone icon) to use it.");
+}
