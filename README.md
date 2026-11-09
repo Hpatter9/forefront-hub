@@ -106,11 +106,6 @@ C:\Jobs\3226 Augustine\
   enough time (`src/workflows/travel.ts`, `src/connectors/travel`). Free, no key: OpenStreetMap
   times the drive, padded 20% for traffic and 45% at weekday rush hour.
 
-- **Where Claude requests go**: always to Anthropic with Keystone's key (`src/agent/env.ts`). Settings on the PC
-  that redirect Claude (`ANTHROPIC_BASE_URL` and friends, which "use another model in Claude Code" add-ons set) are
-  ignored and named at startup and on the Claude chip. To use a different endpoint on purpose, set
-  `HUB_CLAUDE_BASE_URL` in `.env` (or `HUB_ALLOW_CLAUDE_REDIRECT=1` to keep the PC's).
-
 `npm test` runs everything on mocks, including the skill's real Python scripts (it expects the estimator repo
 next to this one, or `ESTIMATOR_DIR`). `npm run typecheck` checks types.
 

@@ -1,5 +1,4 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { claudeEnv } from "./env.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Message } from "../connectors/gmail/types.js";
@@ -97,7 +96,7 @@ ${m.body.slice(0, 8000)}`;
       outputFormat: { type: "json_schema", schema: SCHEMA },
       canUseTool: async () => ({ behavior: "deny", message: "No tools needed." }),
       systemPrompt: "You extract action items from email into short to-do titles. Be strict: no task unless the email needs Hunter to act.",
-      env: claudeEnv(hub),
+      env: { ...(process.env as Record<string, string>), ANTHROPIC_API_KEY: hub.cfg.anthropicApiKey },
     },
   })) {
     if (msg.type === "result" && msg.subtype === "success") {

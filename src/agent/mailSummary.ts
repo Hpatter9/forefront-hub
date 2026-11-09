@@ -1,5 +1,4 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { claudeEnv } from "./env.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Hub } from "../hub.js";
@@ -105,7 +104,7 @@ ${items.map((x, i) => `#${i + 1}\n${x.text}`).join("\n\n---\n\n")}`;
       outputFormat: { type: "json_schema", schema: SCHEMA },
       canUseTool: async () => ({ behavior: "deny", message: "No tools needed." }),
       systemPrompt: "You write very short, specific one-line email summaries.",
-      env: claudeEnv(hub),
+      env: { ...(process.env as Record<string, string>), ANTHROPIC_API_KEY: hub.cfg.anthropicApiKey },
     },
   })) {
     if (m.type === "result" && m.subtype === "success") {

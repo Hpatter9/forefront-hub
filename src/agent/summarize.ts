@@ -1,5 +1,4 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { claudeEnv } from "./env.js";
 import { confirmText } from "../core/approval.js";
 import type { Hub } from "../hub.js";
 
@@ -30,7 +29,7 @@ ${e.text.slice(0, 6000)}`;
       settingSources: [],
       canUseTool: async () => ({ behavior: "deny", message: "No tools for a note." }),
       systemPrompt: "You write short, factual job notes for a restoration contractor's CRM.",
-      env: claudeEnv(hub),
+      env: { ...(process.env as Record<string, string>), ANTHROPIC_API_KEY: hub.cfg.anthropicApiKey },
     },
   })) {
     if (m.type === "result" && m.subtype === "success") out = m.result;

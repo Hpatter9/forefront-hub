@@ -1077,7 +1077,7 @@ async function loadStatus() {
     chip("Homebase", status.homebase !== "mock", `Homebase: ${status.homebase}`),
     chip("Gmail", status.gmail === "google", status.gmail === "google" ? (status.gmailFull ? "Connected" : "Connected for drafts only; reconnect to send from Keystone") : "Not connected (test inbox)"),
     chip("CompanyCam", status.companycam === "rest", status.companycam === "rest" ? "Connected" : "Not connected"),
-    chip("Claude", status.agent, status.agent ? `On · requests go to ${(status.claude?.endpoint || "").replace(/^https?:\/\//, "")}${status.claude?.ignored?.length ? `. Ignored a setting on this PC that tried to send them elsewhere: ${status.claude.ignored.map((r) => r.name + (r.host ? " → " + r.host : "")).join(", ")}` : ""}` : "Off: no Anthropic API key on this machine"),
+    chip("Claude", status.agent, status.agent ? "On" : "Off: no Anthropic API key on this machine"),
   ].join("");
 }
 async function loadSyncState() {

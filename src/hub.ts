@@ -1,4 +1,3 @@
-import { claudeEndpoint, ignoredRedirects } from "./agent/env.js";
 import { makeTravel, type TravelClient } from "./connectors/travel/index.js";
 import path from "node:path";
 import { CliApprover, type Approver } from "./core/approval.js";
@@ -53,7 +52,6 @@ export function describe(hub: Hub): string[] {
     `jobs        ${c.jobsRoot}`,
     `skill       ${c.skillDir}${hub.skill.check() ? `  (!) ${hub.skill.check()}` : ""}`,
     `python      ${c.python}`,
-    `claude      ${c.anthropicApiKey ? `on, requests go to ${claudeEndpoint()}` : "off (no Anthropic API key)"}${ignoredRedirects().length ? `  (ignoring ${ignoredRedirects().map((r) => r.name).join(", ")} set on this PC)` : ""}`,
     `claude      ${c.anthropicApiKey ? `API key set (${c.model})` : "(!) no ANTHROPIC_API_KEY and no Estimator data/api_key.txt"}`,
     `homebase    ${hub.homebase.kind}${hub.homebase.kind === "browser" ? `  login: ${path.relative(c.hubRoot, c.homebase.authFile)}` : ""}`,
     `gmail       ${hub.gmail.kind}${hub.gmail.kind === "mock" ? `  (drafts go to ${path.join(c.stateDir, "outbox")})` : ` ${c.gmail.address}`}`,
