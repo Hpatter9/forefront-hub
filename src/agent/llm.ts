@@ -75,6 +75,8 @@ export async function agentAsk(hub: Hub, prompt: string, opts: { jobNumber?: num
   const decls: FunctionDecl[] = defs.map((d: any) => ({ name: d.name, description: String(d.description).slice(0, 1000), parametersJsonSchema: toSchema(d.inputSchema) }));
   const system = `${systemPrompt(hub, opts.jobNumber)}
 
+Right now it's ${new Date().toLocaleString("en-US", { timeZone: "America/Denver", weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })} (Denver time). "Tomorrow", "this morning" and "next week" are relative to that.
+
 You're running on Gemini inside Keystone. Use the functions provided for anything about jobs, email, the calendar, tasks, contacts and Homebase; read before you answer, and never guess job facts. You can't run the estimating skill or open files here: for estimating, pricing or revising an estimate, tell Hunter to use the Estimator tab. Email is drafts only.`;
   const contents: Turn[] = [{ role: "user", parts: [{ text: prompt }] }];
   for (let step = 0; step < (opts.maxSteps ?? 24); step++) {

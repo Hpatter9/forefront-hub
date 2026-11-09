@@ -233,9 +233,9 @@ export function hubToolDefs(hub: Hub) {
     // ---------------------------------------------------------------- Google Calendar
     tool(
       "calendar_events",
-      "Hunter's Google Calendar events between two times (ISO), all calendars unless calendarIds is given. Events that mention a job (#3226) carry jobNumber.",
-      { start: z.string(), end: z.string(), q: z.string().optional() },
-      wrap(async ({ start, end, q }) => hub.calendar.events({ start, end, q })),
+      "Hunter's own schedule between two times (ISO): events on his calendar plus events on other people's calendars he's invited to (declined ones left out). Other people's meetings he isn't on are not included; only set everyone=true when Hunter asks about someone else's or the whole team's calendar. Events that mention a job (#3226) carry jobNumber.",
+      { start: z.string(), end: z.string(), q: z.string().optional(), everyone: z.boolean().optional().describe("include other people's events Hunter isn't on (only when he asks about them)") },
+      wrap(async ({ start, end, q, everyone }) => (everyone ? hub.calendar.events({ start, end, q }) : (await import("../workflows/myEvents.js")).myEvents(hub, { start, end, q }))),
     ),
     tool(
       "calendar_free_time",
