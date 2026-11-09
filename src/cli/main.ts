@@ -128,9 +128,9 @@ program
     if (!h.jobs.exists(n)) await pullJob(h, n);
     const job = h.jobs.get(n);
     const to: Recipient[] = o.to === "both" ? (job.adjuster.email ? ["homeowner", "adjuster"] : ["homeowner"]) : (o.to.split(",") as Recipient[]);
-    const useTemplate = o.template || h.cfg.mode === "mock" || !h.cfg.anthropicApiKey;
-    const writer = useTemplate ? new TemplateWriter() : new (await import("../agent/writer.js")).AgentWriter(h);
-    if (useTemplate) console.log("(template wording: mock mode, --template, or no API key)");
+    const useTemplate = o.template || h.cfg.mode === "mock";
+    const writer = useTemplate ? new TemplateWriter() : new (await import("../agent/emailWriter.js")).SendoffWriter(h);
+    if (useTemplate) console.log("(template wording: mock mode or --template)");
     await sendoff(h, n, { to, writer, cc: o.cc ? o.cc.split(",") : undefined, yes: program.opts().yes, reusePhotoReport: o.reusePhotoReport });
     await done(h);
   });

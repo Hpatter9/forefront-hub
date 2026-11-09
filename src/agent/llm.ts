@@ -8,8 +8,8 @@ import { hubToolDefs, SERVER } from "./tools.js";
 
 /**
  * Keystone's AI, whichever one is switched on (config.ai.provider): Claude (Anthropic API) or Gemini (Google).
- * Every AI feature goes through here, except the Estimator tab and setting up selections, which use the
- * Claude-only estimating skill.
+ * Every everyday AI feature goes through here (Gemini, free). The paid Claude API is only for the estimating
+ * skill: the Estimator tab, setting up selections and the send-off's report photo picks.
  */
 export type Provider = "claude" | "gemini" | "off";
 
@@ -24,7 +24,7 @@ export const claudeOnlyReady = (hub: Hub) => !!hub.cfg.anthropicApiKey;
 
 export function aiOffReason(hub: Hub): string {
   if (hub.cfg.ai?.provider === "gemini" || process.env.HUB_AI === "gemini") return "Gemini is off: add GEMINI_API_KEY to Keystone's .env (aistudio.google.com/apikey) and restart.";
-  return "AI is off on this machine: add GEMINI_API_KEY (Gemini) or ANTHROPIC_API_KEY (Claude) to Keystone's .env and restart.";
+  return "Everyday AI is off: add a free GEMINI_API_KEY to Keystone's .env (double-click Connect Gemini) and restart. The Claude API key is only used for estimating.";
 }
 
 /**

@@ -14,9 +14,10 @@ const geminiHub = (script: ConstructorParameters<typeof MockGemini>[0]) => {
 describe("Gemini as Keystone's AI", () => {
   it("picks Gemini when there's a Gemini key, and honours HUB_AI", () => {
     expect(loadConfig({ HUB_MODE: "mock", GEMINI_API_KEY: "g" }).ai.provider).toBe("gemini");
-    expect(loadConfig({ HUB_MODE: "mock", ANTHROPIC_API_KEY: "a" }).ai.provider).toBe("claude");
     expect(loadConfig({ HUB_MODE: "mock", ANTHROPIC_API_KEY: "a", GEMINI_API_KEY: "g", HUB_AI: "claude" }).ai.provider).toBe("claude");
     expect(loadConfig({ HUB_MODE: "mock", HUB_AI: "gemini" }).ai.provider).toBe("off");
+    // An Anthropic key alone doesn't put everyday features on the paid Claude API.
+    expect(loadConfig({ HUB_MODE: "mock", ANTHROPIC_API_KEY: "sk-ant-a" }).ai.provider).toBe("off");
     expect(loadConfig({ HUB_MODE: "mock" }).ai.provider).toBe("off");
   });
 
@@ -94,5 +95,23 @@ describe("Gemini as Keystone's AI", () => {
   it("is off without a key", () => {
     const { hub } = testHub();
     expect(aiProvider(hub)).toBe("off");
+  });
+});
+
+describe("send-off email on Gemini", () => {
+  it("writes the email with Gemini, following the skill's step 6 from SKILL.md, and never calls Claude for it", async () => {
+    const { SendoffWriter, skillStep6 } = await import("../src/agent/emailWriter.js");
+    const t = geminiHub(() => JSON.stringify({ subject: "Your Reconstruction Estimate – 12 Elm St", body: "Hi Pat,\n\nAttached is the estimate.\n\nThanks," }));
+    t.hub.cfg.anthropicApiKey = "";
+    const job = { jobNumber: 4100, name: "Doe", address: "12 Elm St, Denver, CO", insurance: "claim", customer: { name: "Pat Doe", email: "" }, adjuster: { name: "", email: "" } } as any;
+    const r = await new SendoffWriter(t.hub).writeEmail({ job, kind: "homeowner", total: 1234, attachments: ["Doe - Reconstruction Estimate.pdf"] });
+    expect(r.subject).toContain("12 Elm St");
+    const req = (t.hub.gemini as MockGemini).requests[0];
+    expect(req.system).toContain("## 6.");
+    expect(req.system).not.toContain("## Company details");
+    expect(skillStep6(t.hub.cfg.skillDir)).toMatch(/^## 6\. Send-off email/);
+    // Photo picks without a Claude key fall back to the plain list (no paid API).
+    const picks = await new SendoffWriter(t.hub).pickPhotos(job, [{ file: "a.jpg", description: "Kitchen", capturedAt: "" }], "/tmp");
+    expect(picks).toEqual([{ file: "a.jpg", caption: "Kitchen" }]);
   });
 });

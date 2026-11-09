@@ -491,9 +491,9 @@ const server = http.createServer(async (req, res) => {
         case "sendoff": {
           const to: Recipient[] = b.to?.length ? b.to : ["homeowner"];
           return send(res, 202, task(`Draft send-off for #${n} (${to.join(" + ")})`, n, async () => {
-            const useTemplate = b.template || cfg.mode === "mock" || !claudeOnlyReady(hub);
-            const writer = useTemplate ? new TemplateWriter() : new (await import("../agent/writer.js")).AgentWriter(hub);
-            if (useTemplate) hub.say("Using plain template wording (no Claude API key on this machine).");
+            // Email wording on Gemini (free); only the report photo picks use Claude and the estimating skill.
+            const useTemplate = b.template || cfg.mode === "mock";
+            const writer = useTemplate ? new TemplateWriter() : new (await import("../agent/emailWriter.js")).SendoffWriter(hub);
             await sendoff(hub, n, { to, writer, cc: b.cc ? String(b.cc).split(",").map((s: string) => s.trim()) : undefined });
           }, "timeline"));
         }
@@ -766,7 +766,7 @@ const server = http.createServer(async (req, res) => {
       const b = await body(req);
       const text = String(b.text ?? "").trim();
       if (!text) return send(res, 400, { error: "Say what you want Claude to do." });
-      if (!claudeOnlyReady(hub)) return send(res, 400, { error: "The Estimator uses the Claude estimating skill, so it needs Claude: ANTHROPIC_API_KEY in Keystone's .env and HUB_AI=claude." });
+      if (!claudeOnlyReady(hub)) return send(res, 400, { error: "The Estimator uses the Claude estimating skill, so it needs a Claude API key: ANTHROPIC_API_KEY=sk-ant-... in Keystone's .env, then restart." });
       if (studio.running(n)) return send(res, 409, { error: "Claude is still working on this job." });
       studio.send(n, text).then(() => bus.emit({ type: "changed", job: n, what: "job" })).catch((e) => console.error(e));
       return send(res, 202, { ok: true });

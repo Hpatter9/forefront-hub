@@ -77,7 +77,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
       const geminiKey = e("GEMINI_API_KEY", e("GOOGLE_API_KEY"));
       const want = e("HUB_AI").toLowerCase();
       const provider: Config["ai"]["provider"] =
-        want === "off" ? "off" : want === "gemini" ? (geminiKey ? "gemini" : "off") : want === "claude" ? (anthropicApiKey ? "claude" : "off") : geminiKey ? "gemini" : anthropicApiKey ? "claude" : "off";
+        want === "off" ? "off" : want === "gemini" ? (geminiKey ? "gemini" : "off") : want === "claude" ? (anthropicApiKey ? "claude" : "off") : geminiKey ? "gemini" : "off";
+      // Everyday features (summaries, tasks, brief, Ask, email wording) never fall back to the paid Claude API on
+      // their own: only the estimating skill uses Claude. HUB_AI=claude is a deliberate opt-in.
       return {
         provider,
         geminiKey,

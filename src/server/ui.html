@@ -1089,7 +1089,7 @@ async function loadStatus() {
     chip("Homebase", status.homebase !== "mock", `Homebase: ${status.homebase}`),
     chip("Gmail", status.gmail === "google", status.gmail === "google" ? (status.gmailFull ? "Connected" : "Connected for drafts only; reconnect to send from Keystone") : "Not connected (test inbox)"),
     chip("CompanyCam", status.companycam === "rest", status.companycam === "rest" ? "Connected" : "Not connected"),
-    chip(status.ai?.name && status.ai.provider !== "off" ? status.ai.name : "AI", status.agent, status.agent ? `${status.ai?.name || "Claude"} is on (${status.ai?.model || ""})${status.ai?.provider === "gemini" ? (status.estimator ? ". Estimating (Estimator tab, selections, send-off wording) runs on Claude." : ". The Estimator tab needs Claude: add ANTHROPIC_API_KEY to Keystone's .env.") : ""}` : status.ai?.offReason || "Off: no AI key on this machine"),
+    chip(status.ai?.name && status.ai.provider !== "off" ? status.ai.name : "AI", status.agent, status.agent ? `${status.ai?.name || "Claude"} is on (${status.ai?.model || ""})${status.ai?.provider === "gemini" ? (status.estimator ? ". Only estimating (Estimator tab, setting up selections, report photo picks) uses the Claude API; everything else is on Gemini." : ". The Estimator tab needs Claude: add ANTHROPIC_API_KEY to Keystone's .env.") : ""}` : status.ai?.offReason || "Off: no AI key on this machine"),
   ].join("");
 }
 async function loadSyncState() {

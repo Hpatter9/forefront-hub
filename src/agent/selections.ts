@@ -43,7 +43,7 @@ const PLAN_SCHEMA = {
 };
 
 export async function buildSelections(hub: Hub, n: number, say: (m: string) => void = hub.say): Promise<number> {
-  if (!claudeOnlyReady(hub)) throw new Error("Setting up selections uses the Claude estimating skill, so it needs Claude (ANTHROPIC_API_KEY and HUB_AI=claude). You can add categories by hand.");
+  if (!claudeOnlyReady(hub)) throw new Error("Setting up selections uses the Claude estimating skill, so it needs a Claude API key (ANTHROPIC_API_KEY in Keystone's .env). You can add categories by hand.");
   const folder = hub.jobs.folder(n);
   const prompt = `Set up the selections list for job #${n} (folder: ${folder}).
 
