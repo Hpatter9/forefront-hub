@@ -74,6 +74,8 @@ export const JobSchema = z.object({
   /** Last background sync with Homebase, and the last CompanyCam/DocuSketch look-up (those run at most daily). */
   syncedAt: z.string().default(""),
   lookupsAt: z.string().default(""),
+  /** Follow-ups: when Hunter last ticked one off in the brief (counts as contact), and when the brief last asked. */
+  followups: z.object({ doneAt: z.string().default(""), nudgedAt: z.string().default("") }).default({ doneAt: "", nudgedAt: "" }),
   /** What the background sync last saw on the job, for the Today screen's reminders. */
   pulse: z
     .object({

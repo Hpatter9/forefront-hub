@@ -1112,6 +1112,7 @@ $("#syncnow").addEventListener("click", async () => { try { await api("/api/sync
 const ACTIONS = {
   reply: (r) => `${r.threadId ? `<button class="btn small primary" data-do="thread" data-thread="${esc(r.threadId)}">Reply</button>` : ""}<button class="btn small" data-do="claude" data-p="Read the latest email on job #${r.jobNumber} and draft my reply in Gmail (draft only).">Draft reply with Claude</button>`,
   log: (r) => `<button class="btn small primary" data-do="logsent" data-n="${r.jobNumber}">Log in Homebase</button>`,
+  walk: (r) => `<button class="btn small" data-do="open" data-n="${r.jobNumber}">Open job to schedule the walk</button>`,
   estimate: (r) => `<button class="btn small" data-do="claude" data-p="Start the estimate for job #${r.jobNumber}: check what's in the job folder (ESX, photos, notes) and tell me what's missing before you price it.">Start estimate with Claude</button>`,
   adjuster: (r) => `<button class="btn small primary" data-do="claude" data-p="Draft a short check-in email to the adjuster on job #${r.jobNumber}, in my voice, asking where they are on their review of our estimate and whether they need anything else from us (photos, measurements, a call). Reply in the existing thread with them if there is one. Gmail draft only.">Draft check-in with Claude</button>`,
   followup: (r) => `<button class="btn small" data-do="claude" data-p="Draft a short follow-up email for job #${r.jobNumber}'s proposal in my voice (Gmail draft only), to whoever is waiting on it.">Draft follow-up</button>`,
@@ -2859,7 +2860,8 @@ async function renderBrief() {
 document.addEventListener("change", async (e) => {
   const c = e.target.closest(".bchk"); if (!c) return;
   c.closest("li")?.classList.toggle("done", c.checked);
-  try { await api("/api/plan/check", { method: "POST", body: { key: c.dataset.key, done: c.checked } }); } catch (err) { log(err.message, "t-err"); }
+  const li = c.closest("li"); const job = Number(li?.querySelector("[data-n]")?.dataset.n || li?.textContent.match(/#(\d{4})\b/)?.[1]) || undefined;
+  try { await api("/api/plan/check", { method: "POST", body: { key: c.dataset.key, done: c.checked, job } }); } catch (err) { log(err.message, "t-err"); }
 });
 document.addEventListener("click", async (e) => {
   const g = e.target.closest("[data-do=gobrief]"); if (g) { showTab("brief"); return; }

@@ -111,6 +111,10 @@ C:\Jobs\3226 Augustine\
   (the PM's) stay out, and so does anything old (it still shows on the dashboard). Every View email button is
   checked against its job before the brief shows (`src/workflows/briefEmails.ts`): a wrong one is swapped for the
   job's own waiting email, or removed.
+  Each item carries its job's next step for the stage (`STAGE_STEP`): a Lead's is setting up the scope walk, and the
+  estimate only comes after the walk. Customer follow-ups come up about twice a week (`HUB_FOLLOWUP_DAYS=3`): after
+  3 days without contact, and not again for 3 days once the brief has asked. Emails you send yourself count as
+  contact, and so does ticking the item off in the brief (for a call or text Keystone can't see).
 
 - **Drive times**: calendar events with an address show a "leave by" block, the drive time from the previous
   appointment (or the office, or `HUB_DAY_START_ADDRESS`), and a warning when back-to-back visits don't leave

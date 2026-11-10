@@ -7,7 +7,7 @@ import { STANDARD_FILES } from "./files.js";
  * The Today screen: what needs Hunter's attention, worked out from each job folder's job.json (kept fresh by the
  * background sync). Nothing here writes anywhere.
  */
-export type ReminderKind = "reply" | "adjuster" | "estimate" | "followup" | "stale" | "log" | "upload" | "draft";
+export type ReminderKind = "reply" | "adjuster" | "walk" | "estimate" | "followup" | "stale" | "log" | "upload" | "draft";
 
 export interface Reminder {
   kind: ReminderKind;
@@ -19,14 +19,36 @@ export interface Reminder {
   /** Days since the thing that started the clock. */
   days: number;
   threadId?: string;
+  /** Where the job is, in plain words: the one next step for its stage (a Lead's is the scope walk, not the estimate). */
+  step: string;
+  /** When the brief last asked for this job's follow-up (so it comes up about twice a week, not daily). */
+  nudgedAt?: string;
 }
+
+/** The next step for each stage, in order: walk first, then the estimate, then the proposal. */
+export const STAGE_STEP: Record<string, string> = {
+  Qualify: "Qualify the lead, then set up the scope walk",
+  Lead: "Set up the scope walk (the estimate comes after the walk)",
+  FDA: "Finish the site visit, then write the estimate",
+  "Scope Walk": "Do the scope walk (book it if it isn't on the calendar), then write the estimate",
+  Adjustment: "Settle the scope with the adjuster, then write the estimate",
+  Estimating: "Write the estimate",
+  "Proposal Review": "Review the proposal and send it",
+  "Proposal Submitted": "Follow up on the proposal",
+  Supplement: "Work the supplement with the adjuster",
+};
+export const stepFor = (stage: string) => STAGE_STEP[stage] ?? "Check on the job";
+
+/** Customer follow-ups come up about twice a week: this many days after the last contact or the last nudge. */
+export const FOLLOWUP_EVERY = Number(process.env.HUB_FOLLOWUP_DAYS || 3);
 
 export const REMINDER_GROUPS: { kind: ReminderKind; label: string; hint: string }[] = [
   { kind: "reply", label: "Reply needed", hint: "Someone on the job emailed and there's no answer from you after it" },
   { kind: "adjuster", label: "Check in with the adjuster", hint: "Estimate is with the adjuster and you haven't been in touch for 7+ days" },
   { kind: "log", label: "Sent, log it in Homebase", hint: "Send-offs that went out; log the proposal" },
-  { kind: "estimate", label: "Needs an estimate", hint: "Lead through Estimating with no proposal yet" },
-  { kind: "followup", label: "Follow up on proposals", hint: "Proposal Submitted and quiet for 5+ days" },
+  { kind: "walk", label: "Set up a scope walk", hint: "Leads that need their walk before the estimate" },
+  { kind: "estimate", label: "Needs an estimate", hint: "Walk stage through Estimating with no proposal yet" },
+  { kind: "followup", label: "Follow up on proposals", hint: "Proposal Submitted and no contact for 3+ days (about twice a week)" },
   { kind: "draft", label: "Drafts waiting to send", hint: "Send-off drafts still sitting in Gmail" },
   { kind: "upload", label: "Files Homebase doesn't have", hint: "Estimate PDFs to upload" },
   { kind: "stale", label: "Not touched this week", hint: "No call, email or note in 7+ days" },
@@ -40,7 +62,7 @@ export function reminders(hub: Hub, extras: { needsUpload?: Set<number> } = {}):
   const out: Reminder[] = [];
   for (const j of hub.jobs.list()) {
     if (DONE.has(j.stage)) continue;
-    const base = { jobNumber: j.jobNumber, name: j.name, stage: j.stage };
+    const base = { jobNumber: j.jobNumber, name: j.name, stage: j.stage, step: stepFor(j.stage), nudgedAt: j.followups?.nudgedAt || undefined };
     const p = j.pulse;
     if (p.waiting) out.push({ ...base, kind: "reply", title: p.waiting.subject || "(no subject)", detail: `from ${p.waiting.from}`, days: days(p.waiting.at), threadId: p.waiting.threadId || undefined });
 
@@ -50,14 +72,17 @@ export function reminders(hub: Hub, extras: { needsUpload?: Set<number> } = {}):
     if (unsent.length) out.push({ ...base, kind: "draft", title: unsent.map((d) => d.subject).join("; "), detail: `to ${unsent.flatMap((d) => d.to).join(", ")}`, days: days(unsent[0].createdAt) });
 
     // The clock for "quiet" starts at the last touch, else when the job entered its stage.
-    const quiet = days(p.lastTouchAt || j.stageSince);
+    // A follow-up you ticked off in the brief counts as contact too.
+    const touchedAt = [p.lastTouchAt, j.followups?.doneAt].filter(Boolean).sort().at(-1) ?? "";
+    const quiet = days(touchedAt || j.stageSince);
     const needsEstimate = PRE_ESTIMATE.has(j.stage) && !p.proposalAmount && !hasEstimate(hub, j);
-    if (needsEstimate) out.push({ ...base, kind: "estimate", title: `${j.stage}, no estimate yet`, detail: j.address, days: days(j.stageSince) });
+    if (needsEstimate && (j.stage === "Lead" || j.stage === "Qualify")) out.push({ ...base, kind: "walk", title: `${j.stage}: set up the scope walk`, detail: j.address, days: days(j.stageSince) });
+    else if (needsEstimate) out.push({ ...base, kind: "estimate", title: `${j.stage}: ${stepFor(j.stage).toLowerCase()}`, detail: j.address, days: days(j.stageSince) });
     // The adjuster check-in: a claim whose estimate is with the adjuster, and a week since you were last in touch.
     const adj = adjusterReview(j);
     if (adj && !p.waiting && adj.days >= ADJUSTER_DAYS) {
       out.push({ ...base, kind: "adjuster", title: `Check in with ${adj.who} on the review status`, detail: adj.since, days: adj.days });
-    } else if (j.stage === "Proposal Submitted" && quiet >= 5 && !p.waiting) {
+    } else if (j.stage === "Proposal Submitted" && quiet >= FOLLOWUP_EVERY && !p.waiting) {
       out.push({ ...base, kind: "followup", title: p.proposalAmount ? `$${p.proposalAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })} proposal` : "Proposal out", detail: p.lastTouch ? `last: ${p.lastTouch}` : `in stage since ${j.stageSince}`, days: quiet });
     } else if (!needsEstimate && !p.waiting && p.checkedAt && quiet >= 7 && quiet < 999) {
       out.push({ ...base, kind: "stale", title: p.lastTouch ? `Last: ${p.lastTouch}` : "No activity on record", detail: j.stage, days: quiet });
@@ -82,7 +107,7 @@ export function addressedToMe(t: { to?: string; cc?: string }, me: string): bool
 /** Stages where the work is Hunter's (estimating through the proposal and supplements); later stages belong to the PM. */
 const ESTIMATOR_STAGES = new Set([...PRE_ESTIMATE, "Proposal Submitted", "Supplement"]);
 /** How recent each kind of item has to be for the brief (days since its clock started). */
-export const BRIEF_MAX_DAYS: Record<ReminderKind, number> = { reply: REPLY_DAYS, adjuster: 45, followup: 45, stale: 30, estimate: 60, log: 30, draft: 30, upload: 30 };
+export const BRIEF_MAX_DAYS: Record<ReminderKind, number> = { reply: REPLY_DAYS, adjuster: 45, followup: 45, stale: 30, walk: 60, estimate: 60, log: 30, draft: 30, upload: 30 };
 
 /**
  * The reminders that belong in Hunter's brief: his own action items, and recent ones. Leaves out quiet jobs that
@@ -95,7 +120,9 @@ export function briefItems(list: Reminder[]): { items: Reminder[]; left: Reminde
   for (const r of list) {
     const notMine = (r.kind === "stale" || r.kind === "followup") && !ESTIMATOR_STAGES.has(r.stage);
     const old = r.days > (BRIEF_MAX_DAYS[r.kind] ?? 30);
-    (notMine || old ? left : items).push(r);
+    // Follow-ups twice a week: if the brief already asked in the last few days, it waits.
+    const askedLately = (r.kind === "followup" || r.kind === "stale") && !!r.nudgedAt && days(r.nudgedAt) < FOLLOWUP_EVERY;
+    (notMine || old || askedLately ? left : items).push(r);
   }
   return { items, left };
 }
@@ -170,6 +197,11 @@ export async function pulse(hub: Hub, j: Job): Promise<Job["pulse"]> {
     if (adjEmail) {
       const [last] = await hub.gmail.search(`(from:${adjEmail} OR to:${adjEmail} OR cc:${adjEmail}) newer_than:180d`, 1).catch(() => []);
       if (last) adjTouches.push({ at: new Date(last.date).toISOString(), what: `${last.from.toLowerCase().includes(me) ? "you emailed" : "they emailed"}: ${last.subject}` });
+    }
+    // Emails you sent yourself (a new email, not a reply) count as contact too: the search above skips them.
+    if (people.length) {
+      const sent = await hub.gmail.search(`from:me (${people.map((p) => `to:${p} OR cc:${p}`).join(" OR ")}) newer_than:60d`, 3).catch(() => []);
+      for (const t of sent) touches.push({ at: new Date(t.date).toISOString(), what: `you emailed: ${t.subject}` });
     }
     for (const t of threads) {
       // search() summarises each thread by its newest message: if that one isn't from Hunter, it's waiting on him.
