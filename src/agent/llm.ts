@@ -36,12 +36,21 @@ export function aiOffReason(hub: Hub): string {
  * One question, one answer: plain text, or JSON shaped by `schema` (a JSON Schema). `fast` uses the quicker,
  * cheaper model (summaries, tasks from email).
  */
-export async function complete<T = string>(hub: Hub, o: { system: string; prompt: string; schema?: Record<string, unknown>; fast?: boolean; images?: { mimeType: string; data: string }[]; /** Files uploaded with hub.gemini.uploadFile (recordings). */ files?: { mimeType: string; uri: string }[]; used?: Set<string> }): Promise<T> {
+export async function complete<T = string>(hub: Hub, o: { system: string; prompt: string; schema?: Record<string, unknown>; fast?: boolean; images?: { mimeType: string; data: string }[]; /** Files uploaded with hub.gemini.uploadFile (recordings). */ files?: { mimeType: string; uri: string }[]; /** For long answers (a transcript): stream it so it doesn't time out. */ stream?: boolean; used?: Set<string> }): Promise<T> {
   const p = aiProvider(hub);
   if (p === "off") throw new Error(aiOffReason(hub));
   if (p === "gemini") {
     const parts = [{ text: o.prompt }, ...(o.images ?? []).map((im) => ({ inlineData: im })), ...(o.files ?? []).map((f) => ({ fileData: { mimeType: f.mimeType, fileUri: f.uri } }))];
-    const r = await hub.gemini!.generate({ model: o.fast ? hub.cfg.ai.geminiFastModel : hub.cfg.ai.geminiModel, fallbackModels: o.fast ? [hub.cfg.ai.geminiModel, ...(hub.cfg.ai.geminiFallbacks ?? [])] : hub.cfg.ai.geminiFallbacks, system: o.system, contents: [{ role: "user", parts }], jsonSchema: o.schema });
+    // When every model is busy, wait and try again before giving up (Google's models get busy in bursts).
+    let r: Awaited<ReturnType<NonNullable<Hub["gemini"]>["generate"]>> | undefined;
+    for (let attempt = 0; !r; attempt++) {
+      try {
+        r = await hub.gemini!.generate({ model: o.fast ? hub.cfg.ai.geminiFastModel : hub.cfg.ai.geminiModel, fallbackModels: o.fast ? [hub.cfg.ai.geminiModel, ...(hub.cfg.ai.geminiFallbacks ?? [])] : hub.cfg.ai.geminiFallbacks, system: o.system, contents: [{ role: "user", parts }], jsonSchema: o.schema, stream: o.stream });
+      } catch (e) {
+        if (attempt >= BUSY_WAITS.length || !BUSY_RX.test((e as Error).message)) throw e;
+        await new Promise((res) => setTimeout(res, BUSY_WAITS[attempt]));
+      }
+    }
     o.used?.add(`Gemini (${r.model ?? (o.fast ? hub.cfg.ai.geminiFastModel : hub.cfg.ai.geminiModel)})`);
     if (!o.schema) return r.text as T;
     try {
@@ -81,6 +90,8 @@ export async function complete<T = string>(hub: Hub, o: { system: string; prompt
  */
 /** How long to wait before retrying a step when every Gemini model is busy (tests shorten it). */
 export const BUSY_WAITS = [15_000, 45_000];
+/** An error that means "try again later", not "this won't work". */
+export const BUSY_RX = /busy|unavailable|high demand|overloaded|quota|rate limit|fetch failed|timeout|ECONNRESET/i;
 
 export interface ChatTurn {
   role: "user" | "assistant";
@@ -119,7 +130,7 @@ You're running on Gemini inside Keystone. Use the functions provided for anythin
       try {
         r = await hub.gemini!.generate({ model: hub.cfg.ai.geminiModel, fallbackModels: hub.cfg.ai.geminiFallbacks, system, contents, tools: decls });
       } catch (e) {
-        if (attempt >= BUSY_WAITS.length || !/busy|unavailable|high demand|overloaded/i.test((e as Error).message)) throw e;
+        if (attempt >= BUSY_WAITS.length || !BUSY_RX.test((e as Error).message)) throw e;
         hub.say(`  Gemini is busy; trying again in ${Math.round(BUSY_WAITS[attempt] / 1000)}s…`);
         await new Promise((res) => setTimeout(res, BUSY_WAITS[attempt]));
       }

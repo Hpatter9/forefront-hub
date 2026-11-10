@@ -92,5 +92,26 @@ describe("walk recordings", () => {
     const g = t.hub.gemini as MockGemini;
     expect(g.uploads).toEqual([f]);
     expect(g.requests[0].contents[0].parts.some((p: any) => p.fileData?.mimeType === "audio/mp4")).toBe(true);
+    expect(g.requests[0].stream).toBe(true); // the words first, streamed
+    expect(g.requests[1].jsonSchema).toBeTruthy(); // then the notes from the words
+  });
+
+  it("matches a calendar visit that names the job (\"Sanders walk\"), lists the folder with reasons, and can move a recording", async () => {
+    const { refileWalk, walkFolder, walkNotesText } = await import("../src/workflows/walks.js");
+    const t = setup();
+    t.hub.jobs.upsert(7001, { name: "Sanders", address: "8 Birch Rd, Golden, CO", customer: { name: "Lee Sanders", email: "", phone: "", company: "", attention: "" } });
+    const at = new Date(); at.setHours(13, 10, 0, 0); at.setDate(at.getDate() - 1);
+    await t.hub.calendar.create({ title: "Sanders walk", start: new Date(at.getTime() - 10 * 60e3).toISOString(), end: new Date(at.getTime() + 50 * 60e3).toISOString() });
+    expect(await matchWalk(t.hub, at, { transcript: "kitchen notes", names: [] })).toMatchObject({ jobNumber: 7001, why: "calendar: Sanders walk" });
+    t.hub.cfg.walks.since = new Date().toISOString();
+    t.rec("Voice 010.m4a", at);
+    expect(walkFolder(t.hub)[0]).toMatchObject({ name: "Voice 010.m4a", waiting: expect.stringMatching(/before walk recordings were connected/) });
+    const [w] = await scanWalks(t.hub, { only: "Voice 010.m4a", transcriber: async () => notes() });
+    expect(w).toMatchObject({ status: "filed", jobNumber: 7001 });
+    expect(walkNotesText(t.hub, w.id)).toContain("## Transcript");
+    const moved = refileWalk(t.hub, w.id, 9002);
+    expect(moved.jobNumber).toBe(9002);
+    expect(jobWalks(t.hub, 7001)).toEqual([]);
+    expect(jobWalks(t.hub, 9002)).toHaveLength(1);
   });
 });

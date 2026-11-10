@@ -124,7 +124,10 @@ C:\Jobs\3226 Augustine\
   transcribes new ones with Gemini (uploaded with the Files API), pulls out a summary, room-by-room notes,
   measurements, what the customer wants and what Hunter promised, and files them to the job in `notes/walks/`
   (`src/workflows/walks.ts`). The job comes from the calendar event at that time, else the address or name said in
-  the recording; otherwise the dashboard asks. The Estimator reads the notes as site notes; a Homebase note and
+  the recording; otherwise the dashboard asks. The **Walks** tab lists every recording in the folder with what
+  happened to it (filed where, needs a job, error, or why it was skipped), its notes and transcript, and lets you
+  move one to another job or transcribe an older one. Long recordings are transcribed as streamed text first, then
+  structured; a busy Gemini is retried at the next sync. The Estimator reads the notes as site notes; a Homebase note and
   Google Tasks for the promises are offered and only added with a yes.
 
 - **Morning brief**: Plan my day runs on its own at 7:00 AM Denver time on weekdays and shows as Today's brief on

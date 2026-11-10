@@ -729,12 +729,21 @@ const server = http.createServer(async (req, res) => {
 
     // ---- Google Tasks (the real lists: what's made here shows on the phone, and the other way round)
     // ---- walk recordings
-    if (p === "/api/walks" && req.method === "GET") return send(res, 200, (await import("../workflows/walks.js")).walks(hub));
+    if (p === "/api/walks" && req.method === "GET") {
+      const w = await import("../workflows/walks.js");
+      return send(res, 200, { status: w.walksStatus(hub), running: walksRunning, items: w.walkFolder(hub) });
+    }
+    if (p === "/api/walks/notes" && req.method === "GET") return send(res, 200, { text: (await import("../workflows/walks.js")).walkNotesText(hub, q("id")) });
     if (p === "/api/walks/scan" && req.method === "POST") { scanAndOfferWalks(); return send(res, 202, { ok: true }); }
+    if (p === "/api/walks/transcribe" && req.method === "POST") {
+      if (walksRunning) return send(res, 409, { error: "Keystone is already working on a recording. Try again in a minute." });
+      scanAndOfferWalks(String((await body(req)).name ?? ""));
+      return send(res, 202, { ok: true });
+    }
     if (p === "/api/walks/file" && req.method === "POST") {
       const b = await body(req);
       const w = await import("../workflows/walks.js");
-      const filed = w.fileWalk(hub, String(b.id), Number(b.job));
+      const filed = w.refileWalk(hub, String(b.id), Number(b.job));
       bus.emit({ type: "changed", what: "job" });
       w.offerWalkFollowups(hub, filed).catch((e) => hub.say(`Walk follow-ups: ${(e as Error).message}`));
       return send(res, 200, filed);
@@ -889,17 +898,24 @@ const server = http.createServer(async (req, res) => {
 let lastSync: SyncAllResult | null = null;
 let syncRunning = false;
 let walksRunning = false;
-function scanAndOfferWalks() {
+function scanAndOfferWalks(only?: string) {
   if (walksRunning || !hub.cfg.walks.dir) return;
   walksRunning = true;
   (async () => {
     const w = await import("../workflows/walks.js");
-    const fresh = await w.scanWalks(hub);
-    if (fresh.length) bus.emit({ type: "changed", what: "job" });
+    let fresh: Awaited<ReturnType<typeof w.scanWalks>> = [];
+    try {
+      fresh = await w.scanWalks(hub, only ? { only } : {});
+    } finally {
+      // The approval cards below wait for you; later recordings shouldn't wait with them.
+      walksRunning = false;
+      bus.emit({ type: "changed", what: "job" });
+    }
     for (const x of fresh) await w.offerWalkFollowups(hub, x).catch((e) => hub.say(`Walk follow-ups: ${(e as Error).message}`));
-  })()
-    .catch((e) => hub.say(`Walk recordings: ${(e as Error).message}`))
-    .finally(() => (walksRunning = false));
+  })().catch((e) => {
+    walksRunning = false;
+    hub.say(`Walk recordings: ${(e as Error).message}`);
+  });
 }
 
 function runSyncAll() {

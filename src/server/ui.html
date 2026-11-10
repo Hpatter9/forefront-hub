@@ -728,6 +728,13 @@
   .bmail { border: 1px solid var(--line); background: var(--panel-2); color: var(--link); border-radius: 999px; padding: 1px 10px; font: inherit; font-size: 12.5px; cursor: pointer; margin-left: 6px; text-decoration: none; display: inline-block; text-indent: 0; }
   .bmail:hover { background: var(--soft); }
   .brief li.done .bmail { text-decoration: none; opacity: .7; }
+  .walks { display: grid; grid-template-columns: minmax(300px, 400px) minmax(0, 1fr); gap: 18px; padding: 22px 28px; align-items: start; }
+  .walks-list { display: grid; gap: 6px; max-height: calc(100vh - 220px); overflow: auto; }
+  .walkrow { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; color: var(--ink); font: inherit; cursor: pointer; display: grid; gap: 3px; }
+  .walkrow.on { border-color: var(--link); background: var(--panel-2); }
+  .walks-detail { display: grid; gap: 14px; max-height: calc(100vh - 220px); overflow: auto; }
+  .walks-detail .btext { white-space: normal; line-height: 1.6; }
+  @media (max-width: 900px) { .walks { grid-template-columns: 1fr; } }
   .btask { border: 1px solid var(--line); color: var(--muted); border-radius: 999px; padding: 0 8px; font-size: 11.5px; margin-left: 6px; display: inline-block; text-indent: 0; text-decoration: none; }
   .trow { cursor: pointer; }
 
@@ -781,6 +788,7 @@
       <button data-tab="mail" title="Gmail"><span class="ms">mail</span><span class="nm">Gmail</span> <span class="count" id="mailcount" hidden></span></button>
       <button data-tab="people" title="Contacts"><span class="ms">contacts</span><span class="nm">Contacts</span></button>
       <button data-tab="cal" title="Calendar"><span class="ms">calendar_month</span><span class="nm">Calendar</span></button>
+      <button data-tab="walks" title="Walk recordings"><span class="ms">mic</span><span class="nm">Walks</span></button>
       <button data-tab="music" title="Music"><span class="ms">music_note</span><span class="nm">Music</span></button>
     </nav>
     <div class="mini" id="mini" hidden style="margin-top:auto"><img id="mini-art" alt=""><div style="min-width:0"><b id="mini-t"></b><span id="mini-a"></span></div><button type="button" id="mini-pp" aria-label="Play or pause"></button></div>
@@ -911,6 +919,9 @@
     </div>
   </section>
 
+  <section class="view" id="v-walks" hidden>
+    <div class="walks"><div class="walks-list" id="walks-list"></div><div class="walks-detail" id="walks-detail"><p class="muted">Pick a recording on the left to read its summary, room notes and transcript.</p></div></div>
+  </section>
   <section class="view" id="v-music" hidden>
     <div class="sp" id="sp"><div class="sp-main" style="grid-column:1/-1;grid-row:1/-1"><div class="sp-msg">Loading…</div></div></div>
   </section>
@@ -1065,14 +1076,15 @@ conApply();
 function showTab(t) {
   store.set("tab", t);
   $$("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === t));
-  for (const v of ["today", "brief", "jobs", "est", "mail", "people", "cal", "music"]) $("#v-" + v).hidden = v !== t;
+  for (const v of ["today", "brief", "jobs", "est", "mail", "people", "cal", "walks", "music"]) $("#v-" + v).hidden = v !== t;
+  if (t === "walks") loadWalks();
   if (t === "people") loadPeople();
   if (t === "brief") renderBrief();
   document.querySelector(".askbar form").hidden = t === "est";
   if (t === "est") loadEst();
   if (t === "cal") loadCal();
   if (t === "music" && !$("#sp-bar")) renderMusic();
-  setCrumbs(t === "jobs" && view ? `Jobs / <b>#${view.homebase.jobNumber}</b>` : `<b>${{ today: "Dashboard", brief: "Today's brief", people: "Contacts", jobs: "Jobs", est: "Estimator", mail: "Gmail", cal: "Calendar", music: "Music" }[t]}</b>`);
+  setCrumbs(t === "jobs" && view ? `Jobs / <b>#${view.homebase.jobNumber}</b>` : `<b>${{ today: "Dashboard", brief: "Today's brief", people: "Contacts", jobs: "Jobs", est: "Estimator", mail: "Gmail", cal: "Calendar", walks: "Walk recordings", music: "Music" }[t]}</b>`);
   if (t === "today") loadToday();
   if (t === "mail" && !mailLoaded) loadMail();
 }
@@ -2443,6 +2455,35 @@ function jobFromText(t) {
 }
 /** The AI that runs the everyday features right now (Gemini or Claude); the Estimator tab is always Claude. */
 const AI = () => (status?.ai && status.ai.provider !== "off" ? status.ai.name : "AI");
+// ---- Walks page: every recording, what happened to it, and its notes
+let walkSel = null;
+async function loadWalks() {
+  let d; try { d = await api("/api/walks"); } catch (e) { $("#walks-list").innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
+  if (!d.status.on) { $("#walks-list").innerHTML = `<div class="card"><h3>Walk recordings</h3><p class="muted">${esc(d.status.problem || "Not set up.")}</p><p class="small muted">Double-click <b>Connect walk recordings</b> in the Keystone folder, then restart Keystone.</p></div>`; return; }
+  const tag = (x) => x.walk ? (x.walk.status === "filed" ? (x.walk.jobNumber ? `<span class="tag sent">#${x.walk.jobNumber} ${esc(jobs.find((j) => j.jobNumber === x.walk.jobNumber)?.name || "")}</span>` : `<span class="tag">dismissed</span>`) : x.walk.status === "needs-job" ? `<span class="tag draft">needs a job</span>` : `<span class="tag" style="color:var(--bad)">error</span>`) : `<span class="tag">not transcribed</span>`;
+  $("#walks-list").innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:8px"><div><b>${d.items.length}</b> recording${d.items.length === 1 ? "" : "s"} <span class="small muted">in ${esc(d.status.dir)}</span></div><button class="btn small" id="walks-scan">${d.running ? "Working…" : "Check for new"}</button></div>` +
+    (d.items.map((x) => `<button type="button" class="walkrow ${walkSel === x.name ? "on" : ""}" data-walkname="${esc(x.name)}"><div class="row" style="justify-content:space-between;gap:8px"><b>${new Date(x.at).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</b>${tag(x)}</div><div class="small muted">${esc(x.name)} · ${x.sizeMb} MB</div><div class="small">${esc(x.walk?.status === "error" ? x.walk.error || "" : x.walk?.summary ? x.walk.summary.slice(0, 150) : x.waiting || "")}</div></button>`).join("") || `<p class="muted">No recordings in the folder yet.</p>`);
+  window._walks = d.items;
+  if (walkSel) showWalk(walkSel);
+}
+async function showWalk(name) {
+  walkSel = name;
+  const x = (window._walks || []).find((i) => i.name === name); if (!x) return;
+  $$("#walks-list .walkrow").forEach((b) => b.classList.toggle("on", b.dataset.walkname === name));
+  const w = x.walk, el = $("#walks-detail");
+  const picker = (label) => `<span class="row" style="gap:6px;flex-wrap:wrap">${(w?.candidates || []).map((c) => `<button class="btn small primary" data-walk="${esc(w.id)}" data-walkjob="${c.jobNumber}">#${c.jobNumber} ${esc(c.name)}</button>`).join("")}<datalist id="dl-jobs2">${jobs.map((j) => `<option value="#${j.jobNumber} ${esc(j.name)}">`).join("")}</datalist><input type="text" class="walkpick" data-walk="${esc(w.id)}" list="dl-jobs2" placeholder="Job # or name…" style="width:170px"><button class="btn small" data-walk="${esc(w.id)}" data-walkgo="1">${label}</button></span>`;
+  if (!w) { el.innerHTML = `<div class="card"><h3>${esc(x.name)}</h3><p>${esc(x.waiting || "")}</p><button class="btn primary" data-walktranscribe="${esc(x.name)}">Transcribe this recording now</button></div>`; return; }
+  if (w.status === "error") { el.innerHTML = `<div class="card"><h3>${esc(x.name)}</h3><p style="color:var(--bad)">${esc(w.error || "Couldn't process it.")}</p><button class="btn primary" data-walk="${esc(w.id)}" data-walkretry="1">Try again</button></div>`; return; }
+  const head = `<div class="card"><div class="row" style="justify-content:space-between;gap:10px;flex-wrap:wrap"><div><h3 style="margin:0">${new Date(x.at).toLocaleString([], { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })}</h3><div class="small muted">${esc(x.name)}${w.why ? ` · filed by ${esc(w.why)}` : ""}</div></div>${w.jobNumber ? `<span class="row" style="gap:6px">${goButton(w.jobNumber, "job")}<button class="btn small" data-do="claude" data-p="Use the scope walk notes on job #${w.jobNumber} to start the estimate. Tell me what's missing before you price it.">Start estimate from this</button></span>` : ""}</div>
+    <div style="margin-top:10px">${w.status === "needs-job" ? `<b>Which job is this?</b> ${picker("File")}` : `<span class="small muted">Wrong job?</span> ${picker("Move")}`}</div></div>`;
+  el.innerHTML = head + `<div class="card btext" id="walk-notes"><p class="muted">Loading…</p></div>`;
+  try { const r = await api(`/api/walks/notes?id=${encodeURIComponent(w.id)}`); if (walkSel === name) $("#walk-notes").innerHTML = r.text ? md(r.text.replace(/^# .*\n/, "")) : `<p class="muted">The notes file is missing.</p>`; } catch (e) { $("#walk-notes").innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+}
+document.addEventListener("click", async (e) => {
+  const r = e.target.closest("[data-walkname]"); if (r) { showWalk(r.dataset.walkname); return; }
+  if (e.target.id === "walks-scan") { await api("/api/walks/scan", { method: "POST" }).catch(() => {}); snack("Checking the recordings folder…"); setTimeout(loadWalks, 1500); return; }
+  const t = e.target.closest("[data-walktranscribe]"); if (t) { try { await api("/api/walks/transcribe", { method: "POST", body: { name: t.dataset.walktranscribe } }); snack("Transcribing… a long walk takes a few minutes. Watch the activity box."); t.disabled = true; } catch (err) { snack(err.message); } }
+});
 /** The iPhone's last backup is more than a day old (26 hours, to allow for a late night), so texts are behind. */
 const textsStale = () => !!(status.texts?.connected && status.texts.backupAt && Date.now() - Date.parse(status.texts.backupAt) > 26 * 3600e3);
 // ---- Dashboard: My tasks (Google Tasks) and the Huddle list
@@ -2494,7 +2535,7 @@ document.addEventListener("click", async (e) => {
         snack(`Filed to #${n}.`);
       } else if (wb.dataset.walkretry) { await api("/api/walks/dismiss", { method: "POST", body: { id, retry: true } }); snack("Trying that recording again…"); }
       else if (wb.dataset.walkdrop) await api("/api/walks/dismiss", { method: "POST", body: { id } });
-      loadToday();
+      if (store.get("tab", "today") === "walks") loadWalks(); else loadToday();
     } catch (err) { log(err.message, "t-err"); }
     return;
   }
@@ -2934,7 +2975,7 @@ document.addEventListener("change", async (e) => {
   const c = e.target.closest(".bchk"); if (!c) return;
   c.closest("li")?.classList.toggle("done", c.checked);
   const li = c.closest("li"); const job = Number(li?.querySelector("[data-n]")?.dataset.n || li?.textContent.match(/#(\d{4})\b/)?.[1]) || undefined;
-  try { await api("/api/plan/check", { method: "POST", body: { key: c.dataset.key, done: c.checked, job, task: c.dataset.task || undefined } }); if (c.dataset.task) { snack(c.checked ? "Checked off in Google Tasks too." : "Reopened in Google Tasks."); if (store.get("tab", "today") === "today") loadToday(); } } catch (err) { log(err.message, "t-err"); }
+  try { await api("/api/plan/check", { method: "POST", body: { key: c.dataset.key, done: c.checked, job, task: c.dataset.task || undefined } }); if (c.dataset.task) { snack(c.checked ? "Checked off in Google Tasks too." : "Reopened in Google Tasks."); if (store.get("tab", "today") === "today") loadToday(); if (store.get("tab", "today") === "walks") loadWalks(); } } catch (err) { log(err.message, "t-err"); }
 });
 document.addEventListener("click", async (e) => {
   const g = e.target.closest("[data-do=gobrief]"); if (g) { showTab("brief"); return; }

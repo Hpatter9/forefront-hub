@@ -31,6 +31,8 @@ export interface GenerateRequest {
   /** Answer as JSON matching this JSON Schema. */
   jsonSchema?: Record<string, unknown>;
   tools?: FunctionDecl[];
+  /** Send the answer back as it's written (for long jobs like transcribing an hour of audio, which would time out otherwise). */
+  stream?: boolean;
   /** Models to try in turn when the first is busy, gone or failing (Google retires and overloads models). */
   fallbackModels?: string[];
 }
@@ -104,11 +106,12 @@ export class LiveGemini implements GeminiClient {
     if (req.tools?.length) body.tools = [{ functionDeclarations: req.tools }];
     // Free-tier keys hit per-minute limits: wait as Google asks and try again (a few times).
     for (let attempt = 0; ; attempt++) {
-      const r = await this.fetchFn(`${URL_BASE}/${encodeURIComponent(req.model)}:generateContent`, {
+      const r = await this.fetchFn(`${URL_BASE}/${encodeURIComponent(req.model)}:${req.stream ? "streamGenerateContent?alt=sse" : "generateContent"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": this.key },
         body: JSON.stringify(body),
       });
+      if (r.ok && req.stream) return toResult(joinStream(await r.text()));
       const j: any = await r.json().catch(() => ({}));
       if (r.ok) return toResult(j);
       const msg = j?.error?.message ?? `HTTP ${r.status}`;
@@ -133,6 +136,29 @@ export class LiveGemini implements GeminiClient {
       throw new Error(`Gemini: ${msg}`);
     }
   }
+}
+
+/** A streamed answer ("data: {...}" lines) put back together as one response. */
+export function joinStream(body: string): any {
+  let text = "";
+  let last: any = {};
+  const others: Part[] = [];
+  for (const line of body.split(/\r?\n/)) {
+    if (!line.startsWith("data:")) continue;
+    let j: any;
+    try {
+      j = JSON.parse(line.slice(5).trim());
+    } catch {
+      continue;
+    }
+    last = j;
+    for (const p of j?.candidates?.[0]?.content?.parts ?? []) {
+      if (typeof p.text === "string" && !p.thought) text += p.text;
+      else if (!p.thought) others.push(p);
+    }
+  }
+  const parts: Part[] = [...(text ? [{ text }] : []), ...others];
+  return { ...last, candidates: [{ ...(last?.candidates?.[0] ?? {}), content: { role: "model", parts } }] };
 }
 
 function toResult(j: any): GenerateResult {

@@ -218,3 +218,13 @@ describe("when Gemini is busy mid-task", () => {
     }
   });
 });
+
+describe("streamed answers", () => {
+  it("are put back together as one", async () => {
+    const { joinStream } = await import("../src/connectors/gemini/index.js");
+    const body = ['data: {"candidates":[{"content":{"parts":[{"text":"Hunter: We are at "}]}}]}', "", 'data: {"candidates":[{"content":{"parts":[{"text":"45 Pine."}]},"finishReason":"STOP"}]}', ""].join("\n");
+    const j = joinStream(body);
+    expect(j.candidates[0].content.parts).toEqual([{ text: "Hunter: We are at 45 Pine." }]);
+    expect(j.candidates[0].finishReason).toBe("STOP");
+  });
+});
