@@ -1,3 +1,4 @@
+import { jobTexts } from "./texts.js";
 import { intakeAddress } from "../connectors/homebase/types.js";
 import type { Hub } from "../hub.js";
 
@@ -13,7 +14,7 @@ export interface TimelineItem {
   title: string;
   body?: string;
   who?: string;
-  source: "homebase-note" | "homebase-activity" | "homebase-email" | "gmail" | "hub";
+  source: "homebase-note" | "homebase-activity" | "homebase-email" | "gmail" | "hub" | "iphone";
   threadId?: string;
 }
 
@@ -58,6 +59,9 @@ export async function timeline(hub: Hub, jobNumber: number): Promise<TimelineIte
     if (d.sentAt) continue; // once sent it shows up as an email
     items.push({ at: d.createdAt, kind: "draft", direction: "out", title: d.subject, who: `to ${d.to.join(", ")}`, body: `Draft in Gmail · ${d.attachments.join(", ")}`, source: "hub" });
   }
+
+  // Texts with the people on the job (from the iPhone backup).
+  for (const t of jobTexts(hub, jobNumber)) items.push({ at: t.at, kind: "text", direction: t.fromMe ? "out" : "in", title: t.fromMe ? `Text to ${t.who}` : `Text from ${t.who}`, body: t.text, who: t.role, source: "iphone" });
 
   return items.filter((i) => i.at).sort((a, b) => b.at.localeCompare(a.at));
 }

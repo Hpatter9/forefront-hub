@@ -11,6 +11,7 @@ import { makeCalendar, type CalendarClient } from "./connectors/calendar/index.j
 import { makeTasks, type TasksClient } from "./connectors/tasks/index.js";
 import { makeHomebase, type HomebaseClient } from "./connectors/homebase/index.js";
 import { EstimateSkill } from "./connectors/skill/index.js";
+import { makeTexts, type TextsClient } from "./connectors/texts/index.js";
 
 /** Everything a workflow or agent tool needs, in one place. Tests build one from mocks. */
 export interface Hub {
@@ -24,6 +25,8 @@ export interface Hub {
   /** Gemini, when it's Keystone's AI (null otherwise). */
   gemini: GeminiClient | null;
   photos: PhotoClient;
+  /** Text messages from the iPhone's backup (off unless turned on). */
+  texts: TextsClient;
   sketches: SketchSource;
   skill: EstimateSkill;
   approver: Approver;
@@ -42,6 +45,7 @@ export function makeHub(cfg: Config = loadConfig(), approver: Approver = new Cli
     travel: makeTravel(cfg),
     gemini: makeGemini(cfg),
     photos: makeCompanyCam(cfg),
+    texts: makeTexts(cfg),
     sketches: new DocuSketch(gmail, cfg.docusketch.downloadsDir),
     skill: new EstimateSkill(cfg.skillDir, cfg.python),
     approver,
@@ -62,6 +66,7 @@ export function describe(hub: Hub): string[] {
     `companycam  ${hub.photos.kind}`,
     `calendar    ${hub.calendar.kind}${hub.calendar.kind === "google" && !hub.calendar.connected() ? "  (!) reconnect Google to add Calendar" : ""}`,
     `tasks       ${hub.tasks.kind}${hub.tasks.kind === "google" && !hub.tasks.connected() ? "  (!) reconnect Google to add Tasks" : ""}`,
+    `texts       ${hub.texts.kind === "off" ? "off (Connect iPhone texts turns it on)" : hub.texts.status().connected ? `iPhone backup from ${hub.texts.status().backupAt?.slice(0, 16).replace("T", " ")}` : `(!) ${hub.texts.status().problem}`}`,
     `docusketch  gmail delivery emails + ESX from ${c.docusketch.downloadsDir}`,
   ];
 }

@@ -206,6 +206,7 @@ program
 const connect = program.command("connect").description("Guided set-up for a connection: gmail | companycam | gemini");
 connect.command("gmail").description("Connect Gmail step by step").action(async () => (await import("./connect.js")).connectGmail());
 connect.command("gemini").description("Use Gemini (Google) for Keystone's AI features").action(async () => (await import("./connect.js")).connectGemini());
+connect.command("texts").description("Read texts with job contacts from the iPhone's backup on this PC").action(async () => (await import("./connect.js")).connectTexts());
 connect.command("companycam").description("Connect CompanyCam with an access token").action(async () => (await import("./connect.js")).connectCompanyCam());
 
 program

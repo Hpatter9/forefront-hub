@@ -1,3 +1,4 @@
+import { syncTexts } from "./texts.js";
 import type { Hub } from "../hub.js";
 import { syncFiles } from "./files.js";
 import { pullJob } from "./pull.js";
@@ -58,5 +59,7 @@ export async function syncAll(hub: Hub, opts: { mine?: boolean; concurrency?: nu
     }
   };
   await Promise.all(Array.from({ length: opts.concurrency ?? 3 }, worker));
+  // Texts from the iPhone backup, when that's turned on: filed to their jobs after the jobs are fresh.
+  if (hub.texts.kind !== "off") await syncTexts(hub).catch((e) => out.errors.push({ jobNumber: 0, error: `Texts: ${(e as Error).message}` }));
   return out;
 }

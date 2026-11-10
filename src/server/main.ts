@@ -218,6 +218,7 @@ const server = http.createServer(async (req, res) => {
         gmail: hub.gmail.kind,
         gmailFull: hub.gmail.fullAccess?.() ?? false,
         companycam: hub.photos.kind,
+        texts: hub.texts.kind === "iphone-backup" ? hub.texts.status() : null,
         calendar: hub.calendar.kind,
         calendarConnected: hub.calendar.connected(),
         tasksConnected: hub.tasks.connected(),

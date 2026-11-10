@@ -76,6 +76,17 @@ export const JobSchema = z.object({
   lookupsAt: z.string().default(""),
   /** Follow-ups: when Hunter last ticked one off in the brief (counts as contact), and when the brief last asked. */
   followups: z.object({ doneAt: z.string().default(""), nudgedAt: z.string().default("") }).default({ doneAt: "", nudgedAt: "" }),
+  /** Texts with the people on the job, from the iPhone backup (as of `checkedAt`, the backup's time). */
+  texts: z
+    .object({
+      lastAt: z.string().default(""),
+      lastFromMeAt: z.string().default(""),
+      last: z.string().default(""),
+      /** Their newest text, when nothing from Hunter came after it. */
+      waiting: z.object({ from: z.string(), text: z.string(), at: z.string() }).nullable().default(null),
+      checkedAt: z.string().default(""),
+    })
+    .default({ lastAt: "", lastFromMeAt: "", last: "", waiting: null, checkedAt: "" }),
   /** What the background sync last saw on the job, for the Today screen's reminders. */
   pulse: z
     .object({

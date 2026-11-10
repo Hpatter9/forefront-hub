@@ -1,3 +1,4 @@
+import { MockTexts } from "../src/connectors/texts/index.js";
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdtempSync } from "node:fs";
 import os from "node:os";
@@ -36,6 +37,7 @@ export function testHub(answer = true) {
     travel: new MockTravel(),
     gemini: null,
     photos: new MockCompanyCam(),
+    texts: new MockTexts([], false),
     sketches: new DocuSketch(gmail, cfg.docusketch.downloadsDir),
     skill: new EstimateSkill(cfg.skillDir, PYTHON),
     approver,

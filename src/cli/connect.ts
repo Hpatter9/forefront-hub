@@ -152,3 +152,43 @@ export async function connectGemini() {
   console.log(`\nGemini is connected (test answer: ${r.text.slice(0, 20) || "OK"}). Keystone's AI now runs on Gemini, not the Claude API.`);
   console.log("Restart Keystone (close its black window, then open the Keystone icon) to use it.");
 }
+
+/**
+ * iPhone texts: checks the phone's backup on this PC can be read, shows how many texts belong to people on jobs,
+ * and turns the feature on (IPHONE_TEXTS=on in .env). Nothing is changed on the phone or in the backup.
+ */
+export async function connectTexts() {
+  console.log("Connecting your iPhone's texts to Keystone.");
+  console.log("Keystone reads the iPhone backup on this PC and keeps only texts with people on your jobs");
+  console.log("(matched by phone number). Personal texts are never saved, shown or sent anywhere.\n");
+  const { IphoneBackupTexts, backupRoots } = await import("../connectors/texts/index.js");
+  const cfg = loadConfig();
+  const client = new IphoneBackupTexts(cfg.texts.backupDir || undefined);
+  const st = client.status();
+  if (!st.connected) {
+    console.log(`Not ready yet: ${st.problem}\n`);
+    console.log("How to make the backup:");
+    step(1, "Install \"Apple Devices\" from the Microsoft Store (free), and open it.");
+    step(2, "Plug the iPhone into this PC with its cable. On the phone, tap Trust and enter your passcode.");
+    step(3, "In Apple Devices, click your iPhone, then General.");
+    step(4, "Under Backups: choose \"Back up all of the data on your iPhone to this computer\" and make sure \"Encrypt local backup\" is NOT checked.");
+    step(5, "Click Back Up Now and wait for it to finish (the first one can take a while).");
+    step(6, "Check \"Sync with this iPhone over Wi-Fi\" (or \"Show this iPhone when on Wi-Fi\") and click Apply, so later backups happen without the cable.");
+    step(7, "Double-click Connect iPhone texts again.");
+    console.log(`\n(Keystone looked in: ${backupRoots().join("; ")})`);
+    return;
+  }
+  console.log(`Found a backup from ${new Date(st.backupAt!).toLocaleString()}.`);
+  const { makeHub } = await import("../hub.js");
+  const hub = makeHub(cfg);
+  hub.texts = client;
+  hub.say = () => {};
+  const { syncTexts } = await import("../workflows/texts.js");
+  const r = await syncTexts(hub);
+  setEnv({ IPHONE_TEXTS: "on" });
+  console.log(`Read the last 60 days: ${r.matched} text${r.matched === 1 ? "" : "s"} with people on ${r.jobs.length} job${r.jobs.length === 1 ? "" : "s"} (the other ${r.read - r.matched} were left alone).`);
+  if (!r.matched) console.log("None matched yet. That's normal if the job folders haven't synced on this PC, or the phone numbers aren't in Homebase.");
+  console.log("\niPhone texts are on. Restart Keystone (close its black window, then open the Keystone icon).");
+  console.log("Keystone reads the newest backup each time it syncs. The phone backs up on its own when it's charging");
+  console.log("on the same Wi-Fi as this PC with Apple Devices open, or any time you click Back Up Now.");
+}

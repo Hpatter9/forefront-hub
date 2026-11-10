@@ -102,6 +102,13 @@ C:\Jobs\3226 Augustine\
   for the send-off (a Billing contact at the company first, else the account's billing email). A primary contact
   who isn't at the company (owner or tenant) is kept as the on-site contact only and never emailed estimates.
 
+- **iPhone texts** (off until you run **Connect iPhone texts**; `IPHONE_TEXTS=on`): Apple gives Windows no live
+  access to texts, so Keystone reads the iPhone's own backup on this PC (Apple Devices app or iTunes; it must not
+  be encrypted) (`src/connectors/texts`, `src/workflows/texts.ts`). Only texts whose phone number belongs to
+  someone on a job are kept (job folder `notes/texts.json`); everything else is left unread in the backup. A text
+  you sent counts as contact, a text from them with no answer shows under Reply needed, and texts appear on the
+  job's timeline. It's as fresh as the last backup (`IPHONE_BACKUP_DIR` to point at a specific one).
+
 - **Morning brief**: Plan my day runs on its own at 7:00 AM Denver time on weekdays and shows as Today's brief on
   the dashboard (`src/workflows/brief.ts`). If Keystone opens later, it runs then (until 5 PM). Change it in `.env`:
   `HUB_BRIEF_TIME=08:00`, `HUB_BRIEF_DAYS=0-6` (every day), or `HUB_BRIEF_TIME=off`.

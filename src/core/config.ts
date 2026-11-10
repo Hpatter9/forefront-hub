@@ -28,6 +28,8 @@ export interface Config {
   gmail: { driver: "mock" | "google"; clientId: string; clientSecret: string; address: string; tokenFile: string };
   companycam: { driver: "mock" | "rest"; token: string };
   docusketch: { downloadsDir: string };
+  /** iPhone texts, read from the phone's backup on this PC (off until Connect iPhone texts turns it on). */
+  texts: { enabled: boolean; backupDir: string };
   spotify: { clientId: string };
   /** Drive times for calendar events: where the day's driving starts. */
   travel: { start: string };
@@ -108,6 +110,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
     companycam: { driver: live && ccToken ? "rest" : "mock", token: ccToken },
     spotify: { clientId: e("SPOTIFY_CLIENT_ID") },
     travel: { start: e("HUB_DAY_START_ADDRESS", officeAddress(skillDir)) },
+    texts: { enabled: /^(on|1|true|yes)$/i.test(e("IPHONE_TEXTS")), backupDir: e("IPHONE_BACKUP_DIR") },
     docusketch: { downloadsDir: e("DOWNLOADS_DIR", path.join(env.USERPROFILE || env.HOME || root, "Downloads")) },
     stateDir,
   };

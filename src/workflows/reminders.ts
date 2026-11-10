@@ -64,7 +64,13 @@ export function reminders(hub: Hub, extras: { needsUpload?: Set<number> } = {}):
     if (DONE.has(j.stage)) continue;
     const base = { jobNumber: j.jobNumber, name: j.name, stage: j.stage, step: stepFor(j.stage), nudgedAt: j.followups?.nudgedAt || undefined };
     const p = j.pulse;
-    if (p.waiting) out.push({ ...base, kind: "reply", title: p.waiting.subject || "(no subject)", detail: `from ${p.waiting.from}`, days: days(p.waiting.at), threadId: p.waiting.threadId || undefined });
+    // An email waits on a reply unless you texted them after it; a text waits unless you emailed, called or noted after it.
+    const tx = j.texts;
+    const emailWaiting = p.waiting && !(tx?.lastFromMeAt && tx.lastFromMeAt > p.waiting.at) ? p.waiting : null;
+    const textWaiting = tx?.waiting && days(tx.waiting.at) <= REPLY_DAYS && !(p.lastTouchAt && p.lastTouchAt > tx.waiting.at && !/^email from|^email:/.test(p.lastTouch)) ? tx.waiting : null;
+    if (emailWaiting) out.push({ ...base, kind: "reply", title: emailWaiting.subject || "(no subject)", detail: `from ${emailWaiting.from}`, days: days(emailWaiting.at), threadId: emailWaiting.threadId || undefined });
+    if (textWaiting) out.push({ ...base, kind: "reply", title: `Text: ${textWaiting.text}`, detail: `text from ${textWaiting.from} (answer on your phone)`, days: days(textWaiting.at) });
+    const waitingOnMe = !!(emailWaiting || textWaiting);
 
     const sent = j.sendoff.drafts.filter((d) => d.sentAt);
     if (sent.length && !j.sendoff.homebaseLoggedAt) out.push({ ...base, kind: "log", title: "Send-off went out", detail: sent.map((d) => d.kind).join(" + "), days: days(sent[0].sentAt!) });
@@ -73,18 +79,19 @@ export function reminders(hub: Hub, extras: { needsUpload?: Set<number> } = {}):
 
     // The clock for "quiet" starts at the last touch, else when the job entered its stage.
     // A follow-up you ticked off in the brief counts as contact too.
-    const touchedAt = [p.lastTouchAt, j.followups?.doneAt].filter(Boolean).sort().at(-1) ?? "";
+    // ...and so does a text either way.
+    const touchedAt = [p.lastTouchAt, j.followups?.doneAt, tx?.lastAt].filter(Boolean).sort().at(-1) ?? "";
     const quiet = days(touchedAt || j.stageSince);
     const needsEstimate = PRE_ESTIMATE.has(j.stage) && !p.proposalAmount && !hasEstimate(hub, j);
     if (needsEstimate && (j.stage === "Lead" || j.stage === "Qualify")) out.push({ ...base, kind: "walk", title: `${j.stage}: set up the scope walk`, detail: j.address, days: days(j.stageSince) });
     else if (needsEstimate) out.push({ ...base, kind: "estimate", title: `${j.stage}: ${stepFor(j.stage).toLowerCase()}`, detail: j.address, days: days(j.stageSince) });
     // The adjuster check-in: a claim whose estimate is with the adjuster, and a week since you were last in touch.
     const adj = adjusterReview(j);
-    if (adj && !p.waiting && adj.days >= ADJUSTER_DAYS) {
+    if (adj && !waitingOnMe && adj.days >= ADJUSTER_DAYS) {
       out.push({ ...base, kind: "adjuster", title: `Check in with ${adj.who} on the review status`, detail: adj.since, days: adj.days });
-    } else if (j.stage === "Proposal Submitted" && quiet >= FOLLOWUP_EVERY && !p.waiting) {
+    } else if (j.stage === "Proposal Submitted" && quiet >= FOLLOWUP_EVERY && !waitingOnMe) {
       out.push({ ...base, kind: "followup", title: p.proposalAmount ? `$${p.proposalAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })} proposal` : "Proposal out", detail: p.lastTouch ? `last: ${p.lastTouch}` : `in stage since ${j.stageSince}`, days: quiet });
-    } else if (!needsEstimate && !p.waiting && p.checkedAt && quiet >= 7 && quiet < 999) {
+    } else if (!needsEstimate && !waitingOnMe && p.checkedAt && quiet >= 7 && quiet < 999) {
       out.push({ ...base, kind: "stale", title: p.lastTouch ? `Last: ${p.lastTouch}` : "No activity on record", detail: j.stage, days: quiet });
     }
     if (extras.needsUpload?.has(j.jobNumber)) out.push({ ...base, kind: "upload", title: "Estimate files not in Homebase", detail: "", days: 0 });
@@ -139,7 +146,9 @@ export function adjusterReview(j: Job): { who: string; days: number; since: stri
   const sentToAdjuster = j.sendoff.drafts.filter((d) => d.kind === "adjuster" && d.sentAt).map((d) => d.sentAt!).sort().at(-1);
   if (!WITH_ADJUSTER.has(j.stage) && !(sentToAdjuster && !DONE.has(j.stage) && !["Job Won", "Closed Lost"].includes(j.stage))) return null;
   const p = j.pulse;
-  const clocks = [p.adjusterTouchAt, sentToAdjuster, j.stageSince].filter((x): x is string => !!x && !Number.isNaN(Date.parse(x)));
+  // A text with the adjuster counts as being in touch.
+  const adjText = j.texts?.last.endsWith(j.adjuster.name) && j.adjuster.name ? j.texts.lastAt : "";
+  const clocks = [p.adjusterTouchAt, sentToAdjuster, adjText, j.stageSince].filter((x): x is string => !!x && !Number.isNaN(Date.parse(x)));
   if (!clocks.length) return null;
   const last = clocks.sort().at(-1)!;
   const who = (j.adjuster.name || j.adjuster.email).split(/\s+/)[0] || "the adjuster";
