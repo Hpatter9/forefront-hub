@@ -103,8 +103,11 @@ C:\Jobs\3226 Augustine\
   who isn't at the company (owner or tenant) is kept as the on-site contact only and never emailed estimates.
 
 - **iPhone texts** (off until you run **Connect iPhone texts**; `IPHONE_TEXTS=on`): Apple gives Windows no live
-  access to texts, so Keystone reads the iPhone's own backup on this PC (Apple Devices app or iTunes; it must not
-  be encrypted) (`src/connectors/texts`, `src/workflows/texts.ts`). Only texts whose phone number belongs to
+  access to texts, so Keystone reads the iPhone's own backup on this PC (Apple Devices app or iTunes)
+  (`src/connectors/texts`, `src/workflows/texts.ts`). An encrypted backup (work-managed phones force it) is read
+  with the backup password, which Connect iPhone texts asks for and saves only in `.env`
+  (`IPHONE_BACKUP_PASSWORD_B64`); the Messages database is decrypted to a temporary folder, read and deleted
+  (`backupCrypto.ts`). Only texts whose phone number belongs to
   someone on a job are kept (job folder `notes/texts.json`); everything else is left unread in the backup. A text
   you sent counts as contact, a text from them with no answer shows under Reply needed, and texts appear on the
   job's timeline. It's as fresh as the last backup (`IPHONE_BACKUP_DIR` to point at a specific one).

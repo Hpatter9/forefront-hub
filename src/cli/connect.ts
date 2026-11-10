@@ -30,6 +30,17 @@ async function ask(q: string): Promise<string> {
   }
 }
 
+/** Asks for something secret: what's typed isn't shown. */
+async function askHidden(q: string): Promise<string> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+  process.stdout.write(q);
+  (rl as any)._writeToOutput = () => {};
+  const a = await rl.question("");
+  rl.close();
+  process.stdout.write("\n");
+  return a;
+}
+
 function step(n: number, text: string) {
   console.log(`\n${n}. ${text}`);
 }
@@ -163,17 +174,38 @@ export async function connectTexts() {
   console.log("(matched by phone number). Personal texts are never saved, shown or sent anywhere.\n");
   const { IphoneBackupTexts, backupRoots } = await import("../connectors/texts/index.js");
   const cfg = loadConfig();
-  const client = new IphoneBackupTexts(cfg.texts.backupDir || undefined);
-  const st = client.status();
+  let client = new IphoneBackupTexts(cfg.texts.backupDir || undefined, cfg.texts.password);
+  let st = client.status();
+  let newPassword = "";
+  // An encrypted backup (work-managed phones force it): read it with the backup password, typed here only.
+  for (let tries = 0; st.encrypted && tries < 3; tries++) {
+    if (!st.connected || tries > 0) {
+      console.log(tries ? "" : "This iPhone's backup is encrypted. Keystone can read it with the BACKUP password:");
+      if (!tries) console.log("the one typed into Apple Devices (or iTunes) when the encrypted backup was first set up.\nIt is not your phone passcode or Apple ID password. It's saved only in Keystone's .env file on this PC.\n");
+      newPassword = await askHidden("Backup password (it won't show as you type), then Enter: ");
+      if (!newPassword) return console.log("\nNo password typed. Run Connect iPhone texts again when you have it.");
+      client = new IphoneBackupTexts(cfg.texts.backupDir || undefined, newPassword);
+    }
+    console.log("\nUnlocking the backup (this can take up to a minute)...");
+    try {
+      await client.messages(new Date(Date.now() - 864e5));
+      st = client.status();
+      break;
+    } catch (e) {
+      console.log(`  ${(e as Error).message}`);
+      if (!/password/i.test((e as Error).message) || tries === 2) return console.log("\nNot connected. Run Connect iPhone texts again to retry.");
+      st = { ...st, connected: false };
+    }
+  }
   if (!st.connected) {
     console.log(`Not ready yet: ${st.problem}\n`);
     console.log("How to make the backup:");
     step(1, "Install \"Apple Devices\" from the Microsoft Store (free), and open it.");
     step(2, "Plug the iPhone into this PC with its cable. On the phone, tap Trust and enter your passcode.");
     step(3, "In Apple Devices, click your iPhone, then General.");
-    step(4, "Under Backups: choose \"Back up all of the data on your iPhone to this computer\" and make sure \"Encrypt local backup\" is NOT checked.");
+    step(4, "Under Backups: choose \"Back up all of the data on your iPhone to this computer\". (\"Encrypt local backup\" can stay checked: Keystone will ask for the backup password.)");
     step(5, "Click Back Up Now and wait for it to finish (the first one can take a while).");
-    step(6, "Check \"Sync with this iPhone over Wi-Fi\" (or \"Show this iPhone when on Wi-Fi\") and click Apply, so later backups happen without the cable.");
+    step(6, "Optional: under Options, check \"Show this iPhone when on Wi-Fi\" and click Apply, so later backups happen without the cable.");
     step(7, "Double-click Connect iPhone texts again.");
     console.log(`\n(Keystone looked in: ${backupRoots().join("; ")})`);
     return;
@@ -185,7 +217,7 @@ export async function connectTexts() {
   hub.say = () => {};
   const { syncTexts } = await import("../workflows/texts.js");
   const r = await syncTexts(hub);
-  setEnv({ IPHONE_TEXTS: "on" });
+  setEnv({ IPHONE_TEXTS: "on", ...(newPassword ? { IPHONE_BACKUP_PASSWORD_B64: Buffer.from(newPassword, "utf8").toString("base64") } : {}) });
   console.log(`Read the last 60 days: ${r.matched} text${r.matched === 1 ? "" : "s"} with people on ${r.jobs.length} job${r.jobs.length === 1 ? "" : "s"} (the other ${r.read - r.matched} were left alone).`);
   if (!r.matched) console.log("None matched yet. That's normal if the job folders haven't synced on this PC, or the phone numbers aren't in Homebase.");
   console.log("\niPhone texts are on. Restart Keystone (close its black window, then open the Keystone icon).");

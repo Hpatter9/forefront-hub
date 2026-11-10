@@ -1,4 +1,4 @@
-import { existsSync, openSync, readSync, closeSync, readdirSync, statSync } from "node:fs";
+import { existsSync, openSync, readSync, closeSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { Config } from "../../core/config.js";
@@ -7,7 +7,8 @@ import type { Config } from "../../core/config.js";
  * Text messages (SMS and iMessage) from Hunter's iPhone. Apple gives no live access to texts on Windows, so the
  * live version reads the phone's own backup on this PC (made by the Apple Devices app or iTunes, over a cable or
  * Wi-Fi): the backup holds the Messages database. Read-only; nothing is ever written to the backup or the phone.
- * It only works when the backup isn't encrypted, and is as fresh as the last backup.
+ * An encrypted backup (work-managed phones force that) is read with the backup password; it's as fresh as the last
+ * backup either way.
  */
 export interface TextMessage {
   id: string;
@@ -24,6 +25,8 @@ export interface TextsStatus {
   problem?: string;
   backupAt?: string;
   backupDir?: string;
+  /** The backup is encrypted (read with the backup password). */
+  encrypted?: boolean;
 }
 
 export interface TextsClient {
@@ -93,12 +96,18 @@ export function textFromAttributedBody(b: Uint8Array | null | undefined): string
 
 export class IphoneBackupTexts implements TextsClient {
   readonly kind = "iphone-backup" as const;
-  constructor(private dir?: string) {}
+  /** The unlocked keys of an encrypted backup, kept while the backup doesn't change (unlocking takes seconds). */
+  private keys: { kb?: import("./backupCrypto.js").Keybag; stamp?: string } = {};
+  constructor(private dir?: string, private password = "") {}
 
   status(): TextsStatus {
     const b = findBackup(this.dir);
     if (!b) return { connected: false, problem: "No iPhone backup on this PC yet. Plug the iPhone in, open Apple Devices, and click Back Up Now." };
-    if (!isSqlite(path.join(b.dir, "Manifest.db"))) return { connected: false, backupDir: b.dir, backupAt: b.at.toISOString(), problem: "The iPhone backup is encrypted, so Keystone can't read it. In Apple Devices, uncheck \"Encrypt local backup\", then click Back Up Now." };
+    if (!isSqlite(path.join(b.dir, "Manifest.db"))) {
+      // Encrypted: fine with the backup password (files can't be checked without unlocking, which messages() does).
+      if (this.password) return { connected: true, encrypted: true, backupDir: b.dir, backupAt: b.at.toISOString() };
+      return { connected: false, encrypted: true, backupDir: b.dir, backupAt: b.at.toISOString(), problem: "The iPhone backup is encrypted. Double-click Connect iPhone texts and type the backup password (or uncheck \"Encrypt local backup\" in Apple Devices and back up again)." };
+    }
     const db = path.join(b.dir, SMS_DB.slice(0, 2), SMS_DB);
     if (!existsSync(db)) return { connected: false, backupDir: b.dir, backupAt: b.at.toISOString(), problem: "That backup has no Messages in it yet. Click Back Up Now in Apple Devices and let it finish." };
     return { connected: true, backupDir: b.dir, backupAt: statSync(db).mtime.toISOString() };
@@ -113,7 +122,20 @@ export class IphoneBackupTexts implements TextsClient {
     } catch {
       throw new Error("Reading the iPhone backup needs a newer Node.js (22.13 or later). Run Setup again to update it.");
     }
-    const db = new sqlite.DatabaseSync(path.join(st.backupDir!, SMS_DB.slice(0, 2), SMS_DB), { readOnly: true });
+    // An encrypted backup: the Messages database is decrypted into a temporary folder, read, and deleted again.
+    let tmp = "";
+    let file = path.join(st.backupDir!, SMS_DB.slice(0, 2), SMS_DB);
+    if (st.encrypted) {
+      const { decryptBackupFile } = await import("./backupCrypto.js");
+      tmp = mkdtempSync(path.join(os.tmpdir(), "keystone-texts-"));
+      try {
+        file = await decryptBackupFile(st.backupDir!, this.password, "HomeDomain", "Library/SMS/sms.db", tmp, this.keys);
+      } catch (e) {
+        rmSync(tmp, { recursive: true, force: true });
+        throw (e as Error).message === "WRONG_KEY" ? new Error("Couldn't read the encrypted backup with that password.") : e;
+      }
+    }
+    const db = new sqlite.DatabaseSync(file, { readOnly: true });
     try {
       const secs = since.getTime() / 1000 - APPLE_EPOCH;
       // Dates are nanoseconds since 2001 on current iPhones (too big for a plain number, so SQLite turns them into
@@ -135,6 +157,7 @@ export class IphoneBackupTexts implements TextsClient {
         .filter((m) => m.handle);
     } finally {
       db.close();
+      if (tmp) rmSync(tmp, { recursive: true, force: true });
     }
   }
 }
@@ -163,5 +186,5 @@ export class NoTexts implements TextsClient {
 
 export function makeTexts(cfg: Config): TextsClient {
   if (cfg.mode === "mock") return new MockTexts([], false);
-  return cfg.texts.enabled ? new IphoneBackupTexts(cfg.texts.backupDir || undefined) : new NoTexts();
+  return cfg.texts.enabled ? new IphoneBackupTexts(cfg.texts.backupDir || undefined, cfg.texts.password) : new NoTexts();
 }
