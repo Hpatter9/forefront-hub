@@ -16,6 +16,11 @@ export type Provider = "claude" | "gemini" | "off";
 export const aiProvider = (hub: Hub): Provider => (hub.cfg.ai?.provider === "gemini" && !hub.gemini ? "off" : hub.cfg.ai?.provider ?? (hub.cfg.anthropicApiKey ? "claude" : "off"));
 export const aiReady = (hub: Hub) => aiProvider(hub) !== "off";
 export const aiName = (hub: Hub) => ({ claude: "Claude", gemini: "Gemini", off: "AI" })[aiProvider(hub)];
+
+/** Which AI and model did a piece of work, e.g. "Gemini (gemini-3.5-flash)", for the activity log and answers. */
+export function usedLabel(used: Set<string> | string[]): string {
+  return [...used].join(", ");
+}
 /**
  * The estimating work (Estimator tab, setting up selections, send-off wording) runs on Claude with the estimating
  * skill whenever there's an Anthropic key, even when Gemini runs the everyday features.
@@ -31,12 +36,13 @@ export function aiOffReason(hub: Hub): string {
  * One question, one answer: plain text, or JSON shaped by `schema` (a JSON Schema). `fast` uses the quicker,
  * cheaper model (summaries, tasks from email).
  */
-export async function complete<T = string>(hub: Hub, o: { system: string; prompt: string; schema?: Record<string, unknown>; fast?: boolean; images?: { mimeType: string; data: string }[] }): Promise<T> {
+export async function complete<T = string>(hub: Hub, o: { system: string; prompt: string; schema?: Record<string, unknown>; fast?: boolean; images?: { mimeType: string; data: string }[]; used?: Set<string> }): Promise<T> {
   const p = aiProvider(hub);
   if (p === "off") throw new Error(aiOffReason(hub));
   if (p === "gemini") {
     const parts = [{ text: o.prompt }, ...(o.images ?? []).map((im) => ({ inlineData: im }))];
     const r = await hub.gemini!.generate({ model: o.fast ? hub.cfg.ai.geminiFastModel : hub.cfg.ai.geminiModel, fallbackModels: o.fast ? [hub.cfg.ai.geminiModel, ...(hub.cfg.ai.geminiFallbacks ?? [])] : hub.cfg.ai.geminiFallbacks, system: o.system, contents: [{ role: "user", parts }], jsonSchema: o.schema });
+    o.used?.add(`Gemini (${r.model ?? (o.fast ? hub.cfg.ai.geminiFastModel : hub.cfg.ai.geminiModel)})`);
     if (!o.schema) return r.text as T;
     try {
       return JSON.parse(r.text) as T;
@@ -45,6 +51,7 @@ export async function complete<T = string>(hub: Hub, o: { system: string; prompt
     }
   }
   if (o.images?.length) throw new Error("Looking at pictures needs Gemini (GEMINI_API_KEY).");
+  o.used?.add(`Claude (${o.fast ? hub.cfg.fastModel : hub.cfg.model})`);
   let out: any = o.schema ? null : "";
   for await (const m of query({
     prompt: o.prompt,
@@ -84,10 +91,13 @@ export function withHistory(prompt: string, history: ChatTurn[] = []): string {
   return `Earlier in this conversation:\n\n${lines}\n\nHunter's reply now: ${prompt}`;
 }
 
-export async function agentAsk(hub: Hub, prompt: string, opts: { jobNumber?: number; onMessage?: (m: SDKMessage) => void; maxSteps?: number; history?: ChatTurn[] } = {}): Promise<string> {
+export async function agentAsk(hub: Hub, prompt: string, opts: { jobNumber?: number; onMessage?: (m: SDKMessage) => void; maxSteps?: number; history?: ChatTurn[]; used?: Set<string> } = {}): Promise<string> {
   const p = aiProvider(hub);
   if (p === "off") throw new Error(aiOffReason(hub));
-  if (p === "claude") return claudeAsk(hub, withHistory(prompt, opts.history), opts);
+  if (p === "claude") {
+    opts.used?.add(`Claude (${hub.cfg.model})`);
+    return claudeAsk(hub, withHistory(prompt, opts.history), opts);
+  }
 
   const defs = hubToolDefs(hub);
   const decls: FunctionDecl[] = defs.map((d: any) => ({ name: d.name, description: String(d.description).slice(0, 1000), parametersJsonSchema: toSchema(d.inputSchema) }));
@@ -101,6 +111,7 @@ You're running on Gemini inside Keystone. Use the functions provided for anythin
   for (let step = 0; step < (opts.maxSteps ?? 24); step++) {
     compactOlder(contents);
     const r = await hub.gemini!.generate({ model: hub.cfg.ai.geminiModel, fallbackModels: hub.cfg.ai.geminiFallbacks, system, contents, tools: decls });
+    opts.used?.add(`Gemini (${r.model ?? hub.cfg.ai.geminiModel})`);
     contents.push(r.turn);
     if (r.text && r.calls.length) hub.say(r.text);
     if (!r.calls.length) {

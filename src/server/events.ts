@@ -9,7 +9,7 @@ export type HubEvent =
   | { type: "task"; id: string; state: "running" | "done" | "error"; label: string; error?: string; job?: number }
   | { type: "changed"; job?: number; what: "timeline" | "mail" | "job" | "calendar" | "plan" | "summaries" }
   | ({ type: "studio" } & StudioEvent)
-  | { type: "answer"; id: string; conv?: string; turns?: number; prompt: string; text: string; error?: string; drafts: { threadId?: string; subject: string; to: string[] }[]; jobs: number[]; contacts: string[] };
+  | { type: "answer"; id: string; ai?: string; conv?: string; turns?: number; prompt: string; text: string; error?: string; drafts: { threadId?: string; subject: string; to: string[] }[]; jobs: number[]; contacts: string[] };
 
 /** Server-sent events to every open window. */
 export class EventBus {

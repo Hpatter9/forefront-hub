@@ -37,6 +37,8 @@ export interface GenerateResult {
   turn: Turn;
   text: string;
   calls: { name: string; args: Record<string, unknown>; id?: string }[];
+  /** The model that actually answered (a fallback when the first was busy). */
+  model?: string;
 }
 
 export interface GeminiClient {
@@ -57,7 +59,7 @@ export class LiveGemini implements GeminiClient {
     let last: Error | null = null;
     for (const model of models) {
       try {
-        return await this.once({ ...req, model });
+        return { ...(await this.once({ ...req, model })), model };
       } catch (e) {
         last = e as Error;
         // A bad key or a malformed request won't get better on another model.
@@ -130,7 +132,7 @@ export class MockGemini implements GeminiClient {
     const r = typeof out === "string" ? { text: out } : out;
     const calls = r.calls ?? [];
     const text = r.text ?? "";
-    return { text, calls, turn: r.turn ?? { role: "model", parts: [...(text ? [{ text }] : []), ...calls.map((c) => ({ functionCall: { name: c.name, args: c.args } }))] } };
+    return { text, calls, model: req.model, turn: r.turn ?? { role: "model", parts: [...(text ? [{ text }] : []), ...calls.map((c) => ({ functionCall: { name: c.name, args: c.args } }))] } };
   }
 }
 

@@ -171,3 +171,31 @@ describe("Ask follow-ups", () => {
     expect(withHistory("hi")).toBe("hi");
   });
 });
+
+describe("which AI did the work", () => {
+  it("reports the model that actually answered, including a fallback", async () => {
+    let n = 0;
+    const g = new LiveGemini("k", (async () => {
+      n++;
+      if (n === 1) return new Response(JSON.stringify({ error: { message: "high demand" } }), { status: 503 });
+      if (n === 2) return new Response(JSON.stringify({ error: { message: "high demand" } }), { status: 503 });
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "hi" }] } }] }), { status: 200 });
+    }) as any);
+    (g as any).once = (LiveGemini.prototype as any).once; // real retry logic, but don't wait 3s
+    const orig = setTimeout;
+    (globalThis as any).setTimeout = (f: any) => orig(f, 0);
+    try {
+      const r = await g.generate({ model: "first-model", fallbackModels: ["backup-model"], contents: [{ role: "user", parts: [{ text: "x" }] }] });
+      expect(r.model).toBe("backup-model");
+    } finally {
+      (globalThis as any).setTimeout = orig;
+    }
+  });
+  it("Ask and complete record Gemini and its model", async () => {
+    const t = geminiHub(() => "ok");
+    const used = new Set<string>();
+    await agentAsk(t.hub, "hi", { used });
+    await complete(t.hub, { system: "s", prompt: "p", fast: true, used });
+    expect([...used]).toEqual(["Gemini (gemini-flash-latest)", "Gemini (gemini-flash-lite-latest)"]);
+  });
+});

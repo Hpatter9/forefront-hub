@@ -797,7 +797,7 @@ const server = http.createServer(async (req, res) => {
       for (const [k, c] of askConvs) if (Date.now() - c.at > 6 * 3600_000) askConvs.delete(k);
       const jobForAsk = job ?? conv.job;
       const made: import("../workflows/generated.js").GeneratedDraft[] = [];
-      const jobsSeen = new Set<number>(), contacts = new Set<string>();
+      const jobsSeen = new Set<number>(), contacts = new Set<string>(), used = new Set<string>();
       task(`Ask: ${prompt.slice(0, 60)}`, job, async () => {
         const { withDraftSource } = await import("../workflows/generated.js");
         let text = "", error: string | undefined;
@@ -805,6 +805,7 @@ const server = http.createServer(async (req, res) => {
           text = await withDraftSource("Claude", async () => (await import("../agent/llm.js")).agentAsk(hub, prompt, {
             jobNumber: jobForAsk,
             history: conv.turns.slice(-12),
+            used,
             onMessage: (m) => {
               if (m.type !== "assistant") return;
               for (const c of m.message.content) {
@@ -824,7 +825,8 @@ const server = http.createServer(async (req, res) => {
           conv.at = Date.now();
           conv.job = jobForAsk;
         }
-        bus.emit({ type: "answer", id, conv: convId, turns: conv.turns.length / 2, prompt, text, error, drafts: made.map((d) => ({ threadId: d.threadId || (hub.gmail.kind === "mock" ? d.draftId : undefined), subject: d.subject, to: d.to })), jobs: [...jobsSeen].slice(0, 4), contacts: [...contacts].slice(0, 3) });
+        if (used.size) hub.say(`Answered by ${[...used].join(", ")}`);
+        bus.emit({ type: "answer", id, conv: convId, turns: conv.turns.length / 2, ai: [...used].join(", "), prompt, text, error, drafts: made.map((d) => ({ threadId: d.threadId || (hub.gmail.kind === "mock" ? d.draftId : undefined), subject: d.subject, to: d.to })), jobs: [...jobsSeen].slice(0, 4), contacts: [...contacts].slice(0, 3) });
         if (error) throw new Error(error);
       }, "timeline");
       return send(res, 202, { id, conv: convId });
@@ -945,7 +947,7 @@ function teamPeople() {
 const askConvs = new Map<string, { turns: import("../agent/llm.js").ChatTurn[]; job?: number; at: number }>();
 
 // ---- Plan my day: the last brief Claude wrote, shown on the dashboard
-interface Plan { state: "running" | "done" | "error"; startedAt: string; finishedAt?: string; text: string; steps: string[]; error?: string; trigger?: "button" | "morning"; /** Items ticked off on the Brief tab, by item key. */ done?: Record<string, boolean>; /** Which job each tick was about, and its follow-up time before. */ ticks?: Record<string, { job: number; prev: string }> }
+interface Plan { state: "running" | "done" | "error"; /** Which AI and model wrote it. */ ai?: string; startedAt: string; finishedAt?: string; text: string; steps: string[]; error?: string; trigger?: "button" | "morning"; /** Items ticked off on the Brief tab, by item key. */ done?: Record<string, boolean>; /** Which job each tick was about, and its follow-up time before. */ ticks?: Record<string, { job: number; prev: string }> }
 
 function startPlan(trigger: "button" | "morning"): { taskId: string } | { error: string; code: number } {
   if (!aiReady(hub)) return { error: aiOffReason(hub), code: 400 };
@@ -963,7 +965,9 @@ function startPlan(trigger: "button" | "morning"): { taskId: string } | { error:
       const { withDraftSource } = await import("../workflows/generated.js");
       const note = await travelNote();
       const prompt = buildPrompt(await myDay());
+      const used = new Set<string>();
       plan.text = await withDraftSource(trigger === "morning" ? "Morning brief" : "Plan my day", async () => (await import("../agent/llm.js")).agentAsk(hub, prompt + note, {
+        used,
         onMessage: (m) => {
           if (m.type !== "assistant") return;
           for (const b of m.message.content) if (b.type === "tool_use") { plan.steps.push(describeTool(b.name, b.input as Record<string, unknown>)); savePlan(plan); bus.emit({ type: "changed", what: "plan" }); }
@@ -976,6 +980,8 @@ function startPlan(trigger: "button" | "morning"): { taskId: string } | { error:
       const checked = await checkEmailButtons(hub, plan.text, list.map((r) => ({ threadId: r.threadId, jobNumber: r.jobNumber })));
       plan.text = checked.text;
       if (checked.fixed || checked.dropped) hub.say(`Brief: ${checked.fixed ? `fixed ${checked.fixed} email button${checked.fixed === 1 ? "" : "s"} that pointed to the wrong email` : ""}${checked.fixed && checked.dropped ? "; " : ""}${checked.dropped ? `removed ${checked.dropped} that didn't match the job` : ""}.`);
+      plan.ai = [...used].join(", ");
+      if (plan.ai) hub.say(`Brief written by ${plan.ai}`);
       plan.state = "done";
     } catch (e) {
       plan.state = "error";

@@ -916,14 +916,14 @@
   <footer class="askbar">
     <form id="askform">
       <button type="button" class="btn" id="addfiles" title="Add files to a job (or drag them anywhere onto Keystone)">Add files</button>
-      <textarea id="prompt" rows="1" placeholder="Ask Claude, or drop files here, e.g. “who's waiting on me?”, “draft a follow-up to the Wegener homeowner”"></textarea>
+      <textarea id="prompt" rows="1" placeholder="Ask, or drop files here, e.g. “who's waiting on me?”, “draft a follow-up to the Wegener homeowner”"></textarea>
       <button class="btn primary">Ask</button>
     </form>
     <div class="attached small" id="attached"></div>
     <input type="file" id="filepick" multiple hidden>
     <div class="conwrap" id="conwrap" hidden>
-      <div class="congrip" id="congrip" title="Drag to make Claude's activity taller or shorter"></div>
-      <div class="conhead"><button type="button" id="contoggle" title="Show or hide Claude's activity"></button><span class="conlast" id="conlast"></span><button type="button" id="conclear" title="Clear the activity log">Clear</button></div>
+      <div class="congrip" id="congrip" title="Drag to make the activity box taller or shorter"></div>
+      <div class="conhead"><button type="button" id="contoggle" title="Show or hide the activity box"></button><span class="conlast" id="conlast"></span><button type="button" id="conclear" title="Clear the activity log">Clear</button></div>
       <div class="console" id="console"></div>
     </div>
   </footer>
@@ -931,8 +931,8 @@
 </div>
 
 <dialog id="answerdlg" class="answerdlg"><div class="in"><div id="ans-thread"></div><div class="ans-q small muted" id="ans-q"></div><div class="ans-body btext" id="ans-body"></div></div>
-  <form id="ans-reply" class="ans-reply"><textarea id="ans-input" rows="2" placeholder="Reply to Claude… (Enter to send, Shift+Enter for a new line)"></textarea><button class="btn primary" type="submit">Reply</button></form>
-  <div class="foot"><span class="row" id="ans-acts" style="flex:1;flex-wrap:wrap;gap:6px"></span><button class="btn" type="button" onclick="this.closest('dialog').close()">Done</button></div></dialog>
+  <form id="ans-reply" class="ans-reply"><textarea id="ans-input" rows="2" placeholder="Reply… (Enter to send, Shift+Enter for a new line)"></textarea><button class="btn primary" type="submit">Reply</button></form>
+  <div class="foot"><span class="row" id="ans-acts" style="flex:1;flex-wrap:wrap;gap:6px"></span><span class="small muted" id="ans-ai"></span><button class="btn" type="button" onclick="this.closest('dialog').close()">Done</button></div></dialog>
 
 <dialog id="approve"><div class="in"><h4 id="ap-title"></h4><ul id="ap-details"></ul><textarea id="ap-text" rows="3" hidden></textarea></div>
   <div class="foot"><button class="btn" id="ap-no">No</button><button class="btn primary" id="ap-yes">Yes, go ahead</button></div></dialog>
@@ -949,7 +949,7 @@
   <h4>Log a call</h4>
   <div class="row"><select id="lg-dir" style="width:auto"><option>Outbound</option><option>Inbound</option></select><input type="text" id="lg-who" placeholder="With (e.g. Eileen Brandt)" style="flex:1"></div>
   <textarea id="lg-body" rows="4" placeholder="First line is the subject on Homebase's Activity tab"></textarea>
-  <p class="small muted">Claude will offer a one-line note for the job's feed afterwards.</p>
+  <p class="small muted">The AI will offer a one-line note for the job's feed afterwards.</p>
   </div><div class="foot"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="go">Log it</button></div></form></dialog>
 
 <dialog id="adjdlg"><form method="dialog"><div class="in">
@@ -1045,7 +1045,7 @@ function log(text, cls = "") {
 function conApply() {
   const open = store.get("conOpen", true), w = $("#conwrap");
   w.classList.toggle("open", open);
-  $("#contoggle").textContent = (open ? "▾" : "▸") + " Claude's activity";
+  $("#contoggle").textContent = (open ? "▾" : "▸") + " Activity";
   w.style.setProperty("--con-h", store.get("conH", 150) + "px");
 }
 $("#contoggle").addEventListener("click", () => { store.set("conOpen", !store.get("conOpen", true)); conApply(); $("#console").scrollTop = $("#console").scrollHeight; });
@@ -1090,6 +1090,7 @@ $("#logo").addEventListener("click", (e) => { e.preventDefault(); showTab("today
 async function loadStatus() {
   status = await api("/api/status");
   meta = await api("/api/meta").catch(() => meta);
+    $("#prompt").placeholder = `Ask ${AI()}, or drop files here, e.g. “who's waiting on me?”, “draft a follow-up to the Wegener homeowner”`;
   const chip = (label, on, title) => `<span class="chip ${on ? "" : "off"}" title="${esc(title)}">${on ? "●" : "○"} ${label}</span>`;
   $("#chips").innerHTML = [
     chip("Homebase", status.homebase !== "mock", `Homebase: ${status.homebase}`),
@@ -1110,11 +1111,11 @@ $("#syncnow").addEventListener("click", async () => { try { await api("/api/sync
 
 // ============================================================= TODAY
 const ACTIONS = {
-  reply: (r) => `${r.threadId ? `<button class="btn small primary" data-do="thread" data-thread="${esc(r.threadId)}">Reply</button>` : ""}<button class="btn small" data-do="claude" data-p="Read the latest email on job #${r.jobNumber} and draft my reply in Gmail (draft only).">Draft reply with Claude</button>`,
+  reply: (r) => `${r.threadId ? `<button class="btn small primary" data-do="thread" data-thread="${esc(r.threadId)}">Reply</button>` : ""}<button class="btn small" data-do="claude" data-p="Read the latest email on job #${r.jobNumber} and draft my reply in Gmail (draft only).">Draft reply with ${AI()}</button>`,
   log: (r) => `<button class="btn small primary" data-do="logsent" data-n="${r.jobNumber}">Log in Homebase</button>`,
   walk: (r) => `<button class="btn small" data-do="open" data-n="${r.jobNumber}">Open job to schedule the walk</button>`,
   estimate: (r) => `<button class="btn small" data-do="claude" data-p="Start the estimate for job #${r.jobNumber}: check what's in the job folder (ESX, photos, notes) and tell me what's missing before you price it.">Start estimate with Claude</button>`,
-  adjuster: (r) => `<button class="btn small primary" data-do="claude" data-p="Draft a short check-in email to the adjuster on job #${r.jobNumber}, in my voice, asking where they are on their review of our estimate and whether they need anything else from us (photos, measurements, a call). Reply in the existing thread with them if there is one. Gmail draft only.">Draft check-in with Claude</button>`,
+  adjuster: (r) => `<button class="btn small primary" data-do="claude" data-p="Draft a short check-in email to the adjuster on job #${r.jobNumber}, in my voice, asking where they are on their review of our estimate and whether they need anything else from us (photos, measurements, a call). Reply in the existing thread with them if there is one. Gmail draft only.">Draft check-in with ${AI()}</button>`,
   followup: (r) => `<button class="btn small" data-do="claude" data-p="Draft a short follow-up email for job #${r.jobNumber}'s proposal in my voice (Gmail draft only), to whoever is waiting on it.">Draft follow-up</button>`,
   draft: () => `<a class="btn small" href="https://mail.google.com/mail/u/0/#drafts" target="_blank" rel="noopener">Open Gmail drafts</a>`,
   upload: (r) => `<button class="btn small primary" data-do="upload" data-n="${r.jobNumber}">Upload</button>`,
@@ -1140,7 +1141,7 @@ async function loadToday() {
   const notesCard = await teamNotesCard();
   $("#today").innerHTML = `
     <div class="todayhead"><div style="flex:1;min-width:240px"><h2>Dashboard</h2><div class="dateline">${esc(longDate)} · ${t.open} open jobs${d.lastSync ? ` · synced ${fmtWhen(d.lastSync)}` : ""}</div></div>
-      <button class="btn primary" id="plan" ${status.agent ? "" : "disabled title='Claude is off on this machine'"}>Plan my day with Claude</button></div>
+      <button class="btn primary" id="plan" ${status.agent ? "" : `disabled title='${AI()} is off on this machine'`}>Plan my day with ${AI()}</button></div>
     ${!d.autoFiling ? `<div class="banner">Incoming job emails file themselves to Homebase once Gmail is fully connected${status.gmail === "google" ? ": double-click <b>Connect Gmail</b> in the Keystone folder (forefront-hub) once more and click Allow" : ""}.</div>` : ""}
     <div id="brief"></div>
     <div class="strip">
@@ -1322,7 +1323,7 @@ function renderOverview(el) {
       <div class="tile" style="cursor:default"><span class="k">Days in stage</span><span class="v">${daysSince(h.stageSince) ?? "—"}</span><span class="k">${esc(h.stage)}</span></div>
       <div class="tile" style="cursor:default"><span class="k">Last touched</span><span class="v">${l?.pulse?.lastTouchAt ? daysSince(l.pulse.lastTouchAt) + "d" : "—"}</span><span class="k">${esc((l?.pulse?.lastTouch || "").slice(0, 34))}</span></div>
     </div>
-    ${waiting ? `<div class="banner" style="border-left-color:var(--bad)"><b>${esc(waiting.from)}</b> is waiting on you · ${esc(waiting.subject)} · ${fmtDate(waiting.at)} <span class="row" style="display:inline-flex;margin-left:8px">${waiting.threadId ? `<button class="btn small primary" data-do="thread" data-thread="${esc(waiting.threadId)}">Open &amp; reply</button>` : ""}<button class="btn small" data-do="claude" data-n="${h.jobNumber}" data-p="Read the latest email on job #${h.jobNumber} and draft my reply in Gmail (draft only).">Draft reply with Claude</button></span></div>` : ""}
+    ${waiting ? `<div class="banner" style="border-left-color:var(--bad)"><b>${esc(waiting.from)}</b> is waiting on you · ${esc(waiting.subject)} · ${fmtDate(waiting.at)} <span class="row" style="display:inline-flex;margin-left:8px">${waiting.threadId ? `<button class="btn small primary" data-do="thread" data-thread="${esc(waiting.threadId)}">Open &amp; reply</button>` : ""}<button class="btn small" data-do="claude" data-n="${h.jobNumber}" data-p="Read the latest email on job #${h.jobNumber} and draft my reply in Gmail (draft only).">Draft reply with ${AI()}</button></span></div>` : ""}
     <div class="grid" style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)">
       <div class="side">
         <div class="card"><h3>Customer ${pen}</h3>
@@ -1513,7 +1514,7 @@ $("#logdlg").addEventListener("close", async () => {
 // ============================================================= MAIL (Gmail-style)
 let genCount = 0, mailLoaded = false, mailLabel = store.get("mlabel", "INBOX"), mailCat = store.get("mcat", "primary"), mailThread = null;
 let mailPages = [null], mailPage = 0, mailNext = null, mailRows = [], mailSel = new Set(), threadView = null;
-const GLABELS = [["INBOX", "Inbox", "inbox"], ["STARRED", "Starred", "star"], ["SENT", "Sent", "send"], ["DRAFT", "Drafts", "draft"], ["HUB_DRAFTS", "Claude drafts", "auto_awesome"], ["IMPORTANT", "Important", "label_important"], ["SPAM", "Spam", "report"], ["TRASH", "Trash", "delete"]];
+const GLABELS = [["INBOX", "Inbox", "inbox"], ["STARRED", "Starred", "star"], ["SENT", "Sent", "send"], ["DRAFT", "Drafts", "draft"], ["HUB_DRAFTS", "AI drafts", "auto_awesome"], ["IMPORTANT", "Important", "label_important"], ["SPAM", "Spam", "report"], ["TRASH", "Trash", "delete"]];
 const GCATS = [["primary", "Primary", "inbox"], ["promotions", "Promotions", "sell"], ["social", "Social", "group"], ["updates", "Updates", "info"]];
 const AVC = ["#e8710a", "#1a73e8", "#d93025", "#188038", "#9334e6", "#e52592", "#12b5cb", "#f9ab00", "#5f6368"];
 const nameOf = (from) => (from || "").replace(/<.*>/, "").replace(/"/g, "").trim() || (from || "").replace(/[<>]/g, "");
@@ -1594,7 +1595,7 @@ async function loadThreads() {
       <div class="ln">${(t.labelIds || []).includes("IMPORTANT") && mailLabel !== "IMPORTANT" ? "" : ""}${t.generated?.jobNumber ? `<span class="chip">#${t.generated.jobNumber}</span>` : ""}<span class="sj">${esc(t.subject || "(no subject)")}</span><span class="sn"> - ${esc(t.snippet)}</span></div>
       <div class="dt">${t.hasAttachments ? `<span class="ms" style="font-size:16px;vertical-align:-3px;margin-right:6px">attach_file</span>` : ""}${gDate(t.date)}</div>
       <div class="acts"><button class="gm-ib" data-act1="archive" title="Archive">${msI("archive")}</button><button class="gm-ib" data-act1="trash" title="Delete">${msI("delete")}</button><button class="gm-ib" data-act1="${t.unread ? "read" : "unread"}" title="${t.unread ? "Mark as read" : "Mark as unread"}">${msI(t.unread ? "drafts" : "mark_email_unread")}</button></div>
-    </div>`).join("") || `<div class="gm-empty">${q ? "No messages matched your search." : mailLabel === "INBOX" ? "Your inbox is empty." : genView ? "No drafts from Claude waiting. Drafts Claude makes for you (replies, Plan my day, send-offs) collect here until you send them." : "No conversations here."}</div>`;
+    </div>`).join("") || `<div class="gm-empty">${q ? "No messages matched your search." : mailLabel === "INBOX" ? "Your inbox is empty." : genView ? "No AI drafts waiting. Drafts the AI makes for you (replies, Plan my day, send-offs) collect here until you send them." : "No conversations here."}</div>`;
   if (!genView) applySummaries();
   renderMailBar();
 }
@@ -1762,7 +1763,7 @@ async function openThread(id) {
       <div class="gm-filebar">${t.jobs.length ? t.jobs.map((j) => `<button class="gm-pill" data-do="filethread" data-thread="${esc(t.id)}" data-n="${j.jobNumber}" type="button">${msI("drive_file_move")}File to #${j.jobNumber}</button>`).join("") : `<span>Not matched to a job.</span>`}
         <select id="fileto-job" aria-label="File to another job"><option value="">File to another job…</option>${jobs.map((j) => `<option value="${j.jobNumber}">#${j.jobNumber} ${esc(j.name)}</option>`).join("")}</select><button class="gm-pill" data-do="filethread" data-thread="${esc(t.id)}" type="button">File</button></div>
       ${t.messages.map((m, i) => `<div class="gm-msg ${m.draft ? "draft" : ""} ${i < t.messages.length - 1 && t.messages.length > 2 && !m.draft ? "col" : ""}" data-mi="${i}">${avatar(m.from)}<div style="min-width:0">
-          ${m.draft ? `<div class="gm-draftbar"><span class="tagd">${m.draft.generated ? `${msI("auto_awesome")} Claude draft${m.draft.source && m.draft.source !== "Claude" ? ` · ${esc(m.draft.source)}` : ""}` : `${msI("draft")} Draft`}</span><span class="nots">Not sent. Nothing goes out until you press Send and confirm.</span></div>` : ""}
+          ${m.draft ? `<div class="gm-draftbar"><span class="tagd">${m.draft.generated ? `${msI("auto_awesome")} AI draft${m.draft.source && m.draft.source !== "Claude" ? ` · ${esc(m.draft.source)}` : ""}` : `${msI("draft")} Draft`}</span><span class="nots">Not sent. Nothing goes out until you press Send and confirm.</span></div>` : ""}
           <div class="gm-mh"><b>${esc(nameOf(m.from))}</b><button type="button" class="em" data-copy="${esc(addrOf(m.from))}" title="Copy address">&lt;${esc(addrOf(m.from))}&gt;</button><span class="when">${m.draft ? (m.date && !isNaN(Date.parse(m.date)) ? `Draft saved ${new Date(m.date).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Draft") : new Date(m.date).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span></div>
           <div class="snip">${esc(m.body.slice(0, 160))}</div>
           <div class="gm-to">to ${m.to.map(addrChip).join(" ")}${m.cc.length ? ` <span class="lbl">cc</span> ${m.cc.map(addrChip).join(" ")}` : ""}${m.bcc?.length ? ` <span class="lbl">bcc</span> ${m.bcc.map(addrChip).join(" ")}` : ""}</div>
@@ -1770,7 +1771,7 @@ async function openThread(id) {
           ${m.draft ? `<div class="gm-draftacts"><button class="gm-pill send" type="button" data-dsend="${esc(m.id)}">${msI("send")}Send…</button><button class="gm-pill" type="button" data-dedit="${i}">${msI("edit")}Edit</button><button class="gm-pill" type="button" data-ddel="${esc(m.id)}">${msI("delete")}Delete draft</button></div>` : ""}
           ${m.attachments.length ? `<div class="gm-atts">${m.attachments.map((a) => `<a class="gm-att" href="/api/mail/attachment/${esc(m.id)}/${esc(a.id)}?name=${encodeURIComponent(a.filename)}" target="_blank">${msI(/\.pdf$/i.test(a.filename) ? "picture_as_pdf" : /\.(jpe?g|png|gif|heic)$/i.test(a.filename) ? "image" : "attach_file")}<span>${esc(a.filename)}</span></a>`).join("")}</div>` : ""}
         </div></div>`).join("")}
-      <div class="gm-replies"><button class="gm-pill" id="replybtn" type="button">${msI("reply")}Reply</button><button class="gm-pill" id="replyall" type="button">${msI("reply_all")}Reply all</button><button class="gm-pill" id="fwd" type="button">${msI("forward")}Forward</button>${status.agent ? `<button class="gm-pill ai" id="claudereply" type="button">${msI("auto_awesome")}Draft reply with Claude</button>` : ""}</div>
+      <div class="gm-replies"><button class="gm-pill" id="replybtn" type="button">${msI("reply")}Reply</button><button class="gm-pill" id="replyall" type="button">${msI("reply_all")}Reply all</button><button class="gm-pill" id="fwd" type="button">${msI("forward")}Forward</button>${status.agent ? `<button class="gm-pill ai" id="claudereply" type="button">${msI("auto_awesome")}Draft reply with ${AI()}</button>` : ""}</div>
     </div>`;
   $("#gm-back").onclick = () => { showList(); loadThreads(); };
   $$("#reader .gm-msg.col").forEach((el) => el.addEventListener("click", () => el.classList.remove("col"), { once: true }));
@@ -2431,9 +2432,11 @@ function jobFromText(t) {
   const hits = jobs.filter((j) => j.name && j.name.length >= 4 && new RegExp(`\\b${j.name.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(low));
   return hits.length === 1 ? hits[0].jobNumber : null;
 }
+/** The AI that runs the everyday features right now (Gemini or Claude); the Estimator tab is always Claude. */
+const AI = () => (status?.ai && status.ai.provider !== "off" ? status.ai.name : "AI");
 const asking = new Map();
 async function askClaude(prompt, job) {
-  if (!status.agent) { log("Claude is off on this machine (no Anthropic API key).", "t-err"); return; }
+  if (!status.agent) { log(status.ai?.offReason || "The AI is off on this machine.", "t-err"); return; }
   if (EST_RX.test(prompt) && !DRAFT_RX.test(prompt)) {
     const n = jobFromText(prompt) || job || (store.get("tab") === "jobs" && view ? view.homebase.jobNumber : null) || estJob;
     showTab("est");
@@ -2451,7 +2454,7 @@ async function askClaude(prompt, job) {
 function renderAskCard() {
   let el = $("#askcard"); if (!el) { el = document.createElement("div"); el.id = "askcard"; el.className = "askcard"; document.body.appendChild(el); }
   el.hidden = !asking.size;
-  el.innerHTML = [...asking.values()].map((p) => `<div><span class="spin"></span><span><b>Claude is working on it</b><small>${esc(p.length > 90 ? p.slice(0, 90) + "…" : p)}</small></span></div>`).join("");
+  el.innerHTML = [...asking.values()].map((p) => `<div><span class="spin"></span><span><b>${AI()} is working on it</b><small>${esc(p.length > 90 ? p.slice(0, 90) + "…" : p)}</small></span></div>`).join("");
 }
 let ansConv = null, ansPast = [];
 async function onAnswer(e) {
@@ -2468,10 +2471,11 @@ async function onAnswer(e) {
     showTab("mail");
     if (d.threadId) openThread(d.threadId);
     else setTimeout(() => $('#labels [data-label="HUB_DRAFTS"]')?.click(), 400);
-    snack(`Claude drafted “${d.subject}”${e.drafts.length > 1 ? ` and ${e.drafts.length - 1} more (in Claude drafts)` : ""}. Review it, then press Send.`);
+    snack(`${e.ai ? e.ai.split(" (")[0] : AI()} drafted “${d.subject}”${e.drafts.length > 1 ? ` and ${e.drafts.length - 1} more (in AI drafts)` : ""}. Review it, then press Send.`);
     if (e.text) log(e.text);
     return;
   }
+  $("#ans-ai").textContent = e.ai ? `Answered by ${e.ai}` : "";
   $("#ans-q").textContent = e.prompt;
   $("#ans-body").innerHTML = e.error ? `<p style="color:var(--bad)">${esc(e.error)}</p>` : md(e.text || "(no answer)").replace(/(^|[\s(>])#(\d{4})\b/g, '$1<a href="#" data-do="open" data-n="$2">#$2</a>');
   $("#ans-acts").innerHTML = [...e.jobs.filter((n) => jobs.some((j) => j.jobNumber === n)).map((n) => `<button class="btn small" data-do="open" data-n="${n}">Open #${n} ${esc(jobs.find((j) => j.jobNumber === n)?.name || "")}</button>`), ...e.contacts.map((q) => `<button class="btn small" data-ans-people="${esc(q)}">${msI("contacts")} ${esc(q)} in Contacts</button>`), e.drafts.length ? `<button class="btn small" data-label-go="HUB_DRAFTS">Claude drafts</button>` : ""].join("");
@@ -2492,7 +2496,7 @@ $("#ans-reply").addEventListener("submit", async (ev) => {
     ansPast.push({ q: $("#ans-q").textContent, a: $("#ans-body").innerHTML });
     $("#ans-thread").innerHTML = ansPast.map((t) => `<div class="ans-past"><div class="ans-q small muted">${esc(t.q)}</div><div class="ans-body btext">${t.a}</div></div>`).join("");
     $("#ans-q").textContent = p;
-    $("#ans-body").innerHTML = `<p class="muted"><span class="spin"></span> Claude is working on it…</p>`;
+    $("#ans-body").innerHTML = `<p class="muted"><span class="spin"></span> ${AI()} is working on it…</p>`;
   } catch (err) { log(err.message, "t-err"); $("#ans-input").disabled = false; $("#ans-reply").querySelector("button").disabled = false; }
 });
 $("#ans-input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#ans-reply").requestSubmit(); } });
@@ -2816,7 +2820,7 @@ async function renderBrief() {
   const page = $("#briefpage"), line = $("#brief");
   const today = p.startedAt && new Date().toDateString() === new Date(p.startedAt).toDateString();
   const sch = p.schedule && /^\d/.test(p.schedule.at) ? `Runs on its own at ${new Date(`2000-01-01T${p.schedule.at.padStart(5, "0")}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${p.schedule.days === "1-5" ? " on weekdays" : p.schedule.days === "0-6" ? " every day" : ""}` : "";
-  const planBtn = status.agent ? `<button class="btn ${p.state === "none" ? "primary" : ""}" id="briefplan" ${p.state === "running" ? "disabled" : ""}>${p.state === "running" ? "Planning your day…" : p.state === "none" ? "Plan my day with Claude" : "Plan again"}</button>` : "";
+  const planBtn = status.agent ? `<button class="btn ${p.state === "none" ? "primary" : ""}" id="briefplan" ${p.state === "running" ? "disabled" : ""}>${p.state === "running" ? "Planning your day…" : p.state === "none" ? `Plan my day with ${AI()}` : "Plan again"}</button>` : "";
   // The checklist: every list item in the brief gets a box.
   let total = 0, doneN = 0, html = "";
   if (p.state === "done") {
@@ -2843,19 +2847,19 @@ async function renderBrief() {
   if (page) {
     const when = new Date(p.finishedAt || p.startedAt || Date.now());
     const stamp = p.startedAt ? `${p.trigger === "morning" ? "Made on its own · " : ""}${today ? "Today" : when.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}, ${when.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : "";
-    page.innerHTML = `<div class="bhead"><div style="flex:1;min-width:220px"><h2>Today's brief</h2><div class="dateline">${esc(stamp)}${stamp && sch ? " · " : ""}${esc(sch)}${p.startedAt && !today ? ` · <b>from an earlier day</b>` : ""}</div></div>${planBtn}</div>
+    page.innerHTML = `<div class="bhead"><div style="flex:1;min-width:220px"><h2>Today's brief</h2><div class="dateline">${esc(stamp)}${p.ai ? ` · written by ${esc(p.ai)}` : ""}${stamp && sch ? " · " : ""}${esc(sch)}${p.startedAt && !today ? ` · <b>from an earlier day</b>` : ""}</div></div>${planBtn}</div>
       ${p.state === "done" && total ? `<div class="bprog"><div class="bar"><span style="width:${Math.round((doneN / total) * 100)}%"></span></div><b>${doneN} of ${total} done</b>${doneN ? `<button class="linkbtn" data-do="briefclear">Untick all</button>` : ""}</div>` : ""}
-      <div class="card brief ${p.state}">${p.state === "none" ? `<p class="muted" style="margin:0">No brief yet. ${status.agent ? "Press <b>Plan my day with Claude</b>, or wait for the morning one." : "Claude is off on this machine."}</p>`
-        : p.state === "running" ? `<div class="bwork"><span class="spin"></span>Claude is going through your jobs, inbox, calendar and tasks…</div>${p.steps.length ? `<div class="bsteps">${p.steps.slice(-5).map((x) => `<div>${esc(x)}</div>`).join("")}</div>` : ""}`
-        : p.state === "error" ? `<div class="small" style="color:var(--bad)">${esc(p.error || "Claude couldn't finish the plan.")}</div>`
+      <div class="card brief ${p.state}">${p.state === "none" ? `<p class="muted" style="margin:0">No brief yet. ${status.agent ? `Press <b>Plan my day with ${AI()}</b>, or wait for the morning one.` : `${AI()} is off on this machine.`}</p>`
+        : p.state === "running" ? `<div class="bwork"><span class="spin"></span>${AI()} is going through your jobs, inbox, calendar and tasks…</div>${p.steps.length ? `<div class="bsteps">${p.steps.slice(-5).map((x) => `<div>${esc(x)}</div>`).join("")}</div>` : ""}`
+        : p.state === "error" ? `<div class="small" style="color:var(--bad)">${esc(p.error || "The AI couldn't finish the plan.")}</div>`
         : `<div class="btext">${html}</div>`}</div>`;
     $("#briefplan")?.addEventListener("click", startPlan);
   }
   if (line) {
-    line.innerHTML = p.state === "none" ? "" : `<button class="briefline" type="button" data-do="gobrief">${msI("checklist")}<span>Today's brief: ${p.state === "running" ? "Claude is working on it…" : p.state === "error" ? "didn't finish" : total ? `<b>${doneN} of ${total} done</b>${today ? "" : " (from an earlier day)"}` : "ready"}</span><span class="go">Open →</span></button>`;
+    line.innerHTML = p.state === "none" ? "" : `<button class="briefline" type="button" data-do="gobrief">${msI("checklist")}<span>Today's brief: ${p.state === "running" ? `${AI()} is working on it…` : p.state === "error" ? "didn't finish" : total ? `<b>${doneN} of ${total} done</b>${today ? "" : " (from an earlier day)"}` : "ready"}</span><span class="go">Open →</span></button>`;
   }
   const btn = $("#plan");
-  if (btn && status.agent) { btn.disabled = p.state === "running"; btn.textContent = p.state === "running" ? "Planning your day…" : p.state === "none" ? "Plan my day with Claude" : "Plan again"; }
+  if (btn && status.agent) { btn.disabled = p.state === "running"; btn.textContent = p.state === "running" ? "Planning your day…" : p.state === "none" ? `Plan my day with ${AI()}` : "Plan again"; }
 }
 document.addEventListener("change", async (e) => {
   const c = e.target.closest(".bchk"); if (!c) return;
@@ -2984,7 +2988,7 @@ async function renderSelections(el) {
             <div class="small muted">${p.source === "email" ? `From ${esc((p.from || "").replace(/<.*>/, "").trim())}'s email · ${fmtDate(p.at)}${p.threadId ? ` · <a href="#" data-do="thread" data-thread="${esc(p.threadId)}">View email</a>` : ""}` : `Added ${fmtDate(p.at)}`}${p.note ? ` · ${esc(p.note)}` : ""}</div></div>
           <div class="pacts">${!p.chosen ? `<button class="btn small" data-sel="choose">Choose</button>` : ""}<button class="btn small" data-sel="rmpick" title="Remove">✕</button></div></div>`).join("")}</div>
       <form class="addpick" data-sel="addpick"><input type="text" name="url" placeholder="Paste a product link, or type a product name"><input type="number" step="0.01" min="0" name="price" placeholder="$ per ${esc(c.unit)}"><button class="btn small">Add pick</button></form>
-    </div>`).join("") : `<div class="card"><p class="muted" style="margin:0">${d.hasEstimate ? "No selections yet. Press <b>Set up from the estimate with Claude</b> to list the finishes the owner has to pick, with quantities and material budgets." : "No estimate in this job's folder yet. Once there is one, Claude can set up the selections from it. You can also add categories by hand."}</p></div>`;
+    </div>`).join("") : `<div class="card"><p class="muted" style="margin:0">${d.hasEstimate ? `No selections yet. Press <b>Set up from the estimate</b> (${AI()}) to list the finishes the owner has to pick, with quantities and material budgets.` : `No estimate in this job's folder yet. Once there is one, ${AI()} can set up the selections from it. You can also add categories by hand.`}</p></div>`;
   el.innerHTML = `<div class="sels">${head}${body}</div>`;
 }
 document.addEventListener("click", async (e) => {
@@ -2992,7 +2996,7 @@ document.addEventListener("click", async (e) => {
   const n = view.homebase.jobNumber, cat = b.closest("[data-cat]")?.dataset.cat, pick = b.closest("[data-pick]")?.dataset.pick;
   const k = b.dataset.sel;
   try {
-    if (k === "build") { await api(`/api/jobs/${n}/selections/build`, { method: "POST", body: {} }); snack("Claude is reading the estimate. The categories show up here when it's done."); return; }
+    if (k === "build") { await api(`/api/jobs/${n}/selections/build`, { method: "POST", body: {} }); snack(`${AI()} is reading the estimate. The categories show up here when it's done.`); return; }
     if (k === "addcat") {
       const name = prompt("What needs picking? (e.g. Kitchen backsplash tile)"); if (!name) return;
       const qty = prompt("Quantity and unit (e.g. 45 SF)", "1 EA") || "1 EA"; const [q, u] = qty.trim().split(/\s+/);
