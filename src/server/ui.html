@@ -735,6 +735,36 @@
   .walks-detail { display: grid; gap: 14px; max-height: calc(100vh - 220px); overflow: auto; }
   .walks-detail .btext { white-space: normal; line-height: 1.6; }
   @media (max-width: 900px) { .walks { grid-template-columns: 1fr; } }
+  .bj-toggle { display: flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; margin-right: 10px; }
+  .bj-toggle button { background: transparent; border: 0; color: var(--muted); font: inherit; font-size: 14px; padding: 7px 14px; cursor: pointer; }
+  .bj-toggle button.on { background: var(--panel-2); color: var(--ink); font-weight: 600; }
+  .bj { display: none; grid-column: 1 / -1; min-height: 0; grid-template-columns: 300px minmax(0, 1fr) 250px; }
+  .gm.byjob .bj { display: grid; }
+  .gm.byjob #labels, .gm.byjob #gm-main { display: none; }
+  .bj-jobs { border-right: 1px solid var(--line); padding: 14px 10px; overflow: auto; display: flex; flex-direction: column; gap: 6px; background: color-mix(in srgb, var(--panel) 60%, var(--bg)); }
+  .bj-job { text-align: left; background: transparent; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; color: var(--ink); font: inherit; cursor: pointer; display: grid; gap: 3px; }
+  .bj-job.on { background: var(--panel-2); border-color: var(--accent); }
+  .bj-job .top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .bj-job .wait { background: #f08a7a; color: #2b0c07; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+  .bj-conv { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .bj-head { padding: 16px 22px 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .bj-head h2 { margin: 0; font-size: 21px; }
+  .bj-stream { flex: 1; min-height: 0; overflow: auto; padding: 8px 22px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .bj-b { max-width: 78%; border-radius: 16px 16px 16px 4px; padding: 11px 14px; background: var(--panel-2); border: 1px solid var(--line); align-self: flex-start; }
+  .bj-b.me { align-self: flex-end; border-radius: 16px 16px 4px 16px; background: color-mix(in srgb, var(--link) 26%, var(--panel)); border-color: transparent; }
+  .bj-b.text { border-style: dashed; }
+  .bj-b.draft { border: 1px dashed var(--link); background: var(--panel); }
+  .bj-b .meta { font-size: 12.5px; color: var(--muted); margin-bottom: 3px; display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+  .bj-b .subj { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .bj-b .body { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14.5px; line-height: 1.5; }
+  .bj-b .acts { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .bj-b .att { display: inline-block; border: 1px solid var(--line); border-radius: 8px; padding: 1px 8px; font-size: 12.5px; margin: 6px 6px 0 0; }
+  .bj-pill { align-self: center; color: var(--muted); font-size: 13px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 14px; max-width: 80%; text-align: center; }
+  .bj-day { align-self: center; color: var(--muted); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; margin-top: 6px; }
+  .bj-bar { border-top: 1px solid var(--line); padding: 12px 22px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--panel); }
+  .bj-facts { border-left: 1px solid var(--line); padding: 18px 16px; overflow: auto; display: flex; flex-direction: column; gap: 14px; font-size: 14px; }
+  .bj-facts .k { color: var(--muted); font-size: 12.5px; margin-bottom: 2px; }
+  @media (max-width: 1100px) { .bj { grid-template-columns: 240px minmax(0, 1fr); } .bj-facts { display: none; } }
   .btask { border: 1px solid var(--line); color: var(--muted); border-radius: 999px; padding: 0 8px; font-size: 11.5px; margin-left: 6px; display: inline-block; text-indent: 0; text-decoration: none; }
   .trow { cursor: pointer; }
 
@@ -847,6 +877,7 @@
       <div class="gm-head">
         <button class="gm-ib" type="button" data-zone-toggle="gm" title="Main menu"><span class="ms">menu</span></button>
         <div class="gm-brand"><span class="ms fill">mail</span>Gmail</div>
+        <div class="bj-toggle" role="group" aria-label="How email is shown"><button type="button" data-mailmode="byjob">By job</button><button type="button" data-mailmode="inbox">Inbox</button></div>
         <label class="gm-search"><span class="ms">search</span><input type="search" id="mq" placeholder="Search mail" aria-label="Search mail"><button class="gm-ib" type="button" id="mq-clear" title="Clear search" hidden><span class="ms">close</span></button></label>
         <div class="gm-acct" id="gm-acct" title="hunter@forefrontteam.com">H</div>
       </div>
@@ -858,6 +889,11 @@
           <div class="gm-list" id="threads"></div>
         </div>
         <div id="reader" hidden style="display:flex;flex-direction:column;min-height:0;flex:1"></div>
+      </div>
+      <div class="bj" id="byjob">
+        <nav class="bj-jobs" id="bj-jobs" aria-label="Jobs with mail"></nav>
+        <div class="bj-conv"><div class="bj-head" id="bj-head"></div><div class="bj-stream" id="bj-stream"></div><div class="bj-bar" id="bj-bar"></div></div>
+        <aside class="bj-facts" id="bj-facts" aria-label="Job facts"></aside>
       </div>
     </div>
   </section>
@@ -1087,6 +1123,7 @@ function showTab(t) {
   setCrumbs(t === "jobs" && view ? `Jobs / <b>#${view.homebase.jobNumber}</b>` : `<b>${{ today: "Dashboard", brief: "Today's brief", people: "Contacts", jobs: "Jobs", est: "Estimator", mail: "Gmail", cal: "Calendar", walks: "Walk recordings", music: "Music" }[t]}</b>`);
   if (t === "today") loadToday();
   if (t === "mail" && !mailLoaded) loadMail();
+  if (t === "mail") applyMailMode();
 }
 $$("#tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
 
@@ -1571,7 +1608,7 @@ let mqTimer;
 $("#mq").addEventListener("input", () => { $("#mq-clear").hidden = !$("#mq").value; clearTimeout(mqTimer); mqTimer = setTimeout(() => { mailPages = [null]; mailPage = 0; showList(); loadThreads(); }, 400); });
 $("#mq-clear").addEventListener("click", () => { $("#mq").value = ""; $("#mq-clear").hidden = true; mailPages = [null]; mailPage = 0; loadThreads(); });
 
-function showList() { $("#gm-listview").style.display = "flex"; $("#reader").hidden = true; mailThread = null; }
+function showList() { $("#gm-listview").style.display = "flex"; $("#reader").hidden = true; mailThread = null; if (mailMode === "byjob") applyMailMode(); }
 function renderMailBar() {
   const any = mailSel.size > 0, all = mailRows.length && mailSel.size === mailRows.length;
   $("#gm-bar").innerHTML = `<input type="checkbox" class="gm-cb" id="gm-all" ${all ? "checked" : ""} aria-label="Select all" style="margin:0 11px">
@@ -1764,6 +1801,7 @@ document.addEventListener("click", async (e) => {
   try { await navigator.clipboard.writeText(c.dataset.copy); snack(`Copied ${c.dataset.copy}`); } catch { snack(c.dataset.copy); }
 });
 async function openThread(id) {
+  $("#gm").classList.remove("byjob"); // one thread at a time uses the reader; Back returns to By job
   if (!mailLoaded) await loadMail();
   mailThread = id;
   $("#gm-listview").style.display = "none"; const rd = $("#reader"); rd.hidden = false;
@@ -1819,10 +1857,12 @@ async function openThread(id) {
   $$("#reader .gm-more[data-q]").forEach((b) => (b.onclick = () => { b.nextElementSibling.hidden = !b.nextElementSibling.hidden; }));
   const me = "hunter@forefrontteam.com";
   const quote = (m) => `\n\nOn ${new Date(m.date).toLocaleString("en-US")}, ${m.from} wrote:\n${m.body.split("\n").map((l) => "> " + l).join("\n")}`;
-  const replyTo = () => { const from = addrOf(last.from); return from.toLowerCase() === me ? last.to.join(", ") : from; };
-  const re = /^re:/i.test(last.subject) ? last.subject : `Re: ${last.subject}`;
-  $("#replybtn").onclick = () => openCompose({ reply: true, to: replyTo(), subject: re, body: quote(last), threadId: t.id, inReplyTo: last.messageIdHeader, job: job?.jobNumber });
-  $("#replyall").onclick = () => openCompose({ reply: true, to: [replyTo(), ...last.to].map(addrOf).filter((a) => a.toLowerCase() !== me).filter((a, i, arr) => arr.indexOf(a) === i).join(", "), cc: last.cc.map(addrOf).filter((a) => a.toLowerCase() !== me).join(", "), subject: re, body: quote(last), threadId: t.id, inReplyTo: last.messageIdHeader, job: job?.jobNumber });
+  // Replies answer the newest real message (never a draft sitting in the thread) and keep the thread's subject.
+  const rmsg = [...t.messages].reverse().find((m) => !m.labelIds?.includes("DRAFT")) || last;
+  const replyTo = () => { const from = addrOf(rmsg.from); return from.toLowerCase() === me ? rmsg.to.join(", ") : from; };
+  const re = reSubject(t.messages[0].subject || rmsg.subject);
+  $("#replybtn").onclick = () => openCompose({ reply: true, to: replyTo(), subject: re, body: quote(rmsg), threadId: t.id, inReplyTo: rmsg.messageIdHeader, references: refsFor(rmsg), job: job?.jobNumber });
+  $("#replyall").onclick = () => openCompose({ reply: true, to: [replyTo(), ...rmsg.to].map(addrOf).filter((a) => a.toLowerCase() !== me).filter((a, i, arr) => arr.indexOf(a) === i).join(", "), cc: rmsg.cc.map(addrOf).filter((a) => a.toLowerCase() !== me).join(", "), subject: re, body: quote(rmsg), threadId: t.id, inReplyTo: rmsg.messageIdHeader, references: refsFor(rmsg), job: job?.jobNumber });
   $("#fwd").onclick = () => openCompose({ subject: `Fwd: ${last.subject}`, body: `\n\n---------- Forwarded message ---------\nFrom: ${last.from}\nDate: ${last.date}\nSubject: ${last.subject}\nTo: ${last.to.join(", ")}\n\n${last.body}`, job: job?.jobNumber });
   $("#claudereply") && ($("#claudereply").onclick = () => askClaude(`Read Gmail thread ${t.id}${job ? ` (job #${job.jobNumber})` : ""} and draft my reply in Gmail as a draft in that thread, in my voice. Don't send it.`, job?.jobNumber));
 }
@@ -1840,9 +1880,81 @@ $("#reader").addEventListener("click", async (e) => {
   try { await api(`/api/mail/threads/${mailThread}/modify`, { method: "POST", body: change }); if (b.dataset.m === "star") openThread(mailThread); else { showList(); loadThreads(); loadMailCounts(); } } catch (err) { log(err.message, "t-err"); }
 });
 
+// ---- By job: each job's whole conversation (email, texts, calls) as one back-and-forth
+let mailMode = store.get("mailmode", "byjob"), bjJob = store.get("bjjob", null), bjData = null, bjList = [];
+function applyMailMode() {
+  $("#gm").classList.toggle("byjob", mailMode === "byjob");
+  $$(".bj-toggle button").forEach((b) => b.classList.toggle("on", b.dataset.mailmode === mailMode));
+  if (mailMode === "byjob") loadByJob();
+}
+function setMailMode(m) { mailMode = m; store.set("mailmode", m); applyMailMode(); }
+$$(".bj-toggle button").forEach((b) => b.addEventListener("click", () => setMailMode(b.dataset.mailmode)));
+async function loadByJob() {
+  try { bjList = await api("/api/mail/jobs"); } catch (e) { $("#bj-jobs").innerHTML = `<p class="muted small">${esc(e.message)}</p>`; return; }
+  if (!bjList.some((j) => j.jobNumber === bjJob)) bjJob = bjList[0]?.jobNumber ?? null;
+  $("#bj-jobs").innerHTML = (bjList.map((j) => `<button type="button" class="bj-job ${j.jobNumber === bjJob ? "on" : ""}" data-bjjob="${j.jobNumber}"><span class="top"><b>#${j.jobNumber} ${esc(j.name)}</b>${j.waiting ? `<span class="wait">waiting on you</span>` : j.quietDays != null ? `<span class="small muted">${j.quietDays === 0 ? "today" : `quiet ${j.quietDays}d`}</span>` : ""}</span><span class="small muted">${esc(j.stage)} · ${esc(j.address)}</span></button>`).join("") || `<p class="muted small" style="padding:8px">No open jobs yet. They show up after the first sync.</p>`) + `<button type="button" class="bj-job" data-mailmode-go="inbox" style="border-style:dashed;color:var(--muted);margin-top:6px">Everything else: open the Inbox</button>`;
+  if (bjJob) openBj(bjJob); else { $("#bj-head").innerHTML = ""; $("#bj-stream").innerHTML = ""; $("#bj-bar").innerHTML = ""; $("#bj-facts").innerHTML = ""; }
+}
+const bjWhen = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+const bjDay = (iso) => new Date(iso).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+async function openBj(n, quiet) {
+  bjJob = n; store.set("bjjob", n);
+  $$("#bj-jobs .bj-job").forEach((b) => b.classList.toggle("on", Number(b.dataset.bjjob) === n));
+  const j0 = bjList.find((j) => j.jobNumber === n);
+  if (!quiet) { $("#bj-head").innerHTML = `<div><h2>#${n} ${esc(j0?.name || "")}</h2><div class="small muted">Loading the conversation…</div></div>`; $("#bj-stream").innerHTML = ""; $("#bj-bar").innerHTML = ""; }
+  let d; try { d = await api(`/api/jobs/${n}/conversation`); } catch (e) { $("#bj-stream").innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
+  if (bjJob !== n) return;
+  bjData = d;
+  const j = d.job;
+  $("#bj-head").innerHTML = `<div><h2>#${n} ${esc(j.name)}</h2><div class="small muted">Everything said on this job, in order: email${d.items.some((x) => x.kind === "text") ? ", texts" : ""}${d.items.some((x) => x.kind === "call") ? ", calls" : ""}</div></div><span class="row" style="gap:8px">${goButton(n, "job")}<button class="btn primary" type="button" data-bjnew="1">New email on this job</button></span>`;
+  let lastDay = "", lastSubj = "";
+  const norm = (x) => String(x || "").replace(/^(\s*(re|fwd?|aw|sv)\s*:\s*)+/i, "").trim().toLowerCase();
+  $("#bj-stream").innerHTML = d.items.map((x) => {
+    const day = bjDay(x.at), dayRow = day !== lastDay ? `<div class="bj-day">${esc(day)}</div>` : ""; lastDay = day;
+    if (x.kind === "call" || x.kind === "walk") return dayRow + `<div class="bj-pill">${x.kind === "call" ? `Call${x.who ? ` with ${esc(x.who)}` : ""}` : "Scope walk recording"} · ${bjWhen(x.at)}${x.body ? `<br>${esc(x.body.slice(0, 260))}` : ""}</div>`;
+    const showSubj = x.kind === "email" && norm(x.subject) !== lastSubj; if (x.kind === "email") lastSubj = norm(x.subject);
+    const long = x.body.length > 700;
+    return dayRow + `<div class="bj-b ${x.fromMe ? "me" : ""} ${x.kind === "text" ? "text" : ""} ${x.draft ? "draft" : ""}" data-bjid="${esc(x.id)}">
+      <div class="meta"><b>${x.draft ? "Draft " : ""}${esc(x.fromMe ? `You ${x.who}` : x.who)}</b><span>${x.kind === "text" ? "text" : "email"} · ${bjWhen(x.at)}</span>${x.unread ? `<span style="color:var(--link)">new</span>` : ""}</div>
+      ${showSubj ? `<div class="subj">${esc(x.subject || "(no subject)")}</div>` : ""}
+      <div class="body">${esc(long ? x.body.slice(0, 700) + "…" : x.body)}</div>
+      ${(x.attachments || []).map((a) => `<span class="att">${esc(a)}</span>`).join("")}
+      ${x.kind === "email" ? `<div class="acts">${x.draft ? `<button class="btn small primary" type="button" data-bjopen="${esc(x.threadId)}">Review and send</button>` : `<button class="btn small" type="button" data-bjreply="${esc(x.id)}">Reply</button><button class="btn small" type="button" data-bjreply="${esc(x.id)}" data-all="1">Reply all</button>`}${long || x.full ? `<button class="btn small" type="button" data-bjmore="${esc(x.id)}">${long ? "Show all" : "Show quoted text"}</button>` : ""}<button class="btn small" type="button" data-bjopen="${esc(x.threadId)}">Open thread</button></div>` : ""}
+    </div>`;
+  }).join("") || `<p class="muted" style="margin:30px auto">No emails or texts on this job yet.</p>`;
+  const r = d.replyTo;
+  $("#bj-bar").innerHTML = r ? `<span style="flex:1 1 240px;min-width:0" class="small"><b>Reply to ${esc(r.who)}</b> <span class="muted">· ${esc((r.subject || "").slice(0, 70))} · stays in the same thread</span></span><button class="btn" type="button" data-bjreply="${esc(r.id)}">Write it myself</button>${status.agent ? `<button class="btn primary" type="button" data-bjdraft="${esc(r.threadId)}">Draft it with ${AI()}</button>` : ""}` : `<span class="small muted" style="flex:1">No email from them to answer yet.</span><button class="btn" type="button" data-bjnew="1">Write to ${esc((j.customer.attention || j.customer.name || "the customer").split(" ")[0])}</button>`;
+  const person = (label, p) => p && (p.name || p.email) ? `<div><div class="k">${label}</div>${esc(p.attention || p.name || "")}${p.company && p.attention ? `<br><span class="small muted">${esc(p.company)}</span>` : ""}${p.email ? `<br><span class="small">${esc(p.email)}</span>` : ""}${p.phone ? `<br><span class="small muted">${esc(p.phone)}</span>` : ""}</div>` : "";
+  const atts = [...new Set(d.items.flatMap((x) => x.attachments || []))].slice(0, 12);
+  $("#bj-facts").innerHTML = `<div><div class="k">Stage</div>${esc(j.stage)}</div><div><div class="k">Next step</div><span style="color:var(--accent)">${esc(j.step)}</span></div>${person("Customer", j.customer)}${person("Adjuster", j.adjuster)}${person("On site", j.occupant)}${j.claimNumber ? `<div><div class="k">Claim</div>${esc(j.claimNumber)}${j.carrier ? `<br><span class="small muted">${esc(j.carrier)}</span>` : ""}</div>` : ""}${atts.length ? `<div><div class="k">Attachments in this conversation</div>${atts.map((a) => esc(a)).join("<br>")}</div>` : ""}`;
+  if (!quiet) { const st = $("#bj-stream"); st.scrollTop = st.scrollHeight; }
+}
+function bjReply(id, all) {
+  const x = bjData?.items.find((i) => i.id === id); if (!x) return;
+  const me = (bjData.me || "").toLowerCase(), n = bjData.job.jobNumber;
+  const first = bjData.items.find((i) => i.kind === "email" && i.threadId === x.threadId) || x;
+  const others = (list) => (list || []).map(addrOf).filter((a) => a && a.toLowerCase() !== me && !/^office\+\d+@/i.test(a));
+  const to = x.fromMe ? others(x.to) : [addrOf(x.from), ...(all ? others(x.to) : [])];
+  const quoted = `\n\nOn ${new Date(x.at).toLocaleString("en-US")}, ${x.from} wrote:\n${(x.full || x.body).split("\n").map((l) => "> " + l).join("\n")}`;
+  openCompose({ reply: true, to: [...new Set(to)].join(", "), cc: all ? others(x.cc).join(", ") : "", subject: reSubject(first.subject), body: quoted, threadId: x.threadId, inReplyTo: x.messageIdHeader, references: refsFor(x), job: n });
+}
+document.addEventListener("click", (e) => {
+  const jb = e.target.closest("[data-bjjob]"); if (jb) { openBj(Number(jb.dataset.bjjob)); return; }
+  if (e.target.closest("[data-mailmode-go]")) { setMailMode("inbox"); return; }
+  const rp = e.target.closest("[data-bjreply]"); if (rp) { bjReply(rp.dataset.bjreply, !!rp.dataset.all); return; }
+  const op = e.target.closest("[data-bjopen]"); if (op) { openThread(op.dataset.bjopen); return; }
+  const mr = e.target.closest("[data-bjmore]"); if (mr) { const x = bjData?.items.find((i) => i.id === mr.dataset.bjmore); const el = mr.closest(".bj-b")?.querySelector(".body"); if (x && el) { el.textContent = x.full || x.body; mr.remove(); } return; }
+  const dr = e.target.closest("[data-bjdraft]"); if (dr) { askClaude(`Read Gmail thread ${dr.dataset.bjdraft} (job #${bjData.job.jobNumber}) and draft my reply in Gmail as a draft in that thread, in my voice. Don't send it.`, bjData.job.jobNumber); return; }
+  if (e.target.closest("[data-bjnew]") && bjData) { const j = bjData.job; openCompose({ to: j.customer.email || "", subject: "", job: j.jobNumber }); }
+});
+
 // ---- compose (send only on your click + confirm)
 let composeFiles = [];
 let composeReplace = "";
+let composeRefs = "";
+/** "Re: " once on the thread's subject, and the References chain for a reply (keeps it one conversation everywhere). */
+const reSubject = (subj) => "Re: " + String(subj || "").replace(/^(\s*(re|aw|sv)\s*:\s*)+/i, "").trim();
+const refsFor = (m) => [...new Set((`${m.references || ""} ${m.messageIdHeader || ""}`.match(/<[^<>\s]+>/g) || []))].slice(-20).join(" ");
 function openCompose(o) {
   $("#cp-title").textContent = o.reply ? (o.subject || "Reply") : o.subject?.startsWith("Fwd:") ? o.subject : "New Message";
   $("#composedlg").classList.remove("min");
@@ -1850,6 +1962,7 @@ function openCompose(o) {
   $("#cp-to").value = o.to || ""; $("#cp-cc").value = o.cc || ""; $("#cp-subject").value = o.subject || ""; $("#cp-body").value = o.body || "";
   $("#cp-thread").value = o.threadId || ""; $("#cp-reply").value = o.inReplyTo || "";
   composeReplace = o.replaceDraft || "";
+  composeRefs = o.references || "";
   $("#cp-bcc").value = o.job ? `office+${o.job}@forefrontteam.com` : "";
   composeFiles = [];
   renderComposeFiles();
@@ -1875,7 +1988,7 @@ $("#composedlg").addEventListener("close", async () => {
   const how = $("#composedlg").returnValue;
   if (how !== "send" && how !== "draft") return;
   const n = $("#cp-job").value ? Number($("#cp-job").value) : undefined;
-  const body = { to: $("#cp-to").value, cc: $("#cp-cc").value, bcc: $("#cp-bcc").value, subject: $("#cp-subject").value, body: $("#cp-body").value, threadId: $("#cp-thread").value || undefined, inReplyTo: $("#cp-reply").value || undefined, jobNumber: n, attachments: composeFiles.map((p) => ({ job: n, path: p })), replaceDraft: composeReplace || undefined };
+  const body = { to: $("#cp-to").value, cc: $("#cp-cc").value, bcc: $("#cp-bcc").value, subject: $("#cp-subject").value, body: $("#cp-body").value, threadId: $("#cp-thread").value || undefined, inReplyTo: $("#cp-reply").value || undefined, references: ($("#cp-reply").value && composeRefs) || undefined, jobNumber: n, attachments: composeFiles.map((p) => ({ job: n, path: p })), replaceDraft: composeReplace || undefined };
   try {
     if (how === "send") await api("/api/mail/send", { method: "POST", body });
     else { await api("/api/mail/draft", { method: "POST", body }); log("Saved as a Gmail draft."); }
@@ -3250,6 +3363,7 @@ es.onmessage = (m) => {
   if (e.type === "changed" && e.what === "plan") { renderBrief(); return; }
   if (e.type === "changed") {
     if (e.what === "mail" && mailLoaded) { loadThreads(); if (mailThread) openThread(mailThread); }
+    if ((e.what === "mail" || (e.what === "job" && !e.job)) && mailMode === "byjob" && store.get("tab", "today") === "mail" && bjJob) openBj(bjJob, true);
     if ((e.what === "job" || e.what === "timeline") && view && (!e.job || e.job === view.homebase.jobNumber)) openJob(view.homebase.jobNumber, true);
     if (e.what === "job" && !e.job) { loadSyncState(); loadJobs(); if (store.get("tab", "today") === "today") loadToday(); }
   }

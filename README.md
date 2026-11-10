@@ -130,6 +130,13 @@ C:\Jobs\3226 Augustine\
   structured; a busy Gemini is retried at the next sync. The Estimator reads the notes as site notes; a Homebase note and
   Google Tasks for the promises are offered and only added with a yes.
 
+- **Gmail: By job** (the default view; **Inbox** is one click away): pick a job and read everything said on it as
+  one conversation, oldest to newest: the emails in its Gmail threads (quoted history trimmed), texts, calls and walk
+  recordings (`src/workflows/conversation.ts`). Reply from any message: it goes in that message's thread with the
+  thread's subject, In-Reply-To and the full References chain, BCC'd to the job's Homebase address, and still only
+  sends after you confirm. AI drafts are tidied first (`cleanDraftBody`: real line breaks, no greeting to a
+  company, no typed signature).
+
 - **Morning brief**: Plan my day runs on its own at 7:00 AM Denver time on weekdays and shows as Today's brief on
   the dashboard (`src/workflows/brief.ts`). If Keystone opens later, it runs then (until 5 PM). Change it in `.env`:
   `HUB_BRIEF_TIME=08:00`, `HUB_BRIEF_DAYS=0-6` (every day), or `HUB_BRIEF_TIME=off`.
