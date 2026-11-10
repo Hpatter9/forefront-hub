@@ -36,6 +36,9 @@ export interface ThreadSummary {
   date: string;
   snippet: string;
   messageCount: number;
+  /** The newest message's To and Cc lines, as written (search results). */
+  to?: string;
+  cc?: string;
   unread?: boolean;
   starred?: boolean;
   labelIds?: string[];

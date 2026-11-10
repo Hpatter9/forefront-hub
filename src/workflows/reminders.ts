@@ -67,6 +67,39 @@ export function reminders(hub: Hub, extras: { needsUpload?: Set<number> } = {}):
   return out.sort((a, b) => b.days - a.days);
 }
 
+/** An email waits on a reply only for this long (HUB_REPLY_DAYS); after that it was dealt with some other way. */
+export const REPLY_DAYS = Number(process.env.HUB_REPLY_DAYS || 21);
+
+/**
+ * Whether the newest email in a thread is written to Hunter: he's on the To line. Cc'd only, or sent just to the
+ * office or someone else, it's for his information and not a reply he owes. (No To line known: counts.)
+ */
+export function addressedToMe(t: { to?: string; cc?: string }, me: string): boolean {
+  if (t.to === undefined || !t.to.trim()) return true;
+  return t.to.toLowerCase().includes(me.toLowerCase());
+}
+
+/** Stages where the work is Hunter's (estimating through the proposal and supplements); later stages belong to the PM. */
+const ESTIMATOR_STAGES = new Set([...PRE_ESTIMATE, "Proposal Submitted", "Supplement"]);
+/** How recent each kind of item has to be for the brief (days since its clock started). */
+export const BRIEF_MAX_DAYS: Record<ReminderKind, number> = { reply: REPLY_DAYS, adjuster: 45, followup: 45, stale: 30, estimate: 60, log: 30, draft: 30, upload: 30 };
+
+/**
+ * The reminders that belong in Hunter's brief: his own action items, and recent ones. Leaves out quiet jobs that
+ * are in someone else's stage (production, billing), and anything old enough that it's no longer today's work
+ * (it still shows on the dashboard). Returns what was left out, so the brief can say so.
+ */
+export function briefItems(list: Reminder[]): { items: Reminder[]; left: Reminder[] } {
+  const items: Reminder[] = [];
+  const left: Reminder[] = [];
+  for (const r of list) {
+    const notMine = (r.kind === "stale" || r.kind === "followup") && !ESTIMATOR_STAGES.has(r.stage);
+    const old = r.days > (BRIEF_MAX_DAYS[r.kind] ?? 30);
+    (notMine || old ? left : items).push(r);
+  }
+  return { items, left };
+}
+
 /** Days without contact before the adjuster check-in shows (HUB_ADJUSTER_DAYS to change it). */
 export const ADJUSTER_DAYS = Number(process.env.HUB_ADJUSTER_DAYS || 7);
 /** Stages where the estimate is sitting with the adjuster. */
@@ -131,7 +164,8 @@ export async function pulse(hub: Hub, j: Job): Promise<Job["pulse"]> {
   } else if (hub.gmail.kind === "google") {
     const people = [j.customer.email, j.adjuster.email].filter(Boolean);
     const street = j.address.split(",")[0];
-    const q = [...people.map((p) => `from:${p}`), `"${intakeAddress(j.jobNumber)}"`, street ? `"${street}"` : ""].filter(Boolean).join(" OR ");
+    // The street only counts in the subject: "123 Main St" in someone's signature or an unrelated email isn't this job.
+    const q = [...people.map((p) => `from:${p}`), `"${intakeAddress(j.jobNumber)}"`, street ? `subject:"${street}"` : ""].filter(Boolean).join(" OR ");
     const threads = q ? await hub.gmail.search(`(${q}) newer_than:60d -from:me`, 5).catch(() => []) : [];
     if (adjEmail) {
       const [last] = await hub.gmail.search(`(from:${adjEmail} OR to:${adjEmail} OR cc:${adjEmail}) newer_than:180d`, 1).catch(() => []);
@@ -141,7 +175,7 @@ export async function pulse(hub: Hub, j: Job): Promise<Job["pulse"]> {
       // search() summarises each thread by its newest message: if that one isn't from Hunter, it's waiting on him.
       const at = new Date(t.date).toISOString();
       touches.push({ at, what: `email: ${t.subject}` });
-      if (!t.from.toLowerCase().includes(me) && !isAutomated(t.from, "", t.subject) && (!waiting || at > waiting.at)) {
+      if (!t.from.toLowerCase().includes(me) && !isAutomated(t.from, "", t.subject) && addressedToMe(t, me) && days(at) <= REPLY_DAYS && (!waiting || at > waiting.at)) {
         waiting = { from: t.from.replace(/<.*>/, "").trim() || t.from, subject: t.subject, at, threadId: t.id };
       }
     }

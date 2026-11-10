@@ -100,6 +100,12 @@ C:\Jobs\3226 Augustine\
 - **Morning brief**: Plan my day runs on its own at 7:00 AM Denver time on weekdays and shows as Today's brief on
   the dashboard (`src/workflows/brief.ts`). If Keystone opens later, it runs then (until 5 PM). Change it in `.env`:
   `HUB_BRIEF_TIME=08:00`, `HUB_BRIEF_DAYS=0-6` (every day), or `HUB_BRIEF_TIME=off`.
+  Only your own, recent action items go in (`briefItems` in `src/workflows/reminders.ts`): emails count as waiting
+  on a reply only when you're on the To line (not just Cc'd) and they're under 21 days old (`HUB_REPLY_DAYS`); a
+  street name only ties an email to a job when it's in the subject; quiet jobs in production or billing stages
+  (the PM's) stay out, and so does anything old (it still shows on the dashboard). Every View email button is
+  checked against its job before the brief shows (`src/workflows/briefEmails.ts`): a wrong one is swapped for the
+  job's own waiting email, or removed.
 
 - **Drive times**: calendar events with an address show a "leave by" block, the drive time from the previous
   appointment (or the office, or `HUB_DAY_START_ADDRESS`), and a warning when back-to-back visits don't leave

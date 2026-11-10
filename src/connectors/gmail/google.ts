@@ -213,10 +213,10 @@ export class GoogleGmail implements MailClient {
     const { data } = await this.gmail().users.threads.list({ userId: "me", q, maxResults: max });
     const out: ThreadSummary[] = [];
     for (const t of data.threads ?? []) {
-      const th = await this.gmail().users.threads.get({ userId: "me", id: t.id!, format: "metadata", metadataHeaders: ["Subject", "From", "Date"] });
+      const th = await this.gmail().users.threads.get({ userId: "me", id: t.id!, format: "metadata", metadataHeaders: ["Subject", "From", "Date", "To", "Cc"] });
       const last = th.data.messages?.at(-1);
       const h = (n: string) => last?.payload?.headers?.find((x) => x.name === n)?.value ?? "";
-      out.push({ id: t.id!, subject: h("Subject"), from: h("From"), date: h("Date"), snippet: last?.snippet ?? "", messageCount: th.data.messages?.length ?? 0 });
+      out.push({ id: t.id!, subject: h("Subject"), from: h("From"), date: h("Date"), to: h("To"), cc: h("Cc"), snippet: last?.snippet ?? "", messageCount: th.data.messages?.length ?? 0 });
     }
     return out;
   }
