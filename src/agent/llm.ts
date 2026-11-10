@@ -79,6 +79,9 @@ export async function complete<T = string>(hub: Hub, o: { system: string; prompt
  * and the daily brief. With Gemini, its function calling runs the same tools Claude uses, and approvals work the
  * same way. `onMessage` gets Claude-style messages either way (the brief and Ask use them to show progress).
  */
+/** How long to wait before retrying a step when every Gemini model is busy (tests shorten it). */
+export const BUSY_WAITS = [15_000, 45_000];
+
 export interface ChatTurn {
   role: "user" | "assistant";
   text: string;
@@ -110,7 +113,17 @@ You're running on Gemini inside Keystone. Use the functions provided for anythin
   const contents: Turn[] = [...(opts.history ?? []).map((t): Turn => ({ role: t.role === "user" ? "user" : "model", parts: [{ text: t.text }] })), { role: "user", parts: [{ text: prompt }] }];
   for (let step = 0; step < (opts.maxSteps ?? 24); step++) {
     compactOlder(contents);
-    const r = await hub.gemini!.generate({ model: hub.cfg.ai.geminiModel, fallbackModels: hub.cfg.ai.geminiFallbacks, system, contents, tools: decls });
+    // Google's models get busy in bursts: when every model says so, wait and try the step again before giving up.
+    let r: Awaited<ReturnType<NonNullable<Hub["gemini"]>["generate"]>> | undefined;
+    for (let attempt = 0; !r; attempt++) {
+      try {
+        r = await hub.gemini!.generate({ model: hub.cfg.ai.geminiModel, fallbackModels: hub.cfg.ai.geminiFallbacks, system, contents, tools: decls });
+      } catch (e) {
+        if (attempt >= BUSY_WAITS.length || !/busy|unavailable|high demand|overloaded/i.test((e as Error).message)) throw e;
+        hub.say(`  Gemini is busy; trying again in ${Math.round(BUSY_WAITS[attempt] / 1000)}s…`);
+        await new Promise((res) => setTimeout(res, BUSY_WAITS[attempt]));
+      }
+    }
     opts.used?.add(`Gemini (${r.model ?? hub.cfg.ai.geminiModel})`);
     contents.push(r.turn);
     if (r.text && r.calls.length) hub.say(r.text);

@@ -199,3 +199,22 @@ describe("which AI did the work", () => {
     expect([...used]).toEqual(["Gemini (gemini-flash-latest)", "Gemini (gemini-flash-lite-latest)"]);
   });
 });
+
+describe("when Gemini is busy mid-task", () => {
+  it("waits and tries the step again instead of failing the whole brief", async () => {
+    const { BUSY_WAITS } = await import("../src/agent/llm.js");
+    const saved = [...BUSY_WAITS];
+    BUSY_WAITS.splice(0, BUSY_WAITS.length, 1, 1);
+    try {
+      let n = 0;
+      const t = geminiHub(() => {
+        if (++n < 3) throw new Error("Gemini: gemini-flash-lite-latest is busy or unavailable (high demand)");
+        return "done";
+      });
+      expect(await agentAsk(t.hub, "hi")).toBe("done");
+      expect(t.said.some((x) => /busy; trying again/.test(x))).toBe(true);
+    } finally {
+      BUSY_WAITS.splice(0, BUSY_WAITS.length, ...saved);
+    }
+  });
+});

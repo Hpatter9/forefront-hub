@@ -109,6 +109,11 @@ C:\Jobs\3226 Augustine\
   you sent counts as contact, a text from them with no answer shows under Reply needed, and texts appear on the
   job's timeline. It's as fresh as the last backup (`IPHONE_BACKUP_DIR` to point at a specific one).
 
+- **My tasks and Huddle** (dashboard): My tasks lists every open Google Task with a checkbox and an add box. Due
+  tasks are also in the brief, each tagged so ticking its line checks it off in Google Tasks
+  (`src/workflows/briefTasks.ts`). Huddle is a list of things to bring up at the team huddle
+  (`src/workflows/huddle.ts`, kept in `.hub/huddle.json`); "add to my huddle list: ..." in Ask adds one.
+
 - **Morning brief**: Plan my day runs on its own at 7:00 AM Denver time on weekdays and shows as Today's brief on
   the dashboard (`src/workflows/brief.ts`). If Keystone opens later, it runs then (until 5 PM). Change it in `.env`:
   `HUB_BRIEF_TIME=08:00`, `HUB_BRIEF_DAYS=0-6` (every day), or `HUB_BRIEF_TIME=off`.

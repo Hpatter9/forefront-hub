@@ -17,6 +17,7 @@ import { editContact, editFields, FIELDS, fieldValues, SECTIONS, setAdjuster } f
 import { timeline } from "../workflows/timeline.js";
 import { briefItems, REMINDER_GROUPS, reminders } from "../workflows/reminders.js";
 import { checkEmailButtons } from "../workflows/briefEmails.js";
+import { huddleAdd, huddleClearDone, huddleList, huddleRemove, huddleUpdate } from "../workflows/huddle.js";
 import { STAGES } from "../core/job.js";
 import { TemplateWriter, type Recipient } from "../workflows/writer.js";
 import { autoFile, dismissUnfiled, fileMessage, inboxState } from "../workflows/inbox.js";
@@ -298,6 +299,8 @@ const server = http.createServer(async (req, res) => {
         schedule,
         travel: await import("../workflows/travel.js").then(async (t) => t.travelFor(hub, schedule, { calendars: await myCalendars() })).catch(() => ({})),
         tasksDue,
+        huddle: huddleList(hub),
+        tasksOpen: hub.tasks.connected() ? (await hub.tasks.tasks().catch(() => [])).filter((t) => !t.completed).sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999")).slice(0, 60) : [],
         tasksConnected: hub.tasks.connected(),
         calendarConnected: hub.calendar.connected(),
         activity,
@@ -326,6 +329,18 @@ const server = http.createServer(async (req, res) => {
         const f = hub.jobs.get(n).followups;
         if (b.done) { ticks[String(b.key)] = { job: n, prev: f.doneAt }; hub.jobs.upsert(n, { followups: { ...f, doneAt: new Date().toISOString() } }); }
         else if (ticks[String(b.key)]) { hub.jobs.upsert(n, { followups: { ...f, doneAt: ticks[String(b.key)].prev } }); delete ticks[String(b.key)]; }
+      }
+      // A line that is a Google Task: ticking it checks the task off in Google Tasks (and unticking reopens it).
+      const gt = typeof b.task === "string" ? cur.tasks?.[b.task] : undefined;
+      let taskNote = "";
+      if (gt) {
+        try {
+          await hub.tasks.update(gt.listId, gt.id, { completed: !!b.done });
+          taskNote = b.done ? `Checked off in Google Tasks: ${gt.title}` : `Reopened in Google Tasks: ${gt.title}`;
+          hub.say(taskNote);
+        } catch (e) {
+          return send(res, 502, { error: `Couldn't update Google Tasks: ${(e as Error).message}` });
+        }
       }
       savePlan({ ...cur, done, ticks });
       bus.emit({ type: "changed", what: "plan" });
@@ -711,6 +726,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---- Google Tasks (the real lists: what's made here shows on the phone, and the other way round)
+    // ---- huddle list: things to bring up at the team huddle
+    if (p === "/api/huddle" && req.method === "GET") return send(res, 200, huddleList(hub));
+    if (p === "/api/huddle" && req.method === "POST") return send(res, 200, huddleAdd(hub, String((await body(req)).text ?? "")));
+    if (p === "/api/huddle/clear-done" && req.method === "POST") return send(res, 200, { removed: huddleClearDone(hub) });
+    const hm = p.match(/^\/api\/huddle\/([\w-]+)$/);
+    if (hm && req.method === "PATCH") return send(res, 200, huddleUpdate(hub, hm[1], await body(req)));
+    if (hm && req.method === "DELETE") { huddleRemove(hub, hm[1]); return send(res, 200, { ok: true }); }
     if (p === "/api/tasks/lists") return send(res, 200, await hub.tasks.lists());
     if (p === "/api/tasks" && req.method === "GET") {
       return send(res, 200, await hub.tasks.tasks({ showCompleted: q("completed") === "1", dueMin: q("start") || undefined, dueMax: q("end") || undefined }));
@@ -948,14 +970,14 @@ function teamPeople() {
 const askConvs = new Map<string, { turns: import("../agent/llm.js").ChatTurn[]; job?: number; at: number }>();
 
 // ---- Plan my day: the last brief Claude wrote, shown on the dashboard
-interface Plan { state: "running" | "done" | "error"; /** Which AI and model wrote it. */ ai?: string; startedAt: string; finishedAt?: string; text: string; steps: string[]; error?: string; trigger?: "button" | "morning"; /** Items ticked off on the Brief tab, by item key. */ done?: Record<string, boolean>; /** Which job each tick was about, and its follow-up time before. */ ticks?: Record<string, { job: number; prev: string }> }
+interface Plan { state: "running" | "done" | "error"; /** Which AI and model wrote it. */ ai?: string; startedAt: string; finishedAt?: string; text: string; steps: string[]; error?: string; trigger?: "button" | "morning"; /** Items ticked off on the Brief tab, by item key. */ done?: Record<string, boolean>; /** Which job each tick was about, and its follow-up time before. */ ticks?: Record<string, { job: number; prev: string }>; /** The Google Tasks in this brief, by tag ({task:T1}). */ tasks?: Record<string, { listId: string; id: string; title: string }> }
 
 function startPlan(trigger: "button" | "morning"): { taskId: string } | { error: string; code: number } {
   if (!aiReady(hub)) return { error: aiOffReason(hub), code: 400 };
   if (readPlan().state === "running") return { error: "Claude is already planning your day.", code: 409 };
   // Only my own, recent action items go in (older or other people's ones stay on the dashboard).
   const { items: list, left } = briefItems(reminders(hub, { needsUpload: new Set((lastSync?.needsUpload ?? []).map((x) => x.jobNumber)) }));
-  const buildPrompt = (myDayNote: string) => `Plan my day. Here is everything Keystone thinks needs me, as JSON (kind, job, title, detail, days waiting, threadId):\n${JSON.stringify(list.slice(0, 60))}\n${left.length ? `(${left.length} older items, or ones in other people's stages, are left out on purpose; don't go looking for them.)\n` : ""}\n${myDayNote}\n\nThis brief is only for me and my time. Rules:\n- Only use the items above. Don't search for other work to add, and don't add anything older than what's listed.\n- Each item's "step" is where that job is. Suggest only that step, never a later one: a Lead needs its scope walk set up (not an estimate); the estimate comes after the walk. If a job's walk is already on my calendar above, say when it is instead of asking me to book it.\n- Customer follow-ups are about twice a week, not daily: only the follow-ups listed above are due today.\n- Before you put an email on my list, check it's really waiting on me: the newest message is to me (not just cc'd), it's from a person (not an automated notice), and nothing from me came after it. If I already answered, leave it out.\n- Use ONLY the calendar events and tasks listed above. They are mine: my own calendar plus events I'm invited to on other people's calendars, and my own Google Tasks. Don't look up other calendars or tasks with Keystone's tools, and leave out other people's meetings and to-dos.\n- Every line in the brief is something I do. If something waits on someone else, either write it as my action (\"Ask Shannon whether the selections went out\") or leave it out.\n\nFor the top replies and follow-ups, read the thread or the job (Keystone's tools) and draft the email in Gmail for me (drafts only; I'll send).\n\nEmail buttons: whenever a line is about a specific email conversation, end that line with {email:THREAD_ID}. For a job's reply, use that job's threadId from the JSON above; otherwise only a thread you read for that same job, or the threadId a draft you made for it returned. Keystone checks each button against the job and removes any that don't match, e.g. \"1. #3184 Wegener: reply to Andrew about the revised scope {email:18c2f0a9b7e1d234}\". Keystone turns it into a View email button. Never invent an id; leave it off when you don't have one.\n\nGo buttons: end every line that's about a job with {go:JOB#:PLACE}, where PLACE is where I'd start the work: estimator (writing, pricing or revising an estimate, agreement, photo report), selections (the owner's finish picks and budgets), notes (team notes), photos, files (documents), or job (anything else). E.g. \"2. #3226 Augustine: start the estimate from the ESX {go:3226:estimator}\". Keystone turns it into a button that takes me there.\n\nYour final reply is my brief for the day, shown at the top of my dashboard. Write it in this shape, in markdown, and nothing else:\n**Today at a glance:** one or two sentences (what's booked, how many things are waiting, the one thing that matters most).\n\n**Do in this order**\n1. #<job> <Name>: what to do (one line each, most urgent first: an adjuster or homeowner waiting on me beats a stale job; money-heavy proposals before small ones).\n\n**On the calendar:** the day's appointments, one line each (skip if none).\n\n**Drafts ready in Gmail:** one line per draft you made (skip if none).`;
+  const buildPrompt = (myDayNote: string) => `Plan my day. Here is everything Keystone thinks needs me, as JSON (kind, job, title, detail, days waiting, threadId):\n${JSON.stringify(list.slice(0, 60))}\n${left.length ? `(${left.length} older items, or ones in other people's stages, are left out on purpose; don't go looking for them.)\n` : ""}\n${myDayNote}\n\nThis brief is only for me and my time. Rules:\n- Only use the items above. Don't search for other work to add, and don't add anything older than what's listed.\n- Each item's "step" is where that job is. Suggest only that step, never a later one: a Lead needs its scope walk set up (not an estimate); the estimate comes after the walk. If a job's walk is already on my calendar above, say when it is instead of asking me to book it.\n- Customer follow-ups are about twice a week, not daily: only the follow-ups listed above are due today.\n- Before you put an email on my list, check it's really waiting on me: the newest message is to me (not just cc'd), it's from a person (not an automated notice), and nothing from me came after it. If I already answered, leave it out.\n- Use ONLY the calendar events and tasks listed above. They are mine: my own calendar plus events I'm invited to on other people's calendars, and my own Google Tasks. Don't look up other calendars or tasks with Keystone's tools, and leave out other people's meetings and to-dos.\n- Every line in the brief is something I do. If something waits on someone else, either write it as my action (\"Ask Shannon whether the selections went out\") or leave it out.\n\nFor the top replies and follow-ups, read the thread or the job (Keystone's tools) and draft the email in Gmail for me (drafts only; I'll send).\n\nEmail buttons: whenever a line is about a specific email conversation, end that line with {email:THREAD_ID}. For a job's reply, use that job's threadId from the JSON above; otherwise only a thread you read for that same job, or the threadId a draft you made for it returned. Keystone checks each button against the job and removes any that don't match, e.g. \"1. #3184 Wegener: reply to Andrew about the revised scope {email:18c2f0a9b7e1d234}\". Keystone turns it into a View email button. Never invent an id; leave it off when you don't have one.\n\nGo buttons: end every line that's about a job with {go:JOB#:PLACE}, where PLACE is where I'd start the work: estimator (writing, pricing or revising an estimate, agreement, photo report), selections (the owner's finish picks and budgets), notes (team notes), photos, files (documents), or job (anything else). E.g. \"2. #3226 Augustine: start the estimate from the ESX {go:3226:estimator}\". Keystone turns it into a button that takes me there.\n\nTasks: every one of my Google Tasks listed above goes in the brief, each on its own line ending with its tag as {task:T#} (e.g. "Order tile samples {task:T2}"). Put a task under "Do in this order" when it fits there; put the rest under **My tasks**. Never list a task twice, and never invent a tag.\n\nYour final reply is my brief for the day, shown at the top of my dashboard. Write it in this shape, in markdown, and nothing else:\n**Today at a glance:** one or two sentences (what's booked, how many things are waiting, the one thing that matters most).\n\n**Do in this order**\n1. #<job> <Name>: what to do (one line each, most urgent first: an adjuster or homeowner waiting on me beats a stale job; money-heavy proposals before small ones).\n\n**My tasks**\n- <task> {task:T#} (my Google Tasks that aren't already in the list above; skip if none).\n\n**On the calendar:** the day's appointments, one line each (skip if none).\n\n**Drafts ready in Gmail:** one line per draft you made (skip if none).`;
   const plan: Plan = { state: "running", startedAt: new Date().toISOString(), text: "", steps: [], trigger };
   savePlan(plan);
 
@@ -965,7 +987,9 @@ function startPlan(trigger: "button" | "morning"): { taskId: string } | { error:
     try {
       const { withDraftSource } = await import("../workflows/generated.js");
       const note = await travelNote();
-      const prompt = buildPrompt(await myDay());
+      const day = await myDay();
+      plan.tasks = day.tasks;
+      const prompt = buildPrompt(day.text);
       const used = new Set<string>();
       plan.text = await withDraftSource(trigger === "morning" ? "Morning brief" : "Plan my day", async () => (await import("../agent/llm.js")).agentAsk(hub, prompt + note, {
         used,
@@ -974,6 +998,8 @@ function startPlan(trigger: "button" | "morning"): { taskId: string } | { error:
           for (const b of m.message.content) if (b.type === "tool_use") { plan.steps.push(describeTool(b.name, b.input as Record<string, unknown>)); savePlan(plan); bus.emit({ type: "changed", what: "plan" }); }
         },
       }));
+      // Every due Google Task is in the brief, tagged so ticking it checks it off in Google Tasks.
+      plan.text = (await import("../workflows/briefTasks.js")).ensureTaskLines(plan.text, day.tasks);
       // Follow-ups the brief asked for wait a few days before they come up again (about twice a week).
       const now = new Date().toISOString();
       for (const r of list) if ((r.kind === "followup" || r.kind === "stale") && new RegExp(`#${r.jobNumber}\\b`).test(plan.text) && hub.jobs.exists(r.jobNumber)) hub.jobs.upsert(r.jobNumber, { followups: { ...hub.jobs.get(r.jobNumber).followups, nudgedAt: now } });
@@ -1055,8 +1081,9 @@ async function replaceDraft(messageId: string) {
 
 /** My calendar and my tasks for the brief: my own calendar only (no shared team calendars, nothing I declined) and
  *  my own Google Tasks, today through the next three days. */
-async function myDay(): Promise<string> {
+async function myDay(): Promise<{ text: string; tasks: Record<string, import("../workflows/briefTasks.js").BriefTask> }> {
   const lines: string[] = [];
+  let taskMap: Record<string, import("../workflows/briefTasks.js").BriefTask> = {};
   const d0 = new Date(), d1 = new Date();
   d0.setHours(0, 0, 0, 0);
   d1.setDate(d1.getDate() + 3);
@@ -1071,7 +1098,9 @@ async function myDay(): Promise<string> {
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Denver" });
     const soon = new Date(Date.now() + 86400_000).toLocaleDateString("en-CA", { timeZone: "America/Denver" });
     const ts = (await hub.tasks.tasks().catch(() => [])).filter((t) => !t.completed && t.due && t.due <= soon).sort((a, b) => (a.due ?? "").localeCompare(b.due ?? ""));
-    lines.push("", "My Google Tasks due by tomorrow (and overdue):", ...(ts.length ? ts.map((t) => `- ${t.title}${t.due! < today ? ` (overdue since ${day(t.due!)})` : t.due === today ? " (due today)" : " (due tomorrow)"}`) : ["- none"]));
+    const lab = (await import("../workflows/briefTasks.js")).labelTasks(ts);
+    taskMap = lab.map;
+    lines.push("", "My Google Tasks due by tomorrow (and overdue), each with its tag:", ...(ts.length ? ts.map((t) => `- [${lab.tagOf(t)}] ${t.title}${t.due! < today ? ` (overdue since ${day(t.due!)})` : t.due === today ? " (due today)" : " (due tomorrow)"}`) : ["- none"]));
   } else lines.push("", "My Google Tasks: not connected.");
-  return lines.join("\n");
+  return { text: lines.join("\n"), tasks: taskMap };
 }

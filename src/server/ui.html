@@ -728,6 +728,8 @@
   .bmail { border: 1px solid var(--line); background: var(--panel-2); color: var(--link); border-radius: 999px; padding: 1px 10px; font: inherit; font-size: 12.5px; cursor: pointer; margin-left: 6px; text-decoration: none; display: inline-block; text-indent: 0; }
   .bmail:hover { background: var(--soft); }
   .brief li.done .bmail { text-decoration: none; opacity: .7; }
+  .btask { border: 1px solid var(--line); color: var(--muted); border-radius: 999px; padding: 0 8px; font-size: 11.5px; margin-left: 6px; display: inline-block; text-indent: 0; text-decoration: none; }
+  .trow { cursor: pointer; }
 
   /* ---- Selections */
   .sels { display: grid; gap: 14px; max-width: 980px; padding-top: 12px; }
@@ -1162,10 +1164,12 @@ async function loadToday() {
         ${groups.map((g) => `<div class="group"><h3>${esc(g.label)} <span class="muted">${by[g.kind].length} · ${esc(g.hint)}</span></h3>${by[g.kind].map(remRow).join("")}</div>`).join("") || `<div class="alldone">${d.lastSync || d.folders ? "Nothing is waiting on you." : "The first sync is still running. This fills in when it finishes (about a minute)."}</div>`}
         </div></div>
       <div class="side">
+        ${tasksCard(d)}
+        ${huddleCard(d)}
         ${notesCard}
         <div class="card"><h3>Today <button class="btn small" data-do="gocal">Calendar</button></h3>
           ${(d.schedule = (d.schedule || []).filter((e) => !isHiddenEv(e))) && ""}${d.calendarConnected ? (d.schedule.length ? `<ul class="items">${d.schedule.map((e) => `<li><span class="sw" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${esc(e.color || "#7aa7ff")}"></span> <b>${e.allDay ? "All day" : hm(e.start)}</b> ${esc(e.title)}${e.location ? `<div class="small muted">${esc(e.location)}</div>` : ""}${d.travel?.[e.id] ? `<div class="small ${d.travel[e.id].late ? "" : "muted"}">${d.travel[e.id].late ? `<span style="color:var(--bad)">⚠ ${d.travel[e.id].late} min short from ${esc(d.travel[e.id].fromLabel)}</span>` : `🚗 Leave by <b>${hm(d.travel[e.id].leaveBy)}</b> · ${d.travel[e.id].minutes} min from ${esc(d.travel[e.id].fromLabel)}`} · <a href="${esc(d.travel[e.id].mapsUrl)}" target="_blank" rel="noopener">Directions</a></div>` : ""}${e.jobNumber ? ` <a href="#" class="small" data-do="open" data-n="${e.jobNumber}">#${e.jobNumber}</a>` : ""}</li>`).join("")}</ul>` : `<p class="muted" style="margin:0">Nothing on the calendar today.</p>`) : `<p class="muted" style="margin:0">Connect Google Calendar (Connect Gmail) to see today here.</p>`}
-          ${d.tasksDue?.length ? `<div class="small muted" style="margin:12px 0 4px">Tasks due</div>${d.tasksDue.map((k) => `<div class="row" style="gap:6px;padding:3px 0"><button class="btn small" data-do="taskdone" data-list="${esc(k.listId)}" data-task="${esc(k.id)}" title="Mark done">☐</button><span style="flex:1;min-width:0">${esc(k.title)}</span>${k.jobNumber ? goButton(k.jobNumber, placeFor(k.title)) : ""}${k.due < ymd(new Date()) ? `<span class="small" style="color:var(--bad)">${fmtDate(k.due + "T12:00")}</span>` : ""}</div>`).join("")}` : ""}
+          ${""}
         </div>
         <div class="card"><h3><span><span class="muted small" style="font-variant-numeric:tabular-nums">01</span> Stages</span></h3>
           <table class="tbl"><thead><tr><th>Stage</th><th class="num">Proposals</th><th class="num">Jobs</th></tr></thead><tbody>
@@ -2435,6 +2439,45 @@ function jobFromText(t) {
 }
 /** The AI that runs the everyday features right now (Gemini or Claude); the Estimator tab is always Claude. */
 const AI = () => (status?.ai && status.ai.provider !== "off" ? status.ai.name : "AI");
+// ---- Dashboard: My tasks (Google Tasks) and the Huddle list
+function tasksCard(d) {
+  if (!d.tasksConnected) return "";
+  const today = ymd(new Date());
+  const groups = [["Overdue", (k) => k.due && k.due < today], ["Today", (k) => k.due === today], ["Upcoming", (k) => k.due && k.due > today], ["No date", (k) => !k.due]];
+  const rows = groups.map(([label, f]) => { const ks = (d.tasksOpen || []).filter(f); return ks.length ? `<div class="small muted" style="margin:8px 0 2px">${label}</div>${ks.map((k) => `<label class="row trow" style="gap:8px;padding:3px 0;align-items:flex-start"><input type="checkbox" data-chk="task" data-list="${esc(k.listId)}" data-task="${esc(k.id)}" style="margin-top:3px"><span style="flex:1;min-width:0">${esc(k.title)}</span>${k.jobNumber ? goButton(k.jobNumber, placeFor(k.title)) : ""}${k.due && label !== "Today" ? `<span class="small ${label === "Overdue" ? "" : "muted"}" style="${label === "Overdue" ? "color:var(--bad)" : ""}">${fmtDate(k.due + "T12:00")}</span>` : ""}</label>`).join("")}` : ""; }).join("");
+  return `<div class="card"><h3>My tasks <span class="muted small">${(d.tasksOpen || []).length} open</span></h3>
+    <form id="dash-tk-add" class="row" style="gap:6px;margin-bottom:4px"><input type="text" id="dash-tk-title" placeholder="Add a task (it goes to Google Tasks)" style="flex:1;min-width:0"><input type="date" id="dash-tk-due" style="width:140px"><button class="btn small primary">Add</button></form>
+    ${rows || `<p class="muted" style="margin:6px 0 0">No open tasks.</p>`}</div>`;
+}
+function huddleCard(d) {
+  const list = d.huddle || [], open = list.filter((x) => !x.doneAt), done = list.filter((x) => x.doneAt);
+  const row = (x) => `<label class="row trow ${x.doneAt ? "hdone" : ""}" style="gap:8px;padding:3px 0;align-items:flex-start"><input type="checkbox" data-chk="huddle" data-id="${esc(x.id)}" ${x.doneAt ? "checked" : ""} style="margin-top:3px"><span style="flex:1;min-width:0;white-space:pre-wrap;${x.doneAt ? "text-decoration:line-through;opacity:.6" : ""}">${esc(x.text)}</span>${x.jobNumber && jobs.some((j) => j.jobNumber === x.jobNumber) ? goButton(x.jobNumber, "job") : ""}<button type="button" class="pencil" style="float:none" data-do="huddledel" data-id="${esc(x.id)}" title="Remove">✕</button></label>`;
+  return `<div class="card"><h3>Huddle <span class="muted small">${open.length ? `${open.length} to bring up` : "things to bring up"}</span>${done.length ? `<button class="btn small" data-do="huddleclear" title="Remove the ones already brought up">Clear done</button>` : ""}</h3>
+    <form id="huddle-add" class="row" style="gap:6px;margin-bottom:4px"><input type="text" id="huddle-text" placeholder="Something to bring up at huddle…" style="flex:1;min-width:0"><button class="btn small primary">Add</button></form>
+    ${[...open, ...done].map(row).join("") || `<p class="muted" style="margin:6px 0 0">Nothing yet. Add what you want to bring up; tick it once it's been covered.</p>`}</div>`;
+}
+document.addEventListener("submit", async (e) => {
+  if (e.target.id === "dash-tk-add") {
+    e.preventDefault();
+    const title = $("#dash-tk-title").value.trim(); if (!title) return;
+    try { await api("/api/tasks", { method: "POST", body: { title, due: $("#dash-tk-due").value || undefined, jobNumber: title.match(/#(\d{4})/)?.[1] } }); log(`Added the task "${title}". It's on your phone too.`); await loadToday(); $("#dash-tk-title")?.focus(); } catch (err) { log(err.message, "t-err"); }
+  }
+  if (e.target.id === "huddle-add") {
+    e.preventDefault();
+    const text = $("#huddle-text").value.trim(); if (!text) return;
+    try { await api("/api/huddle", { method: "POST", body: { text } }); await loadToday(); $("#huddle-text")?.focus(); } catch (err) { log(err.message, "t-err"); }
+  }
+});
+document.addEventListener("change", async (e) => {
+  const t = e.target.closest("[data-chk=task]");
+  if (t) { try { await api(`/api/tasks/${encodeURIComponent(t.dataset.list)}/${encodeURIComponent(t.dataset.task)}`, { method: "PATCH", body: { completed: t.checked } }); log(t.checked ? "Task done. It's checked off on your phone too." : "Task reopened."); setTimeout(loadToday, 600); } catch (err) { t.checked = !t.checked; log(err.message, "t-err"); } return; }
+  const h = e.target.closest("[data-chk=huddle]");
+  if (h) { try { await api(`/api/huddle/${h.dataset.id}`, { method: "PATCH", body: { done: h.checked } }); loadToday(); } catch (err) { log(err.message, "t-err"); } }
+});
+document.addEventListener("click", async (e) => {
+  const x = e.target.closest("[data-do=huddledel]"); if (x) { e.preventDefault(); await api(`/api/huddle/${x.dataset.id}`, { method: "DELETE" }).catch(() => {}); loadToday(); return; }
+  const c = e.target.closest("[data-do=huddleclear]"); if (c) { await api("/api/huddle/clear-done", { method: "POST" }).catch(() => {}); loadToday(); }
+});
 const asking = new Map();
 async function askClaude(prompt, job) {
   if (!status.agent) { log(status.ai?.offReason || "The AI is off on this machine.", "t-err"); return; }
@@ -2827,6 +2870,7 @@ async function renderBrief() {
   if (p.state === "done") {
     const box = document.createElement("div");
     box.innerHTML = md(p.text).replace(/(^|[\s(>])#(\d{4})\b/g, '$1<a href="#" data-do="open" data-n="$2">#$2</a>')
+      .replace(/\s*\{task:(T\d+)\}/g, ' <span class="btask" data-t="$1" title="A Google Task: ticking it checks it off in Google Tasks and on your phone">Google Task</span>')
       .replace(/\s*\{email:([\w-]{6,})\}/g, ' <button type="button" class="bmail" data-do="thread" data-thread="$1" title="Open this email in Gmail">✉ View email</button>')
       .replace(/\s*\{go:(\d{3,6}):(\w+)\}/g, (m, n, place) => goButton(Number(n), place));
     // A job line Claude didn't give a place for still gets a button, aimed by its wording.
@@ -2836,10 +2880,11 @@ async function renderBrief() {
       li.insertAdjacentHTML("beforeend", goButton(n, placeFor(li.textContent)));
     });
     box.querySelectorAll("li").forEach((li) => {
-      const plain = li.cloneNode(true); plain.querySelectorAll(".bgo, .bmail").forEach((x) => x.remove());
+      const plain = li.cloneNode(true); plain.querySelectorAll(".bgo, .bmail, .btask").forEach((x) => x.remove());
+      const gtask = li.querySelector(".btask")?.dataset.t || "";
       const key = briefKey(plain.textContent); const on = !!p.done?.[key]; total++; if (on) doneN++;
       li.classList.add("bitem"); if (on) li.classList.add("done");
-      li.insertAdjacentHTML("afterbegin", `<input type="checkbox" class="bchk" data-key="${key}" ${on ? "checked" : ""} aria-label="Done">`);
+      li.insertAdjacentHTML("afterbegin", `<input type="checkbox" class="bchk" data-key="${key}" ${gtask ? `data-task="${gtask}"` : ""} ${on ? "checked" : ""} aria-label="Done">`);
     });
     html = box.innerHTML;
   }
@@ -2866,7 +2911,7 @@ document.addEventListener("change", async (e) => {
   const c = e.target.closest(".bchk"); if (!c) return;
   c.closest("li")?.classList.toggle("done", c.checked);
   const li = c.closest("li"); const job = Number(li?.querySelector("[data-n]")?.dataset.n || li?.textContent.match(/#(\d{4})\b/)?.[1]) || undefined;
-  try { await api("/api/plan/check", { method: "POST", body: { key: c.dataset.key, done: c.checked, job } }); } catch (err) { log(err.message, "t-err"); }
+  try { await api("/api/plan/check", { method: "POST", body: { key: c.dataset.key, done: c.checked, job, task: c.dataset.task || undefined } }); if (c.dataset.task) { snack(c.checked ? "Checked off in Google Tasks too." : "Reopened in Google Tasks."); if (store.get("tab", "today") === "today") loadToday(); } } catch (err) { log(err.message, "t-err"); }
 });
 document.addEventListener("click", async (e) => {
   const g = e.target.closest("[data-do=gobrief]"); if (g) { showTab("brief"); return; }

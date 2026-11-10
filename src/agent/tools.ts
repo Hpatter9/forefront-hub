@@ -238,6 +238,16 @@ export function hubToolDefs(hub: Hub) {
       wrap(async ({ start, end, q, everyone }) => (everyone ? hub.calendar.events({ start, end, q }) : (await import("../workflows/myEvents.js")).myEvents(hub, { start, end, q }))),
     ),
     tool(
+      "huddle_add",
+      "Add something to Hunter's huddle list (things he wants to bring up at the team huddle; it shows on his dashboard). Use when he says to add, note or remember something for huddle. Mention the job as #1234 in the text when it's about one.",
+      { text: z.string().describe("the point to bring up, in his words, one or two sentences") },
+      wrap(async ({ text }) => {
+        const { huddleAdd } = await import("../workflows/huddle.js");
+        return { added: huddleAdd(hub, text).text };
+      }),
+    ),
+    tool("huddle_list", "Hunter's huddle list: what he wants to bring up at the team huddle, and what's already been brought up.", {}, wrap(async () => (await import("../workflows/huddle.js")).huddleList(hub))),
+    tool(
       "calendar_free_time",
       "Open weekday time (7am-5pm Denver) of at least `minutes` over the next `days` days, from Hunter's calendar.",
       { days: z.number().int().min(1).max(21).default(5), minutes: z.number().int().min(15).default(60) },
