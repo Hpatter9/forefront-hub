@@ -39,7 +39,9 @@ export class TemplateWriter implements EmailWriter {
   async writeEmail({ job, kind, total }: EmailContext) {
     const street = job.address.split(",")[0];
     if (kind === "homeowner") {
-      const first = job.customer.name.split(/\s+/)[0] || "there";
+      // A management company: greet the person there, else nobody by name ("Hi Westwind," reads wrong).
+      const who = job.customer.company ? job.customer.attention : job.customer.name;
+      const first = who.split(/\s+/)[0] || "there";
       return {
         subject: `Your Reconstruction Estimate – ${street}`,
         body: [

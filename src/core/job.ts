@@ -17,6 +17,10 @@ const Person = z.object({
   name: z.string().default(""),
   email: z.string().default(""),
   phone: z.string().default(""),
+  /** Property-management jobs: the management company (then `name` is the company too). */
+  company: z.string().default(""),
+  /** Property-management jobs: the person at the company to address ("Hi <first>"). */
+  attention: z.string().default(""),
 });
 
 const Draft = z.object({
@@ -39,8 +43,10 @@ export const JobSchema = z.object({
   market: z.string().default(""), // CODE8X (Denver metro) / COBO8X (Boulder County)
   stage: z.string().default(""),
   stageSince: z.string().default(""),
-  customer: Person.default({ name: "", email: "", phone: "" }),
-  adjuster: Person.default({ name: "", email: "", phone: "" }),
+  customer: Person.default({ name: "", email: "", phone: "", company: "", attention: "" }),
+  /** Property-management jobs: the owner or tenant Homebase lists, for site access only (never the customer). */
+  occupant: Person.nullable().default(null),
+  adjuster: Person.default({ name: "", email: "", phone: "", company: "", attention: "" }),
   carrier: z.string().default(""),
   claimNumber: z.string().default(""),
   dateOfLoss: z.string().default(""),

@@ -1326,6 +1326,7 @@ function renderOverview(el) {
       <div class="side">
         <div class="card"><h3>Customer ${pen}</h3>
           ${f.customerNotes ? `<div class="banner" style="margin-bottom:10px;white-space:pre-wrap">${esc(f.customerNotes)}</div>` : ""}
+          ${l?.customer?.company ? `<div class="banner" style="margin-bottom:10px"><b>Property management job.</b> The customer is <b>${esc(l.customer.company)}</b>${l.customer.attention ? ` (attn ${esc(l.customer.attention)})` : ""}${l.customer.email ? ` · estimates and emails go to ${esc(l.customer.email)}` : " · <span style='color:var(--bad)'>no email for the company in Homebase yet</span>"}.${l.occupant?.name ? ` ${esc(l.occupant.name)} is the on-site contact only.` : ""}</div>` : ""}
           <dl>${row("Project name", esc(view.projectName || ""))}${row("Name", esc(c?.name))}${row("Phone", esc(c?.phone))}${row("Email", c?.email ? `${esc(c.email)} <button class="pencil" style="float:none" data-act="compose" title="Email">✉</button>` : "")}${row("Loss address", esc(h.address))}${row("Preferred", esc(f.preferredContactMethod))}</dl></div>
         <div class="card"><h3>Project ${pen}</h3>
           <dl>${row("Loss type", esc(f.detail))}${row("Carrier", esc(carrier?.name))}${row("Claim number", esc(f.claimNumber))}

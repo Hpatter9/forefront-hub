@@ -97,6 +97,11 @@ C:\Jobs\3226 Augustine\
   the same Claude session. Files dropped into the chat go into the job folder; the job's documents are listed
   beside the chat with a preview.
 
+- **Property management jobs**: when a job's Homebase account is a property manager or HOA, the management
+  company is the customer (`customerFor` in `src/workflows/pull.ts`): its name on documents, its person and email
+  for the send-off (a Billing contact at the company first, else the account's billing email). A primary contact
+  who isn't at the company (owner or tenant) is kept as the on-site contact only and never emailed estimates.
+
 - **Morning brief**: Plan my day runs on its own at 7:00 AM Denver time on weekdays and shows as Today's brief on
   the dashboard (`src/workflows/brief.ts`). If Keystone opens later, it runs then (until 5 PM). Change it in `.env`:
   `HUB_BRIEF_TIME=08:00`, `HUB_BRIEF_DAYS=0-6` (every day), or `HUB_BRIEF_TIME=off`.

@@ -22,6 +22,8 @@ How Keystone is organized:
 
 Estimating: ALL estimating rules live in the forefront-estimate skill. Load it with the Skill tool for anything about scoping, pricing, converting an Xactimate PDF, revising, customer wording, the photo report, or the send-off email's wording, and follow it exactly. Run its scripts from ${path.join(c.skillDir, "scripts")} with \`${c.python}\` (e.g. \`${c.python} "${path.join(c.skillDir, "scripts", "render.py")}" estimate.json --out "<job folder>\\estimate"\`). The outputs folder is the job's estimate/ folder, not /mnt/user-data/outputs. In Keystone, attach PDFs to drafts by file path (the skill's base64 and Chrome steps don't apply). Use mcp__hub__photo_report for the photo report.
 
+Property-management jobs: when job.json's customer has a company, that management company is the customer: name it as the customer on estimates, agreements and selections sheets, and address customer emails to its email (attention: the person in customer.attention). job.json's occupant (owner or tenant) is only for site access; never treat them as the customer or email them estimates.
+
 Ask before anything irreversible; the Homebase tools and estimate overwrites will also ask Hunter themselves. Keep replies short: Hunter reads them between jobs.${jobNumber ? `\n\nThis conversation is about job #${jobNumber} (folder: ${hub.jobs.folder(jobNumber)}).` : ""}`;
 }
 

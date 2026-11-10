@@ -96,8 +96,10 @@ export class ApiHomebase implements HomebaseClient {
       id: c.id ?? undefined,
       title: c.title ?? undefined,
       company: c.accountName ?? undefined,
+      accountId: c.accountId ?? undefined,
       roles: Array.isArray(c.roles) ? c.roles : undefined,
     }));
+    const acct = p.account && typeof p.account === "object" ? p.account : null;
     for (const a of [p.brief?.adjuster1, p.brief?.adjuster2]) {
       if (a && typeof a === "object" && !contacts.some((c) => c.email && c.email === a.email)) {
         contacts.push({ role: "adjuster", name: a.name ?? "", email: a.email ?? "", phone: a.phone ?? a.mobile ?? "" });
@@ -108,6 +110,9 @@ export class ApiHomebase implements HomebaseClient {
       ...toSummary(this.opts.url)(p),
       stageSince: p.dates?.stageChanged ?? undefined,
       contacts,
+      account: acct?.name
+        ? { id: acct.id ?? undefined, name: acct.name, subtype: acct.subtype ?? undefined, propertyManager: !!acct.isPropertyManager || /property manag|\bhoa\b|homeowners? association/i.test(acct.subtype ?? ""), billingEmail: acct.billingEmail ?? undefined, phone: acct.phone ?? undefined }
+        : undefined,
       carrier: typeof p.brief?.carrier === "object" && p.brief?.carrier ? p.brief.carrier.name ?? "" : p.brief?.carrier ?? "",
       claimNumber: p.brief?.claimNumber ?? "",
       dateOfLoss: p.dateOfLoss ?? undefined,

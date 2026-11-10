@@ -19,7 +19,7 @@ describe("job folder", () => {
     expect(path.basename(store.folder(3226))).toBe("3226 Augustine");
     expect(existsSync(store.path(3226, "photos"))).toBe(true);
     const j = store.upsert(3226, { customer: { email: "new@x.com" } as any, sendoff: { drafts: [], homebaseLoggedAt: "2026-11-05" } });
-    expect(j.customer).toEqual({ name: "Jeremy Augustine", email: "new@x.com", phone: "" });
+    expect(j.customer).toEqual({ name: "Jeremy Augustine", email: "new@x.com", phone: "", company: "", attention: "" });
     expect(store.upsert(3226, { sendoff: { homebaseLoggedAt: null } }).sendoff.homebaseLoggedAt).toBeUndefined();
     expect(store.list().map((x) => x.jobNumber)).toEqual([3226]);
   });

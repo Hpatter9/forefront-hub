@@ -63,7 +63,7 @@ export async function sendoff(hub: Hub, jobNumber: number, o: SendoffOptions): P
   const plan: { kind: Recipient; to: string; attachments: string[] }[] = [];
   for (const kind of o.to) {
     if (kind === "homeowner") {
-      if (!job.customer.email) problems.push("No homeowner email (Homebase contact or `hub job set` it).");
+      if (!job.customer.email) problems.push(job.customer.company ? `No email for ${job.customer.company} (the management company) in Homebase: add their contact or billing email.` : "No homeowner email (Homebase contact or `hub job set` it).");
       if (!files.estimate) problems.push("No '<Last Name> - Reconstruction Estimate.pdf' in estimate/.");
       plan.push({ kind, to: job.customer.email, attachments: [files.estimate ?? ""] });
     } else {

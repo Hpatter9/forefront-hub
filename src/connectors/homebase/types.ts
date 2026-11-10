@@ -25,11 +25,26 @@ export interface Contact {
   id?: string;
   title?: string;
   company?: string;
+  /** The Homebase account (company) the contact belongs to. */
+  accountId?: string;
   roles?: string[];
+}
+
+/** The account a job is for, when it's a company: a property manager, HOA, landlord... */
+export interface JobAccount {
+  id?: string;
+  name: string;
+  subtype?: string;
+  /** A property-management company or HOA: it, not the occupant, is the customer. */
+  propertyManager: boolean;
+  billingEmail?: string;
+  phone?: string;
 }
 
 export interface JobDetail extends JobSummary {
   contacts: Contact[];
+  /** Who the job is for, when Homebase has it as an account (drivers that can). */
+  account?: JobAccount;
   carrier: string;
   claimNumber: string;
   proposalAmount?: number;

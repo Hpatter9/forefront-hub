@@ -30,9 +30,10 @@ export class SendoffWriter implements EmailWriter {
     const r = await complete<{ subject: string; body: string }>(this.hub, {
       system: `You write Hunter Patterson's estimate send-off emails for Forefront Building + Restoration. Follow these rules from Forefront's estimating skill exactly (subject format, voice, the right variant):\n\n${rules}`,
       prompt: `Write the ${kind} send-off email for job #${job.jobNumber} (${job.name}, ${job.address}), insurance status "${job.insurance}".
-Facts: ${JSON.stringify({ customer: job.customer, adjuster: job.adjuster, carrier: job.carrier, claimNumber: job.claimNumber, dateOfLoss: job.dateOfLoss, total: ctx.total, xactimateTotal: ctx.xactimateTotal, priceList: ctx.priceList, attachments: ctx.attachments })}
+Facts: ${JSON.stringify({ customer: job.customer, occupantForSiteAccessOnly: job.occupant ?? undefined, adjuster: job.adjuster, carrier: job.carrier, claimNumber: job.claimNumber, dateOfLoss: job.dateOfLoss, total: ctx.total, xactimateTotal: ctx.xactimateTotal, priceList: ctx.priceList, attachments: ctx.attachments })}
 ${estimate ? `The estimate (for the scope the adjuster summary needs): ${estimate}` : ""}
 ${earlier.length ? `Earlier emails with this person (match what was already said; don't repeat it): ${JSON.stringify(earlier.map((t) => ({ subject: t.subject, snippet: t.snippet })))}` : ""}
+${job.customer.company && kind === "homeowner" ? `This is a property-management job: the customer is ${job.customer.company}, not the occupant. Write to the management company${job.customer.attention ? ` (greet ${job.customer.attention.split(/\s+/)[0]})` : " (no name: \"Hello,\")"}, name ${job.customer.company} as the customer, and use the company where the rules say homeowner.` : ""}
 Return only the subject and the plain-text body (paragraphs separated by blank lines). No signature: Gmail adds Hunter's. Never invent numbers or facts not given here.`,
       schema: { type: "object", properties: { subject: { type: "string" }, body: { type: "string" } }, required: ["subject", "body"] },
     });

@@ -32,7 +32,9 @@ export function handoffPrompt(hub: Hub, n: number, action: HandoffAction, note =
     "",
     `Job #${n}${j?.name ? ` ${j.name}` : ""}${j?.address ? `, ${j.address}` : ""}`,
     j?.stage ? `Stage: ${j.stage}` : "",
-    j?.customer.name ? `Customer: ${[j.customer.name, j.customer.email, j.customer.phone].filter(Boolean).join(", ")}` : "",
+    j?.customer.company
+      ? `Customer: ${j.customer.company} (property management company; it is the customer on every document and email${j.customer.attention ? `, attention ${j.customer.attention}` : ""}): ${[j.customer.email, j.customer.phone].filter(Boolean).join(", ")}${j.occupant?.name ? `. On site: ${j.occupant.name} (owner/tenant, for access only; not the customer)` : ""}`
+      : j?.customer.name ? `Customer: ${[j.customer.name, j.customer.email, j.customer.phone].filter(Boolean).join(", ")}` : "",
     j?.insurance === "oop" ? "Out of pocket (no insurance claim)." : "",
     j && (j.carrier || j.claimNumber) ? `Insurance: ${[j.carrier, j.claimNumber && `claim ${j.claimNumber}`, j.dateOfLoss && `date of loss ${j.dateOfLoss}`].filter(Boolean).join(", ")}` : "",
     j?.adjuster.name || j?.adjuster.email ? `Adjuster: ${[j.adjuster.name, j.adjuster.email, j.adjuster.phone].filter(Boolean).join(", ")}` : "",

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { photoFileName, pickProject } from "../connectors/companycam/index.js";
-import type { HbNote } from "../connectors/homebase/types.js";
+import type { Contact, HbNote, JobDetail } from "../connectors/homebase/types.js";
 import { noteJobContacts } from "./contacts.js";
 import { lastName, type Job } from "../core/job.js";
 import type { Hub } from "../hub.js";
@@ -10,11 +10,32 @@ import type { Hub } from "../hub.js";
  * Homebase -> job.json, plus the CompanyCam project and DocuSketch sketch for the job. Safe to run any time:
  * it only fills in what Homebase knows and never clears what you've set by hand.
  */
+/**
+ * Who the customer is. Normally Homebase's primary contact. On a property-management (or HOA) job it's the
+ * management company: the company's name, and its person and email (the one on the account, a Billing contact
+ * first), or the account's billing email. A primary contact who isn't at the company (the owner or tenant) is kept
+ * only as the occupant, for site access, and is never emailed as the customer.
+ */
+export function customerFor(hb: Pick<JobDetail, "contacts" | "account">): { customer?: Contact & { company?: string; attention?: string }; occupant?: Contact; managed: boolean } {
+  const primary = hb.contacts.find((c) => c.role === "customer");
+  const a = hb.account;
+  if (!a?.propertyManager) return { customer: primary, managed: false };
+  const atCompany = hb.contacts.filter((c) => c.role !== "adjuster" && ((a.id && c.accountId === a.id) || (!!c.company && c.company.toLowerCase() === a.name.toLowerCase())));
+  const rank = (c: Contact) => (c.email ? 0 : 4) + ((c.roles ?? []).includes("Billing") ? 0 : 2) + (c.role === "customer" ? 0 : 1);
+  const person = [...atCompany].sort((x, y) => rank(x) - rank(y))[0];
+  const occupant = primary && !atCompany.includes(primary) ? primary : undefined;
+  return {
+    customer: { role: "customer", name: a.name, company: a.name, attention: person?.name ?? "", email: person?.email || a.billingEmail || "", phone: person?.phone || a.phone || "", id: person?.id },
+    occupant,
+    managed: true,
+  };
+}
+
 export async function pullJob(hub: Hub, jobNumber: number, opts: { quiet?: boolean; lookups?: boolean } = {}): Promise<Job> {
   const say = opts.quiet ? () => {} : hub.say;
   const lookups = opts.lookups ?? true;
   const hb = await hub.homebase.getJob(jobNumber);
-  const customer = hb.contacts.find((c) => c.role === "customer");
+  const { customer, occupant, managed } = customerFor(hb);
   const adjuster = hb.contacts.find((c) => c.role === "adjuster");
   const prior = hub.jobs.exists(jobNumber) ? hub.jobs.get(jobNumber) : undefined;
   const keep = <T>(fresh: T | undefined | "", old: T | undefined) => (fresh === undefined || fresh === "" ? old : fresh);
@@ -27,9 +48,14 @@ export async function pullJob(hub: Hub, jobNumber: number, opts: { quiet?: boole
     address: keep(hb.address, prior?.address) ?? "",
     stage: hb.stage,
     stageSince: hb.stageSince ?? prior?.stageSince ?? "",
-    customer: customer
-      ? { name: keep(customer.name, prior?.customer.name) ?? "", email: keep(customer.email, prior?.customer.email) ?? "", phone: keep(customer.phone, prior?.customer.phone) ?? "" }
-      : undefined,
+    // A management company replaces whatever was there (an earlier pull may have saved the occupant as the customer);
+    // its email is only kept from before when it was already the company's.
+    customer: managed && customer
+      ? { name: customer.name, company: customer.company ?? customer.name, attention: customer.attention || (prior?.customer.company === customer.name ? prior.customer.attention : "") || "", email: customer.email || (prior?.customer.company === customer.name ? prior.customer.email : "") || "", phone: customer.phone || (prior?.customer.company === customer.name ? prior.customer.phone : "") || "" }
+      : customer
+        ? { name: keep(customer.name, prior?.customer.name) ?? "", email: keep(customer.email, prior?.customer.email) ?? "", phone: keep(customer.phone, prior?.customer.phone) ?? "", company: "", attention: "" }
+        : undefined,
+    occupant: occupant ? { name: occupant.name, email: occupant.email, phone: occupant.phone, company: "", attention: "" } : managed ? null : prior?.occupant ?? null,
     adjuster: adjuster
       ? { name: keep(adjuster.name, prior?.adjuster.name) ?? "", email: keep(adjuster.email, prior?.adjuster.email) ?? "", phone: keep(adjuster.phone, prior?.adjuster.phone) ?? "" }
       : undefined,
