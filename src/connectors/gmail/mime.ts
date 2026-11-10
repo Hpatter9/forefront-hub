@@ -44,6 +44,12 @@ function wrap76(b64: string): string {
   return b64.replace(/.{1,76}/g, "$&\r\n").trimEnd();
 }
 
+/** References for a reply: the earlier chain, ending with the message being answered (each id once). */
+export function replyRefs(references: string | undefined, inReplyTo: string): string {
+  const ids = `${references ?? ""} ${inReplyTo}`.match(/<[^<>\s]+>/g) ?? [inReplyTo];
+  return [...new Set(ids)].slice(-20).join(" ");
+}
+
 /** A complete RFC 822 message (multipart/mixed: text + HTML alternative, then attachments). */
 export function buildMime(d: DraftInput & { from: string; messageId: string; signatureHtml?: string }): string {
   const boundary = `mixed_${Math.random().toString(36).slice(2)}`;
@@ -56,7 +62,7 @@ export function buildMime(d: DraftInput & { from: string; messageId: string; sig
     d.bcc.length ? `Bcc: ${d.bcc.join(", ")}` : "",
     `Subject: ${encodeHeader(d.subject)}`,
     `Message-ID: ${d.messageId}`,
-    d.inReplyTo ? `In-Reply-To: ${d.inReplyTo}\r\nReferences: ${d.inReplyTo}` : "",
+    d.inReplyTo ? `In-Reply-To: ${d.inReplyTo}\r\nReferences: ${replyRefs(d.references, d.inReplyTo)}` : "",
     "MIME-Version: 1.0",
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
   ].filter(Boolean);

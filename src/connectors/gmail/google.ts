@@ -273,6 +273,7 @@ function toMessage(m: gmail_v1.Schema$Message): Message {
     body: text ? decode(text) : htmlToText(decode(html)),
     html: html ? decode(html) : undefined,
     messageIdHeader: h("Message-ID") || h("Message-Id") || undefined,
+    references: h("References") || undefined,
     labelIds: m.labelIds ?? [],
     attachments: parts
       .filter((p) => p.filename && p.body?.attachmentId)

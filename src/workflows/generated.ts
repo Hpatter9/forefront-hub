@@ -48,7 +48,32 @@ function save(hub: Hub, list: GeneratedDraft[]) {
 }
 
 /** Makes a Gmail draft for Keystone and files it under Claude drafts. Every hub-made draft goes through here. */
+/**
+ * Tidies the text of an AI-written email before it becomes a draft:
+ * - line breaks that arrived as the two characters "\n" become real line breaks;
+ * - a greeting to a company ("Hi State Farm,") becomes "Hello," (there was no person's name to use);
+ * - a signature the AI typed is dropped, since Gmail adds Hunter's real one.
+ */
+export function cleanDraftBody(body: string, opts: { companies?: string[] } = {}): string {
+  let s = body.replace(/\r/g, "");
+  if (/\\n/.test(s)) s = s.replace(/\\r?\\n|\\n/g, "\n").replace(/\\t/g, " ");
+  s = s.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  // The greeting.
+  const m = s.match(/^(hi|hello|hey|dear|good (?:morning|afternoon))[ ,]+([^\n,]{1,60}),/i);
+  if (m) {
+    const who = m[2].trim();
+    const company = /\b(insurance|claims?|mutual|farm|farmers|allstate|usaa|geico|travelers|nationwide|liberty|progressive|management|properties|property|group|team|department|dept|llc|inc|company|co\.|services|adjust(?:er|ing)s?|homeowner|customer|there)\b/i.test(who) || (opts.companies ?? []).some((c) => c && who.toLowerCase() === c.trim().toLowerCase());
+    if (company && !/^there$/i.test(who)) s = s.replace(m[0], "Hello,");
+  }
+  // A typed signature at the end: "-- " and what follows, or a closing followed by Hunter's name block.
+  s = s.replace(/\n--\s*\n[\s\S]*$/, "").trim();
+  s = s.replace(/\n+(Hunter Patterson)(\n(Estimator|Forefront[^\n]*|hunter@[^\n]*|\(?\d{3}\)?[ .-]?\d{3}[ .-]?\d{4}[^\n]*))*\s*$/i, "").trim();
+  return s;
+}
+
 export async function createGeneratedDraft(hub: Hub, d: DraftInput, meta: { jobNumber?: number; source?: string } = {}): Promise<DraftRef> {
+  const job = meta.jobNumber && hub.jobs.exists(meta.jobNumber) ? hub.jobs.get(meta.jobNumber) : null;
+  d = { ...d, body: cleanDraftBody(d.body, { companies: [job?.carrier ?? "", job?.customer.company ?? ""] }), subject: d.subject.replace(/\\n/g, " ").trim() };
   const ref = await hub.gmail.createDraft({ ...d, labels: [GENERATED_LABEL] });
   const list = generatedDrafts(hub);
   list.push({

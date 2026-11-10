@@ -119,6 +119,8 @@ export async function agentAsk(hub: Hub, prompt: string, opts: { jobNumber?: num
 
 Right now it's ${new Date().toLocaleString("en-US", { timeZone: "America/Denver", weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })} (Denver time). "Tomorrow", "this morning" and "next week" are relative to that.
 
+Emails you draft: write in Hunter's voice (short plain paragraphs, warm, no corporate filler like "I hope you're having a good week", no bullet points). Greet a person by first name ("Hi Alex,"); if you don't know a person's name, look the job's contacts up first, and if there still isn't one write "Hello," and never greet a company ("Hi State Farm,"). End with "Thanks," and nothing after it: no name and no signature, because Gmail adds Hunter's. Put real line breaks between paragraphs.
+
 You're running on Gemini inside Keystone. Use the functions provided for anything about jobs, email, the calendar, tasks, contacts and Homebase; read before you answer, and never guess job facts. You can't run the estimating skill or open files here: for estimating, pricing or revising an estimate, tell Hunter to use the Estimator tab. Email is drafts only.`;
   // An answer to a question it asked: the earlier turns come first, so it knows what "yes, the second one" means.
   const contents: Turn[] = [...(opts.history ?? []).map((t): Turn => ({ role: t.role === "user" ? "user" : "model", parts: [{ text: t.text }] })), { role: "user", parts: [{ text: prompt }] }];

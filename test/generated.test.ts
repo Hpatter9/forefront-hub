@@ -45,3 +45,17 @@ describe("drafts are never sent on their own", () => {
     expect((await hub.gmail.draftStatus(ref)).state).toBe("sent");
   });
 });
+
+describe("AI email text is tidied before it becomes a draft", () => {
+  it("fixes literal \\n, a greeting to a company, and a typed signature", async () => {
+    const { cleanDraftBody } = await import("../src/workflows/generated.js");
+    const raw = "Hi State Farm,\n\n\\n\\nI hope you're having a good week.\\n\\nPlease find attached our reconstruction estimate.\\n\\nThank you,\\n\\n-- \\nHunter Patterson\\nEstimator\\nForefront Building + Restoration";
+    expect(cleanDraftBody(raw)).toBe("Hello,\n\nI hope you're having a good week.\n\nPlease find attached our reconstruction estimate.\n\nThank you,");
+  });
+  it("leaves a good email alone, keeps a person's name, and uses the job's carrier name", async () => {
+    const { cleanDraftBody } = await import("../src/workflows/generated.js");
+    const ok = "Hi Alex,\n\nAttached are the hallway photos you asked for.\n\nThanks,";
+    expect(cleanDraftBody(ok)).toBe(ok);
+    expect(cleanDraftBody("Hi Acme Casualty,\n\nSee attached.\n\nThanks,\nHunter Patterson", { companies: ["Acme Casualty"] })).toBe("Hello,\n\nSee attached.\n\nThanks,");
+  });
+});

@@ -151,9 +151,20 @@ export function hubToolDefs(hub: Hub) {
       wrap(async (a) => {
         const bcc = a.jobNumber ? [intakeAddress(a.jobNumber)] : [];
         const files = a.attachments.map((f) => (path.isAbsolute(f) || !a.jobNumber ? f : hub.jobs.path(a.jobNumber, f)));
-        let inReplyTo: string | undefined;
-        if (a.threadId) inReplyTo = (await hub.gmail.getThread(a.threadId).catch(() => null))?.messages.at(-1)?.messageIdHeader;
-        const ref = await createGeneratedDraft(hub, { to: a.to, cc: a.cc, bcc, subject: a.subject, body: a.body, attachments: files, threadId: a.threadId, inReplyTo }, { jobNumber: a.jobNumber });
+        // A reply in a thread: answer the newest real message (not a draft), keep the thread's subject, and carry the
+        // References chain, so it stays one conversation in Gmail and for everyone on it.
+        let inReplyTo: string | undefined, references: string | undefined, subject = a.subject;
+        if (a.threadId) {
+          const { replyReferences, replySubject } = await import("../workflows/conversation.js");
+          const msgs = (await hub.gmail.getThread(a.threadId).catch(() => null))?.messages.filter((m) => !m.labelIds?.includes("DRAFT")) ?? [];
+          const last = msgs.at(-1);
+          if (last) {
+            inReplyTo = last.messageIdHeader;
+            references = replyReferences(last);
+            subject = replySubject(msgs[0].subject || a.subject);
+          }
+        }
+        const ref = await createGeneratedDraft(hub, { to: a.to, cc: a.cc, bcc, subject, body: a.body, attachments: files, threadId: a.threadId, inReplyTo, references }, { jobNumber: a.jobNumber });
         if (a.jobNumber && hub.jobs.exists(a.jobNumber)) hub.jobs.log(a.jobNumber, `Draft "${a.subject}" to ${a.to.join(", ")}`);
         if (a.jobNumber && hub.jobs.exists(a.jobNumber) && a.kind !== "other") {
           const j = hub.jobs.get(a.jobNumber);

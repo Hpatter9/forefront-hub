@@ -14,6 +14,8 @@ export interface DraftInput {
   /** Put the draft in an existing thread (a reply). */
   threadId?: string;
   inReplyTo?: string;
+  /** The reply's References header: the original's own References plus its Message-ID (keeps the thread together in every mail program). */
+  references?: string;
   /** Gmail labels to put on the draft (created if missing), e.g. "Claude drafts". */
   labels?: string[];
 }
@@ -61,6 +63,8 @@ export interface Message {
   html?: string;
   /** RFC 822 Message-ID, for replies. */
   messageIdHeader?: string;
+  /** The References header as received (the thread's earlier Message-IDs). */
+  references?: string;
   labelIds?: string[];
   attachments: { id: string; filename: string; mimeType: string; size?: number }[];
 }

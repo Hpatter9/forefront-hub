@@ -17,6 +17,7 @@ import { editContact, editFields, FIELDS, fieldValues, SECTIONS, setAdjuster } f
 import { timeline } from "../workflows/timeline.js";
 import { briefItems, REMINDER_GROUPS, reminders } from "../workflows/reminders.js";
 import { checkEmailButtons } from "../workflows/briefEmails.js";
+import { replyReferences } from "../workflows/conversation.js";
 import { huddleAdd, huddleClearDone, huddleList, huddleRemove, huddleUpdate } from "../workflows/huddle.js";
 import { STAGES } from "../core/job.js";
 import { TemplateWriter, type Recipient } from "../workflows/writer.js";
@@ -370,6 +371,12 @@ const server = http.createServer(async (req, res) => {
       if (req.method === "GET") {
         if (action === "") return send(res, 200, await jobView(n));
         if (action === "timeline") return send(res, 200, await timeline(hub, n));
+        if (action === "conversation") {
+          if (!hub.jobs.exists(n)) await pullJob(hub, n, { quiet: true, lookups: false });
+          const { jobConversation } = await import("../workflows/conversation.js");
+          const j = hub.jobs.get(n);
+          return send(res, 200, { ...(await jobConversation(hub, n)), job: { jobNumber: n, name: j.name, stage: j.stage, address: j.address, customer: j.customer, adjuster: j.adjuster, occupant: j.occupant, claimNumber: j.claimNumber, carrier: j.carrier, step: (await import("../workflows/reminders.js")).stepFor(j.stage), intake: `office+${n}@forefrontteam.com` }, me: cfg.gmail.address });
+        }
         if (action === "claude-prompt") {
           const { handoffPrompt, HANDOFF_ACTIONS } = await import("../workflows/claudeHandoff.js");
           const act = (q("action") in HANDOFF_ACTIONS ? q("action") : "estimate") as keyof typeof HANDOFF_ACTIONS;
@@ -554,6 +561,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---- mail
+    if (p === "/api/mail/jobs") return send(res, 200, (await import("../workflows/conversation.js")).mailJobs(hub));
     if (p === "/api/mail/labels") return send(res, 200, (await hub.gmail.labels?.()) ?? []);
     // ---- contacts: everyone from email and Homebase, filled out as more turns up
     if (p === "/api/contacts") {
@@ -626,7 +634,7 @@ const server = http.createServer(async (req, res) => {
         const gen = generatedDrafts(hub).some((g) => g.draftId === draftId || (m?.messageIdHeader && g.messageId === m.messageIdHeader));
         const to = split(b.to);
         if (!to.length) return send(res, 400, { error: "Add at least one recipient." });
-        const r = await hub.gmail.updateDraft(draftId, { to, cc: split(b.cc), bcc: b.bcc !== undefined ? split(b.bcc) : m?.bcc ?? [], subject: String(b.subject ?? m?.subject ?? ""), body: String(b.body ?? ""), attachments: files, threadId: prev ? q("thread") || undefined : undefined, inReplyTo: prev?.messageIdHeader, labels: gen ? [GENERATED_LABEL] : undefined }, m?.messageIdHeader);
+        const r = await hub.gmail.updateDraft(draftId, { to, cc: split(b.cc), bcc: b.bcc !== undefined ? split(b.bcc) : m?.bcc ?? [], subject: String(b.subject ?? m?.subject ?? ""), body: String(b.body ?? ""), attachments: files, threadId: prev ? q("thread") || undefined : undefined, inReplyTo: prev?.messageIdHeader, references: prev ? replyReferences(prev) : undefined, labels: gen ? [GENERATED_LABEL] : undefined }, m?.messageIdHeader);
         bus.emit({ type: "changed", what: "mail" });
         return send(res, 200, { ok: true, messageId: r.messageId });
       }
@@ -657,7 +665,7 @@ const server = http.createServer(async (req, res) => {
       if (!hub.gmail.send) return send(res, 400, { error: "This Gmail connection can't send." });
       if (hub.gmail.fullAccess && !hub.gmail.fullAccess()) return send(res, 400, { error: "Gmail needs to be reconnected once to send from Keystone: double-click Connect Gmail." });
       const split = (s: unknown) => String(s ?? "").split(/[,;]/).map((x) => x.trim()).filter(Boolean);
-      const d = { to: split(b.to), cc: split(b.cc), bcc: split(b.bcc), subject: String(b.subject ?? ""), body: String(b.body ?? ""), attachments: resolveAttachments(b.attachments), threadId: b.threadId || undefined, inReplyTo: b.inReplyTo || undefined };
+      const d = { to: split(b.to), cc: split(b.cc), bcc: split(b.bcc), subject: String(b.subject ?? ""), body: String(b.body ?? ""), attachments: resolveAttachments(b.attachments), threadId: b.threadId || undefined, inReplyTo: b.inReplyTo || undefined, references: b.references || undefined };
       if (!d.to.length) return send(res, 400, { error: "Add at least one recipient." });
       const job = b.jobNumber ? Number(b.jobNumber) : undefined;
       return send(res, 202, task(`Send "${d.subject}"`, job, async () => {
@@ -800,7 +808,7 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/mail/draft" && req.method === "POST") {
       const b = await body(req);
       const split = (s: unknown) => String(s ?? "").split(/[,;]/).map((x) => x.trim()).filter(Boolean);
-      const ref = await hub.gmail.createDraft({ to: split(b.to), cc: split(b.cc), bcc: split(b.bcc), subject: String(b.subject ?? ""), body: String(b.body ?? ""), attachments: resolveAttachments(b.attachments), threadId: b.threadId || undefined, inReplyTo: b.inReplyTo || undefined });
+      const ref = await hub.gmail.createDraft({ to: split(b.to), cc: split(b.cc), bcc: split(b.bcc), subject: String(b.subject ?? ""), body: String(b.body ?? ""), attachments: resolveAttachments(b.attachments), threadId: b.threadId || undefined, inReplyTo: b.inReplyTo || undefined, references: b.references || undefined });
       if (b.replaceDraft) await replaceDraft(String(b.replaceDraft));
       bus.emit({ type: "changed", what: "mail" });
       return send(res, 200, { ok: true, id: ref.id });
