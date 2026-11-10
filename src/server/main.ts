@@ -220,6 +220,7 @@ const server = http.createServer(async (req, res) => {
         gmailFull: hub.gmail.fullAccess?.() ?? false,
         companycam: hub.photos.kind,
         texts: hub.texts.kind === "iphone-backup" ? hub.texts.status() : null,
+        walks: cfg.walks.dir ? (await import("../workflows/walks.js")).walksStatus(hub) : null,
         calendar: hub.calendar.kind,
         calendarConnected: hub.calendar.connected(),
         tasksConnected: hub.tasks.connected(),
@@ -300,6 +301,7 @@ const server = http.createServer(async (req, res) => {
         travel: await import("../workflows/travel.js").then(async (t) => t.travelFor(hub, schedule, { calendars: await myCalendars() })).catch(() => ({})),
         tasksDue,
         huddle: huddleList(hub),
+        walks: (await import("../workflows/walks.js")).walks(hub).filter((w) => w.status !== "filed").slice(-10),
         tasksOpen: hub.tasks.connected() ? (await hub.tasks.tasks().catch(() => [])).filter((t) => !t.completed).sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999")).slice(0, 60) : [],
         tasksConnected: hub.tasks.connected(),
         calendarConnected: hub.calendar.connected(),
@@ -726,6 +728,23 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---- Google Tasks (the real lists: what's made here shows on the phone, and the other way round)
+    // ---- walk recordings
+    if (p === "/api/walks" && req.method === "GET") return send(res, 200, (await import("../workflows/walks.js")).walks(hub));
+    if (p === "/api/walks/scan" && req.method === "POST") { scanAndOfferWalks(); return send(res, 202, { ok: true }); }
+    if (p === "/api/walks/file" && req.method === "POST") {
+      const b = await body(req);
+      const w = await import("../workflows/walks.js");
+      const filed = w.fileWalk(hub, String(b.id), Number(b.job));
+      bus.emit({ type: "changed", what: "job" });
+      w.offerWalkFollowups(hub, filed).catch((e) => hub.say(`Walk follow-ups: ${(e as Error).message}`));
+      return send(res, 200, filed);
+    }
+    if (p === "/api/walks/dismiss" && req.method === "POST") {
+      const b = await body(req);
+      (await import("../workflows/walks.js")).retryWalk(hub, String(b.id), !b.retry);
+      if (b.retry) scanAndOfferWalks();
+      return send(res, 200, { ok: true });
+    }
     // ---- huddle list: things to bring up at the team huddle
     if (p === "/api/huddle" && req.method === "GET") return send(res, 200, huddleList(hub));
     if (p === "/api/huddle" && req.method === "POST") return send(res, 200, huddleAdd(hub, String((await body(req)).text ?? "")));
@@ -869,6 +888,20 @@ const server = http.createServer(async (req, res) => {
 // ---- background sync: every 15 minutes while Keystone is open (read-only toward Homebase and Gmail)
 let lastSync: SyncAllResult | null = null;
 let syncRunning = false;
+let walksRunning = false;
+function scanAndOfferWalks() {
+  if (walksRunning || !hub.cfg.walks.dir) return;
+  walksRunning = true;
+  (async () => {
+    const w = await import("../workflows/walks.js");
+    const fresh = await w.scanWalks(hub);
+    if (fresh.length) bus.emit({ type: "changed", what: "job" });
+    for (const x of fresh) await w.offerWalkFollowups(hub, x).catch((e) => hub.say(`Walk follow-ups: ${(e as Error).message}`));
+  })()
+    .catch((e) => hub.say(`Walk recordings: ${(e as Error).message}`))
+    .finally(() => (walksRunning = false));
+}
+
 function runSyncAll() {
   if (syncRunning) return { running: true };
   syncRunning = true;
@@ -884,6 +917,8 @@ function runSyncAll() {
           ".",
       );
       bus.emit({ type: "changed", what: "job" });
+      // New walk recordings: transcribe, file to the job, then offer the Homebase note and tasks.
+      scanAndOfferWalks();
       // Texting days that are over: one summary each for Homebase, asked on one card.
       if (hub.texts.kind !== "off") {
         const { logTextDays } = await import("../workflows/texts.js");

@@ -1,3 +1,5 @@
+import { readFileSync, statSync } from "node:fs";
+import path from "node:path";
 import type { Config } from "../../core/config.js";
 
 /**
@@ -44,6 +46,8 @@ export interface GenerateResult {
 export interface GeminiClient {
   readonly kind: "gemini" | "mock";
   generate(req: GenerateRequest): Promise<GenerateResult>;
+  /** Uploads a file (a recording, a long PDF) for use in a request as { fileData: { mimeType, fileUri } }. Google keeps it 48 hours. */
+  uploadFile(file: string, mimeType: string): Promise<{ uri: string; mimeType: string }>;
 }
 
 const URL_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -52,6 +56,8 @@ export class LiveGemini implements GeminiClient {
   readonly kind = "gemini" as const;
   /** How long to wait out a per-minute limit before retrying (tests make it short). */
   minuteWaitMs = 20_000;
+  /** How often to check an uploaded file that's still being processed. */
+  pollMs = 2_000;
   constructor(private key: string, private fetchFn: typeof fetch = (...a) => fetch(...a)) {}
 
   async generate(req: GenerateRequest): Promise<GenerateResult> {
@@ -67,6 +73,28 @@ export class LiveGemini implements GeminiClient {
       }
     }
     throw last ?? new Error("Gemini: no model to use.");
+  }
+
+  async uploadFile(file: string, mimeType: string): Promise<{ uri: string; mimeType: string }> {
+    const size = statSync(file).size;
+    const start = await this.fetchFn("https://generativelanguage.googleapis.com/upload/v1beta/files", {
+      method: "POST",
+      headers: { "x-goog-api-key": this.key, "X-Goog-Upload-Protocol": "resumable", "X-Goog-Upload-Command": "start", "X-Goog-Upload-Header-Content-Length": String(size), "X-Goog-Upload-Header-Content-Type": mimeType, "Content-Type": "application/json" },
+      body: JSON.stringify({ file: { display_name: path.basename(file).slice(0, 80) } }),
+    });
+    const url = start.headers.get("x-goog-upload-url");
+    if (!start.ok || !url) throw new Error(`Gemini: couldn't start the upload (${(await start.text().catch(() => "")).slice(0, 200) || start.status})`);
+    const up = await this.fetchFn(url, { method: "POST", headers: { "Content-Length": String(size), "X-Goog-Upload-Offset": "0", "X-Goog-Upload-Command": "upload, finalize" }, body: readFileSync(file) });
+    const j: any = await up.json().catch(() => ({}));
+    if (!up.ok || !j?.file?.uri) throw new Error(`Gemini: the upload failed (${j?.error?.message ?? up.status})`);
+    // Audio and video are processed before they can be used.
+    let f = j.file;
+    for (let i = 0; f.state === "PROCESSING" && i < 60; i++) {
+      await new Promise((res) => setTimeout(res, this.pollMs));
+      f = await (await this.fetchFn(`https://generativelanguage.googleapis.com/v1beta/${f.name}`, { headers: { "x-goog-api-key": this.key } })).json();
+    }
+    if (f.state && f.state !== "ACTIVE") throw new Error(`Gemini couldn't read that file (${f.state}).`);
+    return { uri: f.uri, mimeType: f.mimeType ?? mimeType };
   }
 
   private async once(req: GenerateRequest): Promise<GenerateResult> {
@@ -126,6 +154,11 @@ export class MockGemini implements GeminiClient {
   readonly kind = "mock" as const;
   requests: GenerateRequest[] = [];
   constructor(private script: (req: GenerateRequest, n: number) => Partial<GenerateResult> | string = () => "") {}
+  uploads: string[] = [];
+  async uploadFile(file: string, mimeType: string) {
+    this.uploads.push(file);
+    return { uri: `mock://${path.basename(file)}`, mimeType };
+  }
   async generate(req: GenerateRequest): Promise<GenerateResult> {
     this.requests.push(structuredClone(req));
     const out = this.script(req, this.requests.length - 1);

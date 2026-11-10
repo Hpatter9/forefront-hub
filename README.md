@@ -119,6 +119,14 @@ C:\Jobs\3226 Augustine\
   (`src/workflows/briefTasks.ts`). Huddle is a list of things to bring up at the team huddle
   (`src/workflows/huddle.ts`, kept in `.hub/huddle.json`); "add to my huddle list: ..." in Ask adds one.
 
+- **Walk recordings** (off until **Connect walk recordings** sets `WALK_RECORDINGS_DIR`): recordings from Hunter's
+  watch reach a folder on this PC (watch -> phone -> Google Drive -> Drive for desktop). At each sync Keystone
+  transcribes new ones with Gemini (uploaded with the Files API), pulls out a summary, room-by-room notes,
+  measurements, what the customer wants and what Hunter promised, and files them to the job in `notes/walks/`
+  (`src/workflows/walks.ts`). The job comes from the calendar event at that time, else the address or name said in
+  the recording; otherwise the dashboard asks. The Estimator reads the notes as site notes; a Homebase note and
+  Google Tasks for the promises are offered and only added with a yes.
+
 - **Morning brief**: Plan my day runs on its own at 7:00 AM Denver time on weekdays and shows as Today's brief on
   the dashboard (`src/workflows/brief.ts`). If Keystone opens later, it runs then (until 5 PM). Change it in `.env`:
   `HUB_BRIEF_TIME=08:00`, `HUB_BRIEF_DAYS=0-6` (every day), or `HUB_BRIEF_TIME=off`.

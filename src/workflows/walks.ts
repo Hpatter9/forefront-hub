@@ -1,0 +1,286 @@
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { aiProvider, complete } from "../agent/llm.js";
+import { confirmText } from "../core/approval.js";
+import type { Hub } from "../hub.js";
+import { myEvents } from "./myEvents.js";
+
+/**
+ * Walk recordings: Hunter records a scope walk on his watch (his own notes and the conversation with the customer),
+ * the recording reaches a folder on this PC (phone -> Google Drive -> Drive for desktop), and Keystone transcribes
+ * it with Gemini, works out which job it belongs to (the calendar event at that time, else what's said in it),
+ * and files the transcript and a structured summary in the job folder (notes/walks/). The Estimator reads those as a
+ * source for the scope. Nothing leaves the PC except the audio sent to Gemini to be transcribed.
+ */
+export interface WalkNotes {
+  transcript: string;
+  summary: string;
+  rooms: { room: string; notes: string }[];
+  measurements: string[];
+  customerWants: string[];
+  promises: { what: string; due?: string }[];
+  /** Clues to which job this is, as said in the recording. */
+  address?: string;
+  names?: string[];
+}
+
+export interface Walk {
+  id: string; // file name + size
+  file: string;
+  name: string;
+  recordedAt: string;
+  status: "filed" | "needs-job" | "error";
+  jobNumber?: number;
+  why?: string; // how the job was picked
+  candidates?: { jobNumber: number; name: string }[];
+  summary?: string;
+  promises?: { what: string; due?: string }[];
+  notesFile?: string; // relative to the job folder once filed, else the holding copy
+  error?: string;
+  processedAt: string;
+}
+
+const AUDIO = /\.(m4a|mp3|wav|aac|ogg|oga|flac|3gp|amr|mp4|opus)$/i;
+const MIME: Record<string, string> = { m4a: "audio/mp4", mp4: "audio/mp4", mp3: "audio/mp3", wav: "audio/wav", aac: "audio/aac", ogg: "audio/ogg", oga: "audio/ogg", opus: "audio/ogg", flac: "audio/flac", "3gp": "audio/3gpp", amr: "audio/amr" };
+
+const stateFile = (hub: Hub) => path.join(hub.cfg.stateDir, "walks.json");
+export function walks(hub: Hub): Walk[] {
+  try {
+    return existsSync(stateFile(hub)) ? JSON.parse(readFileSync(stateFile(hub), "utf8")) : [];
+  } catch {
+    return [];
+  }
+}
+function save(hub: Hub, list: Walk[]) {
+  mkdirSync(hub.cfg.stateDir, { recursive: true });
+  writeFileSync(stateFile(hub), JSON.stringify(list, null, 2));
+}
+
+export function walksStatus(hub: Hub): { on: boolean; dir: string; problem?: string } {
+  const dir = hub.cfg.walks.dir;
+  if (!dir) return { on: false, dir: "", problem: "Walk recordings aren't set up. Double-click Connect walk recordings." };
+  if (!existsSync(dir)) return { on: false, dir, problem: `The recordings folder isn't there: ${dir}` };
+  return { on: true, dir };
+}
+
+/** When a recording was made: Samsung names files "Voice 251110_143005.m4a"; otherwise the file's own time. */
+export function recordedAt(name: string, mtime: Date): Date {
+  const m = name.match(/(\d{2}|\d{4})(\d{2})(\d{2})[_-](\d{2})(\d{2})(\d{2})/);
+  if (m) {
+    const d = new Date(Number(m[1].length === 2 ? `20${m[1]}` : m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]));
+    if (!Number.isNaN(d.getTime()) && Math.abs(d.getTime() - mtime.getTime()) < 400 * 864e5) return d;
+  }
+  return mtime;
+}
+
+const SCHEMA = {
+  type: "object",
+  properties: {
+    transcript: { type: "string", description: "Everything said, in order, as plain lines. Start a line with \"Hunter:\" for the estimator and \"Customer:\" (or the person's name) for others when you can tell; \"Note:\" for Hunter talking to himself." },
+    summary: { type: "string", description: "3-6 sentences: what the walk covered and what was decided." },
+    rooms: { type: "array", items: { type: "object", properties: { room: { type: "string" }, notes: { type: "string", description: "damage seen, what to remove/replace/repair, materials and finishes mentioned" } }, required: ["room", "notes"] } },
+    measurements: { type: "array", items: { type: "string" }, description: "each measurement or count said out loud, with what it's of" },
+    customerWants: { type: "array", items: { type: "string" }, description: "preferences, selections, upgrades, concerns, deadlines the customer voiced" },
+    promises: { type: "array", items: { type: "object", properties: { what: { type: "string" }, due: { type: "string", description: "when, as said (\"Friday\"), if a time was given" } }, required: ["what"] }, description: "things Hunter said he would do" },
+    address: { type: "string", description: "the property's street address if it's said" },
+    names: { type: "array", items: { type: "string" }, description: "people's names said in the recording (customer, adjuster)" },
+  },
+  required: ["transcript", "summary", "rooms", "measurements", "customerWants", "promises"],
+};
+
+/** Transcribes and structures one recording with Gemini. */
+export async function transcribe(hub: Hub, file: string): Promise<WalkNotes> {
+  if (aiProvider(hub) !== "gemini" || !hub.gemini) throw new Error("Transcribing recordings needs Gemini (double-click Connect Gemini).");
+  const ext = path.extname(file).slice(1).toLowerCase();
+  const up = await hub.gemini.uploadFile(file, MIME[ext] ?? "audio/mp4");
+  return complete<WalkNotes>(hub, {
+    system: "You transcribe and organize site-walk recordings for a reconstruction estimator (water, fire and mold repairs). Write down only what is actually said; never invent rooms, measurements or promises. Unclear words: [unclear].",
+    prompt: "This is a recording from Hunter's scope walk at a customer's property: his own spoken notes and his conversation with the customer. Transcribe all of it, then pull out what an estimator needs to write the scope.",
+    files: [up],
+    schema: SCHEMA,
+  });
+}
+
+/** Which job a recording belongs to: the calendar visit at that time, else the address or names said in it. */
+export async function matchWalk(hub: Hub, at: Date, notes: Pick<WalkNotes, "address" | "names" | "transcript">): Promise<{ jobNumber?: number; why?: string; candidates: { jobNumber: number; name: string }[] }> {
+  const jobs = hub.jobs.list();
+  const byNum = new Map(jobs.map((j) => [j.jobNumber, j]));
+  // 1. A calendar event for a job around that time (the walk can start early or run long).
+  if (hub.calendar.connected()) {
+    const ev = await myEvents(hub, { start: new Date(at.getTime() - 3 * 3600e3).toISOString(), end: new Date(at.getTime() + 3 * 3600e3).toISOString() }).catch(() => []);
+    const near = ev
+      .filter((e) => !e.allDay)
+      .map((e) => {
+        const street = (e.location ?? "").split(",")[0].trim().toLowerCase();
+        const job = e.jobNumber && byNum.has(e.jobNumber) ? e.jobNumber : street.length >= 6 ? jobs.find((j) => j.address.toLowerCase().startsWith(street))?.jobNumber : undefined;
+        const gap = at.getTime() < Date.parse(e.start) ? Date.parse(e.start) - at.getTime() : at.getTime() > Date.parse(e.end) ? at.getTime() - Date.parse(e.end) : 0;
+        return { job, gap, title: e.title };
+      })
+      .filter((x) => x.job && x.gap <= 90 * 60e3)
+      .sort((a, b) => a.gap - b.gap);
+    const distinct = [...new Set(near.map((x) => x.job!))];
+    if (distinct.length === 1 || (near[0] && near[0].gap === 0 && near.filter((x) => x.gap === 0).length === 1)) return { jobNumber: near[0].job, why: `calendar: ${near[0].title}`, candidates: [] };
+    if (distinct.length > 1) return { candidates: distinct.map((n) => ({ jobNumber: n, name: byNum.get(n)!.name })) };
+  }
+  // 2. What's said: the street address, or a customer's last name.
+  const text = `${notes.address ?? ""} ${(notes.names ?? []).join(" ")} ${notes.transcript.slice(0, 4000)}`.toLowerCase();
+  const hits = jobs.filter((j) => {
+    const street = j.address.split(",")[0].trim().toLowerCase();
+    const last = (j.customer.attention || j.customer.name).split(/\s+/).at(-1)?.toLowerCase() ?? "";
+    return (street.length >= 6 && text.includes(street)) || (last.length >= 4 && (notes.names ?? []).some((n) => n.toLowerCase().split(/\s+/).includes(last)));
+  });
+  if (hits.length === 1) return { jobNumber: hits[0].jobNumber, why: "from what's said in the recording", candidates: [] };
+  return { candidates: hits.slice(0, 4).map((j) => ({ jobNumber: j.jobNumber, name: j.name })) };
+}
+
+const holding = (hub: Hub) => path.join(hub.cfg.stateDir, "walks");
+const stamp = (d: Date) => `${d.toLocaleDateString("en-CA", { timeZone: "America/Denver" })} ${d.toLocaleTimeString("en-GB", { timeZone: "America/Denver", hour: "2-digit", minute: "2-digit" }).replace(":", "")}`;
+
+export function walkMarkdown(w: { recordedAt: string; name: string }, n: WalkNotes): string {
+  const list = (xs: string[]) => (xs.length ? xs.map((x) => `- ${x}`).join("\n") : "- (none)");
+  return `# Scope walk recording, ${new Date(w.recordedAt).toLocaleString("en-US", { timeZone: "America/Denver", weekday: "long", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}
+
+Source: ${w.name} (recorded on Hunter's watch; transcribed by Gemini, so check anything that matters against the audio).
+
+## Summary
+${n.summary}
+
+## By room
+${n.rooms.length ? n.rooms.map((r) => `- **${r.room}**: ${r.notes}`).join("\n") : "- (none)"}
+
+## Measurements said out loud
+${list(n.measurements)}
+
+## What the customer wants
+${list(n.customerWants)}
+
+## What Hunter said he'd do
+${list(n.promises.map((p) => `${p.what}${p.due ? ` (by ${p.due})` : ""}`))}
+
+## Transcript
+${n.transcript}
+`;
+}
+
+/** Puts a processed recording in its job: the notes and a copy of the audio in notes/walks/. */
+function fileToJob(hub: Hub, w: Walk, md: string): Walk {
+  const n = w.jobNumber!;
+  const dir = hub.jobs.path(n, "notes", "walks");
+  mkdirSync(dir, { recursive: true });
+  const base = `${stamp(new Date(w.recordedAt))} walk`;
+  writeFileSync(path.join(dir, `${base}.md`), md);
+  if (existsSync(w.file)) copyFileSync(w.file, path.join(dir, `${base}${path.extname(w.file).toLowerCase()}`));
+  hub.jobs.log(n, `Walk recording filed: ${w.summary?.slice(0, 120) ?? w.name}`);
+  return { ...w, status: "filed", notesFile: `notes/walks/${base}.md`, candidates: undefined };
+}
+
+/**
+ * Looks for new recordings and processes each once. Returns what's new. Recordings still being written (changed in
+ * the last minute) wait for the next pass.
+ */
+export async function scanWalks(hub: Hub, opts: { now?: Date; transcriber?: (file: string) => Promise<WalkNotes> } = {}): Promise<Walk[]> {
+  const st = walksStatus(hub);
+  if (!st.on) return [];
+  const now = opts.now ?? new Date();
+  const list = walks(hub);
+  const seen = new Set(list.map((w) => w.id));
+  const fresh: Walk[] = [];
+  const files = readdirSync(st.dir, { recursive: true, withFileTypes: true }).filter((d) => d.isFile() && AUDIO.test(d.name)).map((d) => path.join(d.parentPath ?? (d as any).path ?? st.dir, d.name));
+  for (const file of files) {
+    const s = statSync(file);
+    const id = `${path.basename(file)}:${s.size}`;
+    if (seen.has(id) || s.size < 20_000 || now.getTime() - s.mtimeMs < 60_000) continue;
+    // Only recordings made after this was set up (the folder may hold years of voice memos).
+    if (hub.cfg.walks.since && s.mtimeMs < Date.parse(hub.cfg.walks.since)) continue;
+    const at = recordedAt(path.basename(file), s.mtime);
+    let w: Walk = { id, file, name: path.basename(file), recordedAt: at.toISOString(), status: "error", processedAt: now.toISOString() };
+    try {
+      hub.say(`Walk recording: transcribing ${w.name}…`);
+      const notes = await (opts.transcriber ?? ((f) => transcribe(hub, f)))(file);
+      if (!notes?.transcript?.trim()) throw new Error("Nothing could be heard in that recording.");
+      // One speaker turn per line, however the AI laid it out.
+      notes.transcript = notes.transcript.replace(/([.?!\]])\s+(?=(?:Hunter|Customer|Note|Adjuster|[A-Z][a-z]+):\s)/g, "$1\n");
+      const md = walkMarkdown(w, notes);
+      const m = await matchWalk(hub, at, notes);
+      w = { ...w, summary: notes.summary, promises: notes.promises, jobNumber: m.jobNumber, why: m.why, candidates: m.candidates };
+      if (m.jobNumber) {
+        w = fileToJob(hub, w, md);
+        hub.say(`Walk recording filed to #${m.jobNumber} ${hub.jobs.get(m.jobNumber).name} (${m.why}).`);
+      } else {
+        mkdirSync(holding(hub), { recursive: true });
+        const keep = path.join(holding(hub), `${stamp(at)} ${path.basename(file)}.md`);
+        writeFileSync(keep, md);
+        w = { ...w, status: "needs-job", notesFile: keep };
+        hub.say(`Walk recording transcribed, but I couldn't tell which job it's for: pick one on the dashboard.`);
+      }
+    } catch (e) {
+      w = { ...w, status: "error", error: (e as Error).message };
+      hub.say(`Walk recording ${w.name}: ${(e as Error).message}`);
+    }
+    list.push(w);
+    fresh.push(w);
+    save(hub, list);
+  }
+  return fresh;
+}
+
+/** Files a recording that was waiting for a job (picked on the dashboard). */
+export function fileWalk(hub: Hub, id: string, jobNumber: number): Walk {
+  const list = walks(hub);
+  const i = list.findIndex((w) => w.id === id);
+  if (i < 0) throw new Error("That recording isn't in the list any more.");
+  if (!hub.jobs.exists(jobNumber)) throw new Error(`There's no job folder for #${jobNumber}.`);
+  const w = list[i];
+  if (w.status !== "needs-job" || !w.notesFile || !existsSync(w.notesFile)) throw new Error("That recording is already filed.");
+  list[i] = fileToJob(hub, { ...w, jobNumber, why: "you picked the job" }, readFileSync(w.notesFile, "utf8"));
+  save(hub, list);
+  return list[i];
+}
+
+/** Tries a recording again (after an error), or drops one from the list (`forget`). */
+export function retryWalk(hub: Hub, id: string, forget = false) {
+  const list = walks(hub);
+  const w = list.find((x) => x.id === id);
+  if (!w) return;
+  // Forgotten ones stay in the list (so they aren't picked up again) but out of sight.
+  if (forget) save(hub, list.map((x) => (x.id === id ? { ...x, status: "filed" as const, jobNumber: undefined, candidates: undefined, error: undefined, summary: "(dismissed)" } : x)));
+  else save(hub, list.filter((x) => x.id !== id));
+}
+
+/** A job's walk notes, newest first (for the timeline and the Estimator's inputs). */
+export function jobWalks(hub: Hub, n: number): { file: string; at: string; summary: string }[] {
+  const dir = hub.jobs.path(n, "notes", "walks");
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((f) => f.endsWith(".md"))
+    .map((f) => {
+      const text = readFileSync(path.join(dir, f), "utf8");
+      const w = walks(hub).find((x) => x.jobNumber === n && x.notesFile === `notes/walks/${f}`);
+      return { file: `notes/walks/${f}`, at: w?.recordedAt ?? statSync(path.join(dir, f)).mtime.toISOString(), summary: text.match(/## Summary\n([\s\S]*?)\n\n## /)?.[1]?.trim() ?? "" };
+    })
+    .sort((a, b) => b.at.localeCompare(a.at));
+}
+
+/**
+ * After a recording is filed: offers a short note for the job's Homebase feed (editable), and Google Tasks for what
+ * Hunter said he'd do. Both ask first; nothing is written without a yes.
+ */
+export async function offerWalkFollowups(hub: Hub, w: Walk): Promise<void> {
+  if (w.status !== "filed" || !w.jobNumber || !w.summary) return;
+  const n = w.jobNumber;
+  const day = new Date(w.recordedAt).toLocaleDateString("en-US", { timeZone: "America/Denver", weekday: "short", month: "short", day: "numeric" });
+  const note = await confirmText(hub.approver, `Add this scope walk summary to Homebase #${n}?`, ["From your walk recording. Edit it if you like."], `Scope walk ${day}: ${w.summary}`);
+  if (note) {
+    await hub.homebase.addNote(n, { kind: "note", body: note });
+    hub.jobs.log(n, `Homebase note: ${note.slice(0, 120)}`);
+    hub.say(`Added the walk summary to Homebase #${n}.`);
+  }
+  const promises = (w.promises ?? []).filter((p) => p.what.trim()).slice(0, 8);
+  if (promises.length && hub.tasks.connected()) {
+    const titles = promises.map((p) => `${p.what.trim().replace(/\.$/, "")}${p.due ? ` (said: ${p.due})` : ""} #${n}`);
+    if (await hub.approver.confirm(`Add ${titles.length === 1 ? "this task" : `these ${titles.length} tasks`} to Google Tasks? (things you said you'd do on the walk)`, titles)) {
+      for (const title of titles) await hub.tasks.create({ title });
+      hub.say(`Added ${titles.length} task${titles.length === 1 ? "" : "s"} from the walk.`);
+    }
+  }
+}

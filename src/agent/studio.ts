@@ -4,6 +4,7 @@ import path from "node:path";
 import type { Hub } from "../hub.js";
 import { agentOptions, systemPrompt } from "./run.js";
 import { SERVER } from "./tools.js";
+import { jobWalks } from "../workflows/walks.js";
 
 /**
  * The Estimator tab: a running conversation with Claude about one job, the way Hunter works with the
@@ -100,6 +101,7 @@ export class Studio {
       inputs: {
         sketches: this.hub.jobs.files(job, "sketch", /\.esx$/i).map(info),
         photos: this.hub.jobs.files(job, "photos", /\.(jpe?g|png|heic|webp)$/i).length,
+        walks: jobWalks(this.hub, job).length,
       },
     };
   }

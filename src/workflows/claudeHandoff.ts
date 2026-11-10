@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { Hub } from "../hub.js";
+import { jobWalks } from "./walks.js";
 
 /**
  * Estimates written in the Claude app (Hunter's own subscription and his installed forefront-estimate skill)
@@ -27,6 +28,9 @@ export function handoffPrompt(hub: Hub, n: number, action: HandoffAction, note =
         ...(action === "revise" ? hub.jobs.files(n, "estimate", /\.pdf$/i).slice(0, 3) : []),
       ].map(rel)
     : [];
+  // Walk recordings' notes: site notes for a new estimate or a revision.
+  const walkFiles = j && (action === "estimate" || action === "revise") ? jobWalks(hub, n).slice(0, 3).map((w) => w.file) : [];
+  attach.push(...walkFiles);
   const lines = [
     "Use the forefront-estimate skill.",
     "",
@@ -45,6 +49,7 @@ export function handoffPrompt(hub: Hub, n: number, action: HandoffAction, note =
     "",
     HANDOFF_ACTIONS[action].ask + (note.trim() ? ` ${note.trim()}` : ""),
     "",
+    walkFiles.length ? "I'm attaching my scope walk notes (a transcript of what I said and discussed on site): use them as my site notes for the scope." : "",
     "When you're done, give me the PDFs (named with the customer's last name, as the skill says) and the estimate.json, so I can drop them into Keystone.",
   ];
   return { prompt: lines.filter((l, i, a) => l !== "" || (a[i - 1] ?? "") !== "").join("\n").trim(), attach };

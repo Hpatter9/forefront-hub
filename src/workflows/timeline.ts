@@ -1,4 +1,5 @@
 import { textDays, textLog } from "./texts.js";
+import { jobWalks } from "./walks.js";
 import { intakeAddress } from "../connectors/homebase/types.js";
 import type { Hub } from "../hub.js";
 
@@ -61,6 +62,9 @@ export async function timeline(hub: Hub, jobNumber: number): Promise<TimelineIte
   }
 
   // Texts with the people on the job (from the iPhone backup).
+  // Walk recordings: the summary, with the full notes in the job folder.
+  for (const w of jobWalks(hub, jobNumber)) items.push({ at: w.at, kind: "meeting", title: "Scope walk recording", body: `${w.summary}\n\nFull notes and transcript: ${w.file}`, who: "recorded on your watch", source: "hub" });
+
   // One entry per person per day (not a line per text): the summary that went to Homebase, else the texts themselves.
   const tlog = textLog(hub, jobNumber);
   for (const g of textDays(hub, jobNumber)) {

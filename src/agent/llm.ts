@@ -36,11 +36,11 @@ export function aiOffReason(hub: Hub): string {
  * One question, one answer: plain text, or JSON shaped by `schema` (a JSON Schema). `fast` uses the quicker,
  * cheaper model (summaries, tasks from email).
  */
-export async function complete<T = string>(hub: Hub, o: { system: string; prompt: string; schema?: Record<string, unknown>; fast?: boolean; images?: { mimeType: string; data: string }[]; used?: Set<string> }): Promise<T> {
+export async function complete<T = string>(hub: Hub, o: { system: string; prompt: string; schema?: Record<string, unknown>; fast?: boolean; images?: { mimeType: string; data: string }[]; /** Files uploaded with hub.gemini.uploadFile (recordings). */ files?: { mimeType: string; uri: string }[]; used?: Set<string> }): Promise<T> {
   const p = aiProvider(hub);
   if (p === "off") throw new Error(aiOffReason(hub));
   if (p === "gemini") {
-    const parts = [{ text: o.prompt }, ...(o.images ?? []).map((im) => ({ inlineData: im }))];
+    const parts = [{ text: o.prompt }, ...(o.images ?? []).map((im) => ({ inlineData: im })), ...(o.files ?? []).map((f) => ({ fileData: { mimeType: f.mimeType, fileUri: f.uri } }))];
     const r = await hub.gemini!.generate({ model: o.fast ? hub.cfg.ai.geminiFastModel : hub.cfg.ai.geminiModel, fallbackModels: o.fast ? [hub.cfg.ai.geminiModel, ...(hub.cfg.ai.geminiFallbacks ?? [])] : hub.cfg.ai.geminiFallbacks, system: o.system, contents: [{ role: "user", parts }], jsonSchema: o.schema });
     o.used?.add(`Gemini (${r.model ?? (o.fast ? hub.cfg.ai.geminiFastModel : hub.cfg.ai.geminiModel)})`);
     if (!o.schema) return r.text as T;
@@ -50,7 +50,7 @@ export async function complete<T = string>(hub: Hub, o: { system: string; prompt
       return JSON.parse(r.text.match(/\{[\s\S]*\}/)?.[0] ?? "{}") as T;
     }
   }
-  if (o.images?.length) throw new Error("Looking at pictures needs Gemini (GEMINI_API_KEY).");
+  if (o.images?.length || o.files?.length) throw new Error("Looking at pictures and listening to recordings needs Gemini (GEMINI_API_KEY).");
   o.used?.add(`Claude (${o.fast ? hub.cfg.fastModel : hub.cfg.model})`);
   let out: any = o.schema ? null : "";
   for await (const m of query({

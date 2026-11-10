@@ -1097,6 +1097,7 @@ async function loadStatus() {
   $("#chips").innerHTML = [
     chip("Homebase", status.homebase !== "mock", `Homebase: ${status.homebase}`),
     chip("Gmail", status.gmail === "google", status.gmail === "google" ? (status.gmailFull ? "Connected" : "Connected for drafts only; reconnect to send from Keystone") : "Not connected (test inbox)"),
+    ...(status.walks ? [chip("Walks", status.walks.on, status.walks.on ? `Walk recordings are picked up from ${status.walks.dir}` : status.walks.problem || "Not set up")] : []),
     ...(status.texts ? [chip(textsStale() ? "Texts: old backup" : "Texts", status.texts.connected && !textsStale(), status.texts.connected ? `iPhone texts with job contacts, as of the phone's last backup: ${new Date(status.texts.backupAt).toLocaleString()}${textsStale() ? ". That's more than a day old: plug the iPhone into this PC, open Apple Devices and click Back Up Now." : ""}` : status.texts.problem || "Not connected")] : []),
     chip("CompanyCam", status.companycam === "rest", status.companycam === "rest" ? "Connected" : "Not connected"),
     chip(status.ai?.name && status.ai.provider !== "off" ? status.ai.name : "AI", status.agent, status.agent ? `${status.ai?.name || "Claude"} is on (${status.ai?.model || ""})${status.ai?.provider === "gemini" ? (status.estimator ? ". Only the Estimator tab uses the Claude API; everything else is on Gemini (free)." : ". The Estimator tab needs Claude: add ANTHROPIC_API_KEY to Keystone's .env.") : ""}` : status.ai?.offReason || "Off: no AI key on this machine"),
@@ -1160,6 +1161,8 @@ async function loadToday() {
     <div class="cols">
       <div class="card"><h3>Needs you ${dashFilter ? `<button class="btn small" data-filter="">Show everything</button>` : ""}</h3>
         <div class="needs">
+        ${d.walks?.length && !dashFilter ? `<div class="group"><h3>Walk recordings <span class="muted">${d.walks.length} · pick the job, or try again</span></h3><datalist id="dl-jobs">${jobs.map((j) => `<option value="#${j.jobNumber} ${esc(j.name)}">`).join("")}</datalist>
+          ${d.walks.map((w) => `<div class="rem"><div class="l"><div class="ttl">${esc(w.name)} <span class="muted small">${fmtDate(w.recordedAt)}</span></div><div class="small muted">${w.status === "error" ? `<span style="color:var(--bad)">${esc(w.error || "Couldn't process it")}</span>` : esc((w.summary || "").slice(0, 220))}</div></div><div class="r">${w.status === "needs-job" ? `${(w.candidates || []).map((c) => `<button class="btn small primary" data-walk="${esc(w.id)}" data-walkjob="${c.jobNumber}">#${c.jobNumber} ${esc(c.name)}</button>`).join("")}<input type="text" class="walkpick" data-walk="${esc(w.id)}" list="dl-jobs" placeholder="Job # or name…" style="width:150px"><button class="btn small" data-walk="${esc(w.id)}" data-walkgo="1">File</button>` : `<button class="btn small" data-walk="${esc(w.id)}" data-walkretry="1">Try again</button>`}<button class="btn small" data-walk="${esc(w.id)}" data-walkdrop="1" title="Leave this recording out">Dismiss</button></div></div>`).join("")}</div>` : ""}
         ${d.unfiled?.length && (!dashFilter || dashFilter === "reply") ? `<div class="group"><h3>Emails to file <span class="muted">${d.unfiled.length} · couldn't tell which job; pick one</span></h3>
           ${d.unfiled.map((u) => `<div class="rem"><div class="l"><div class="ttl">${esc(u.subject || "(no subject)")}</div><div class="small muted">from ${esc(u.from)} · ${fmtDate(u.at)}</div></div><div class="r">${u.candidates.map((c) => `<button class="btn small primary" data-do="fileto" data-thread="${esc(u.threadId)}" data-msg="${esc(u.messageId)}" data-n="${c.jobNumber}">#${c.jobNumber} ${esc(c.name)}</button>`).join("")}<button class="btn small" data-do="thread" data-thread="${esc(u.threadId)}">Open</button><button class="btn small" data-do="notjob" data-msg="${esc(u.messageId)}">Not a job email</button></div></div>`).join("")}</div>` : ""}
         ${groups.map((g) => `<div class="group"><h3>${esc(g.label)} <span class="muted">${by[g.kind].length} · ${esc(g.hint)}</span></h3>${by[g.kind].map(remRow).join("")}</div>`).join("") || `<div class="alldone">${d.lastSync || d.folders ? "Nothing is waiting on you." : "The first sync is still running. This fills in when it finishes (about a minute)."}</div>`}
@@ -2478,6 +2481,23 @@ document.addEventListener("change", async (e) => {
   if (h) { try { await api(`/api/huddle/${h.dataset.id}`, { method: "PATCH", body: { done: h.checked } }); loadToday(); } catch (err) { log(err.message, "t-err"); } }
 });
 document.addEventListener("click", async (e) => {
+  const wb = e.target.closest("[data-walk]");
+  if (wb && wb.tagName === "BUTTON") {
+    const id = wb.dataset.walk;
+    try {
+      if (wb.dataset.walkjob) await api("/api/walks/file", { method: "POST", body: { id, job: Number(wb.dataset.walkjob) } });
+      else if (wb.dataset.walkgo) {
+        const v = document.querySelector(`input.walkpick[data-walk="${CSS.escape(id)}"]`)?.value || "";
+        const n = Number(v.match(/\d{4}/)?.[0]) || jobs.find((j) => j.name.toLowerCase() === v.trim().toLowerCase())?.jobNumber;
+        if (!n) { snack("Type the job number (or pick it from the list) first."); return; }
+        await api("/api/walks/file", { method: "POST", body: { id, job: n } });
+        snack(`Filed to #${n}.`);
+      } else if (wb.dataset.walkretry) { await api("/api/walks/dismiss", { method: "POST", body: { id, retry: true } }); snack("Trying that recording again…"); }
+      else if (wb.dataset.walkdrop) await api("/api/walks/dismiss", { method: "POST", body: { id } });
+      loadToday();
+    } catch (err) { log(err.message, "t-err"); }
+    return;
+  }
   const x = e.target.closest("[data-do=huddledel]"); if (x) { e.preventDefault(); await api(`/api/huddle/${x.dataset.id}`, { method: "DELETE" }).catch(() => {}); loadToday(); return; }
   const c = e.target.closest("[data-do=huddleclear]"); if (c) { await api("/api/huddle/clear-done", { method: "POST" }).catch(() => {}); loadToday(); }
 });
@@ -2638,7 +2658,7 @@ function renderEstSide() {
   $("#est-docs").innerHTML = d.docs.map((x) => `<button type="button" class="est-doc ${x.file ? "have" : ""} ${x.file && x.file.path === cur && !$("#est").classList.contains("noprev") ? "on" : ""}" data-est-doc="${x.key}" title="${x.file ? `Preview ${esc(x.file.name)}` : `Ask Claude to make the ${esc(x.label)}`}"><i></i><span>${esc(x.label)}<br><small>${x.file ? `Updated ${new Date(x.file.modified).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Not made yet"}</small></span><span class="mk">${x.file ? "View" : "Make"}</span></button>`).join("") + (d.revisions ? `<div class="small muted" style="padding:2px 8px">${d.revisions} earlier version${d.revisions === 1 ? "" : "s"} kept in estimate/revisions</div>` : "");
   $("#est-other").innerHTML = d.otherPdfs.length ? `<h5>Other PDFs</h5><div class="est-docs">${d.otherPdfs.map((f) => `<button type="button" class="est-doc have ${f.path === cur ? "on" : ""}" data-est-path="${esc(f.path)}"><i style="background:var(--muted)"></i><span>${esc(f.name)}</span><span class="mk">View</span></button>`).join("")}</div>` : "";
   const i = d.inputs;
-  $("#est-inputs").innerHTML = [i.sketches.length ? `✓ Sketch: ${i.sketches.map((s) => esc(s.name)).join(", ")}` : `– No ESX yet (drop it in the chat, or Claude can look for the DocuSketch email)`, i.photos ? `✓ ${i.photos} photos in the job folder` : `– No photos downloaded (Claude can pull them from CompanyCam)`, d.estimateJson ? `✓ estimate.json` : ""].filter(Boolean).map((x) => `<div>${x}</div>`).join("");
+  $("#est-inputs").innerHTML = [i.sketches.length ? `✓ Sketch: ${i.sketches.map((s) => esc(s.name)).join(", ")}` : `– No ESX yet (drop it in the chat, or Claude can look for the DocuSketch email)`, i.photos ? `✓ ${i.photos} photos in the job folder` : `– No photos downloaded (Claude can pull them from CompanyCam)`, i.walks ? `✓ ${i.walks} walk recording${i.walks === 1 ? "" : "s"} (your site notes and the conversation)` : "", d.estimateJson ? `✓ estimate.json` : ""].filter(Boolean).map((x) => `<div>${x}</div>`).join("");
 }
 function renderEstLog() {
   const d = estData, log = $("#est-log");

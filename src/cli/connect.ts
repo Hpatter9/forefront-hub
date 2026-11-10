@@ -224,3 +224,27 @@ export async function connectTexts() {
   console.log("Keystone reads the newest backup each time it syncs. The phone backs up on its own when it's charging");
   console.log("on the same Wi-Fi as this PC with Apple Devices open, or any time you click Back Up Now.");
 }
+
+/**
+ * Walk recordings: tells Keystone which folder on this PC the phone's recordings arrive in (Google Drive for
+ * desktop), and from when (so years of old voice memos aren't transcribed).
+ */
+export async function connectWalks() {
+  const { existsSync, readdirSync } = await import("node:fs");
+  const pathMod = await import("node:path");
+  console.log("Connecting walk recordings to Keystone.");
+  console.log("Recordings you make on your watch reach your phone, the phone uploads them to Google Drive, and Google");
+  console.log("Drive for desktop puts them in a folder on this PC. Keystone watches that folder.\n");
+  const home = process.env.USERPROFILE || process.env.HOME || "";
+  const guesses = ["G:\\My Drive\\Voice Recorder", "G:\\My Drive\\Walk recordings", pathMod.join(home, "My Drive", "Voice Recorder"), pathMod.join(home, "Google Drive", "Voice Recorder")].filter((d) => existsSync(d));
+  if (guesses.length) console.log(`Found: ${guesses[0]}`);
+  const typed = (await ask(`Folder the recordings arrive in${guesses.length ? " (Enter to use the one found)" : ""}: `)).trim().replace(/^"|"$/g, "");
+  const dir = typed || guesses[0] || "";
+  if (!dir) return console.log("\nNo folder given. Run Connect walk recordings again once Google Drive for desktop shows the folder.");
+  if (!existsSync(dir)) return console.log(`\nThat folder isn't on this PC: ${dir}\nCheck the path in File Explorer (click the address bar and copy it), then run this again.`);
+  const audio = readdirSync(dir, { recursive: true }).filter((f) => /\.(m4a|mp3|wav|aac|ogg|3gp|amr)$/i.test(String(f))).length;
+  setEnv({ WALK_RECORDINGS_DIR: dir, WALK_RECORDINGS_SINCE: new Date().toISOString() });
+  console.log(`\nWalk recordings are on. Folder: ${dir}`);
+  console.log(`${audio} recording${audio === 1 ? " is" : "s are"} already in it; those are left alone. Only recordings made from now on are transcribed.`);
+  console.log("Restart Keystone (close its black window, then open the Keystone icon). New recordings are picked up at each sync.");
+}
