@@ -72,10 +72,22 @@ export async function complete<T = string>(hub: Hub, o: { system: string; prompt
  * and the daily brief. With Gemini, its function calling runs the same tools Claude uses, and approvals work the
  * same way. `onMessage` gets Claude-style messages either way (the brief and Ask use them to show progress).
  */
-export async function agentAsk(hub: Hub, prompt: string, opts: { jobNumber?: number; onMessage?: (m: SDKMessage) => void; maxSteps?: number } = {}): Promise<string> {
+export interface ChatTurn {
+  role: "user" | "assistant";
+  text: string;
+}
+
+/** Earlier turns of an Ask conversation, as text in front of the new message (for the Claude path). */
+export function withHistory(prompt: string, history: ChatTurn[] = []): string {
+  if (!history.length) return prompt;
+  const lines = history.map((t) => `${t.role === "user" ? "Hunter" : "You"}: ${t.text}`).join("\n\n");
+  return `Earlier in this conversation:\n\n${lines}\n\nHunter's reply now: ${prompt}`;
+}
+
+export async function agentAsk(hub: Hub, prompt: string, opts: { jobNumber?: number; onMessage?: (m: SDKMessage) => void; maxSteps?: number; history?: ChatTurn[] } = {}): Promise<string> {
   const p = aiProvider(hub);
   if (p === "off") throw new Error(aiOffReason(hub));
-  if (p === "claude") return claudeAsk(hub, prompt, opts);
+  if (p === "claude") return claudeAsk(hub, withHistory(prompt, opts.history), opts);
 
   const defs = hubToolDefs(hub);
   const decls: FunctionDecl[] = defs.map((d: any) => ({ name: d.name, description: String(d.description).slice(0, 1000), parametersJsonSchema: toSchema(d.inputSchema) }));
@@ -84,7 +96,8 @@ export async function agentAsk(hub: Hub, prompt: string, opts: { jobNumber?: num
 Right now it's ${new Date().toLocaleString("en-US", { timeZone: "America/Denver", weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })} (Denver time). "Tomorrow", "this morning" and "next week" are relative to that.
 
 You're running on Gemini inside Keystone. Use the functions provided for anything about jobs, email, the calendar, tasks, contacts and Homebase; read before you answer, and never guess job facts. You can't run the estimating skill or open files here: for estimating, pricing or revising an estimate, tell Hunter to use the Estimator tab. Email is drafts only.`;
-  const contents: Turn[] = [{ role: "user", parts: [{ text: prompt }] }];
+  // An answer to a question it asked: the earlier turns come first, so it knows what "yes, the second one" means.
+  const contents: Turn[] = [...(opts.history ?? []).map((t): Turn => ({ role: t.role === "user" ? "user" : "model", parts: [{ text: t.text }] })), { role: "user", parts: [{ text: prompt }] }];
   for (let step = 0; step < (opts.maxSteps ?? 24); step++) {
     compactOlder(contents);
     const r = await hub.gemini!.generate({ model: hub.cfg.ai.geminiModel, fallbackModels: hub.cfg.ai.geminiFallbacks, system, contents, tools: decls });

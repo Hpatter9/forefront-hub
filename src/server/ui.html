@@ -707,6 +707,11 @@
   .answerdlg .ans-q { margin-bottom: 10px; font-style: italic; }
   .answerdlg .ans-body { max-height: 60vh; overflow: auto; font-size: 15px; line-height: 1.6; }
   .answerdlg .ans-body p { margin: 0 0 10px; }
+  .answerdlg #ans-thread { max-height: 30vh; overflow: auto; }
+  .answerdlg .ans-past { opacity: .75; border-bottom: 1px solid var(--line, #2c3a55); margin-bottom: 12px; padding-bottom: 8px; }
+  .answerdlg .ans-past .ans-body { max-height: none; }
+  .answerdlg .ans-reply { display: flex; gap: 8px; align-items: flex-end; padding: 0 20px 12px; }
+  .answerdlg .ans-reply textarea { flex: 1; resize: vertical; min-height: 44px; font: inherit; }
 
   /* ---- type-to-search job pickers */
   .jp { position: relative; width: 100%; min-width: 180px; }
@@ -925,8 +930,9 @@
   </div>
 </div>
 
-<dialog id="answerdlg" class="answerdlg"><div class="in"><div class="ans-q small muted" id="ans-q"></div><div class="ans-body btext" id="ans-body"></div></div>
-  <div class="foot"><span class="row" id="ans-acts" style="flex:1;flex-wrap:wrap;gap:6px"></span><button class="btn primary" type="button" onclick="this.closest('dialog').close()">Done</button></div></dialog>
+<dialog id="answerdlg" class="answerdlg"><div class="in"><div id="ans-thread"></div><div class="ans-q small muted" id="ans-q"></div><div class="ans-body btext" id="ans-body"></div></div>
+  <form id="ans-reply" class="ans-reply"><textarea id="ans-input" rows="2" placeholder="Reply to Claude… (Enter to send, Shift+Enter for a new line)"></textarea><button class="btn primary" type="submit">Reply</button></form>
+  <div class="foot"><span class="row" id="ans-acts" style="flex:1;flex-wrap:wrap;gap:6px"></span><button class="btn" type="button" onclick="this.closest('dialog').close()">Done</button></div></dialog>
 
 <dialog id="approve"><div class="in"><h4 id="ap-title"></h4><ul id="ap-details"></ul><textarea id="ap-text" rows="3" hidden></textarea></div>
   <div class="foot"><button class="btn" id="ap-no">No</button><button class="btn primary" id="ap-yes">Yes, go ahead</button></div></dialog>
@@ -2445,9 +2451,14 @@ function renderAskCard() {
   el.hidden = !asking.size;
   el.innerHTML = [...asking.values()].map((p) => `<div><span class="spin"></span><span><b>Claude is working on it</b><small>${esc(p.length > 90 ? p.slice(0, 90) + "…" : p)}</small></span></div>`).join("");
 }
+let ansConv = null, ansPast = [];
 async function onAnswer(e) {
   if (!asking.has(e.id)) return; // asked from another window
   asking.delete(e.id); renderAskCard();
+  // A reply in the popup: the earlier back-and-forth stays above the new answer.
+  if (e.conv !== ansConv) ansPast = [];
+  ansConv = e.conv || null;
+  $("#ans-reply").querySelector("button").disabled = false; $("#ans-input").disabled = false;
   if (e.error) { log(`✗ ${e.error}`, "t-err"); }
   const d = e.drafts.find((x) => x.threadId) || e.drafts[0];
   if (d && !e.error) {
@@ -2462,8 +2473,27 @@ async function onAnswer(e) {
   $("#ans-q").textContent = e.prompt;
   $("#ans-body").innerHTML = e.error ? `<p style="color:var(--bad)">${esc(e.error)}</p>` : md(e.text || "(no answer)").replace(/(^|[\s(>])#(\d{4})\b/g, '$1<a href="#" data-do="open" data-n="$2">#$2</a>');
   $("#ans-acts").innerHTML = [...e.jobs.filter((n) => jobs.some((j) => j.jobNumber === n)).map((n) => `<button class="btn small" data-do="open" data-n="${n}">Open #${n} ${esc(jobs.find((j) => j.jobNumber === n)?.name || "")}</button>`), ...e.contacts.map((q) => `<button class="btn small" data-ans-people="${esc(q)}">${msI("contacts")} ${esc(q)} in Contacts</button>`), e.drafts.length ? `<button class="btn small" data-label-go="HUB_DRAFTS">Claude drafts</button>` : ""].join("");
+  $("#ans-thread").innerHTML = ansPast.map((t) => `<div class="ans-past"><div class="ans-q small muted">${esc(t.q)}</div><div class="ans-body btext">${t.a}</div></div>`).join("");
   if (!$("#answerdlg").open) $("#answerdlg").showModal();
+  // Claude asked something back: put the cursor in the reply box.
+  if (/\?\s*$/.test((e.text || "").trim()) || /\?\s*\n/.test(e.text || "")) setTimeout(() => $("#ans-input").focus(), 50);
 }
+$("#ans-reply").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const p = $("#ans-input").value.trim(); if (!p || !ansConv) return;
+  $("#ans-input").disabled = true; $("#ans-reply").querySelector("button").disabled = true;
+  try {
+    const r = await api("/api/ask", { method: "POST", body: { prompt: p, conv: ansConv } });
+    log("› " + p);
+    asking.set(r.id, p); renderAskCard();
+    $("#ans-input").value = "";
+    ansPast.push({ q: $("#ans-q").textContent, a: $("#ans-body").innerHTML });
+    $("#ans-thread").innerHTML = ansPast.map((t) => `<div class="ans-past"><div class="ans-q small muted">${esc(t.q)}</div><div class="ans-body btext">${t.a}</div></div>`).join("");
+    $("#ans-q").textContent = p;
+    $("#ans-body").innerHTML = `<p class="muted"><span class="spin"></span> Claude is working on it…</p>`;
+  } catch (err) { log(err.message, "t-err"); $("#ans-input").disabled = false; $("#ans-reply").querySelector("button").disabled = false; }
+});
+$("#ans-input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#ans-reply").requestSubmit(); } });
 $("#answerdlg").addEventListener("click", (e) => {
   if (e.target === $("#answerdlg")) { $("#answerdlg").close(); return; }
   const o = e.target.closest("[data-do=open]"); if (o) { $("#answerdlg").close(); return; } // the global handler opens the job

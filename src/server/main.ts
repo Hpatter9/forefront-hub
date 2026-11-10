@@ -780,6 +780,12 @@ const server = http.createServer(async (req, res) => {
       // the jobs and contacts Claude looked at (for buttons on the popup), and Claude's reply.
       const id = crypto.randomUUID();
       const prompt = String(b.prompt);
+      // A reply in the popup continues the same conversation (when Claude asked a question back).
+      const convId = typeof b.conv === "string" && askConvs.has(b.conv) ? b.conv : crypto.randomUUID();
+      const conv = askConvs.get(convId) ?? { turns: [], job, at: Date.now() };
+      askConvs.set(convId, conv);
+      for (const [k, c] of askConvs) if (Date.now() - c.at > 6 * 3600_000) askConvs.delete(k);
+      const jobForAsk = job ?? conv.job;
       const made: import("../workflows/generated.js").GeneratedDraft[] = [];
       const jobsSeen = new Set<number>(), contacts = new Set<string>();
       task(`Ask: ${prompt.slice(0, 60)}`, job, async () => {
@@ -787,7 +793,8 @@ const server = http.createServer(async (req, res) => {
         let text = "", error: string | undefined;
         try {
           text = await withDraftSource("Claude", async () => (await import("../agent/llm.js")).agentAsk(hub, prompt, {
-            jobNumber: job,
+            jobNumber: jobForAsk,
+            history: conv.turns.slice(-12),
             onMessage: (m) => {
               if (m.type !== "assistant") return;
               for (const c of m.message.content) {
@@ -802,10 +809,15 @@ const server = http.createServer(async (req, res) => {
           error = (e as Error).message;
         }
         for (const x of text.matchAll(/#(\d{4})\b/g)) jobsSeen.add(Number(x[1]));
-        bus.emit({ type: "answer", id, prompt, text, error, drafts: made.map((d) => ({ threadId: d.threadId || (hub.gmail.kind === "mock" ? d.draftId : undefined), subject: d.subject, to: d.to })), jobs: [...jobsSeen].slice(0, 4), contacts: [...contacts].slice(0, 3) });
+        if (!error) {
+          conv.turns.push({ role: "user", text: prompt }, { role: "assistant", text });
+          conv.at = Date.now();
+          conv.job = jobForAsk;
+        }
+        bus.emit({ type: "answer", id, conv: convId, turns: conv.turns.length / 2, prompt, text, error, drafts: made.map((d) => ({ threadId: d.threadId || (hub.gmail.kind === "mock" ? d.draftId : undefined), subject: d.subject, to: d.to })), jobs: [...jobsSeen].slice(0, 4), contacts: [...contacts].slice(0, 3) });
         if (error) throw new Error(error);
       }, "timeline");
-      return send(res, 202, { id });
+      return send(res, 202, { id, conv: convId });
     }
     const a = p.match(/^\/api\/approvals\/([\w-]+)$/);
     if (a && req.method === "POST") {
@@ -918,6 +930,9 @@ function teamPeople() {
   }
   return [...seen.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name).filter((x) => x.toLowerCase() !== cfg.homebase.me.toLowerCase());
 }
+
+// ---- Ask conversations: kept for a few hours so a reply in the popup continues where it left off
+const askConvs = new Map<string, { turns: import("../agent/llm.js").ChatTurn[]; job?: number; at: number }>();
 
 // ---- Plan my day: the last brief Claude wrote, shown on the dashboard
 interface Plan { state: "running" | "done" | "error"; startedAt: string; finishedAt?: string; text: string; steps: string[]; error?: string; trigger?: "button" | "morning"; /** Items ticked off on the Brief tab, by item key. */ done?: Record<string, boolean> }

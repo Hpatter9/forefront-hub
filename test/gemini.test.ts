@@ -155,3 +155,19 @@ describe("selections setup on Gemini", () => {
     expect(cats.find((c) => c.name === "Laminate flooring")?.budgetTotal).toBe(552.2);
   });
 });
+
+describe("Ask follow-ups", () => {
+  it("sends the earlier turns, so a reply to Claude's question makes sense", async () => {
+    const t = geminiHub(() => "Done: drafted the follow-up to Sam.");
+    await agentAsk(t.hub, "The second one", { history: [{ role: "user", text: "Draft a follow-up for Pine Ave" }, { role: "assistant", text: "Which one: the homeowner or the adjuster?" }] });
+    const c = (t.hub.gemini as MockGemini).requests[0].contents;
+    expect(c.map((x) => x.role)).toEqual(["user", "model", "user"]);
+    expect(c[1].parts[0].text).toContain("homeowner or the adjuster");
+    expect(c[2].parts[0].text).toBe("The second one");
+  });
+  it("puts the earlier turns in front of the message for Claude", async () => {
+    const { withHistory } = await import("../src/agent/llm.js");
+    expect(withHistory("yes", [{ role: "assistant", text: "Want me to draft it?" }])).toMatch(/Earlier in this conversation:[\s\S]*You: Want me to draft it\?[\s\S]*Hunter's reply now: yes/);
+    expect(withHistory("hi")).toBe("hi");
+  });
+});
