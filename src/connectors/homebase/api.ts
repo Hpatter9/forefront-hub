@@ -99,7 +99,7 @@ export class ApiHomebase implements HomebaseClient {
       accountId: c.accountId ?? undefined,
       roles: Array.isArray(c.roles) ? c.roles : undefined,
     }));
-    const acct = p.account && typeof p.account === "object" ? p.account : null;
+    const acct = jobAccount(p);
     for (const a of [p.brief?.adjuster1, p.brief?.adjuster2]) {
       if (a && typeof a === "object" && !contacts.some((c) => c.email && c.email === a.email)) {
         contacts.push({ role: "adjuster", name: a.name ?? "", email: a.email ?? "", phone: a.phone ?? a.mobile ?? "" });
@@ -279,6 +279,24 @@ export class HomebaseError extends Error {
 function fieldResult(r: any, field: string) {
   const f = r?.results?.[field];
   if (f && f.ok === false) throw new HomebaseError(`Homebase refused ${field}: ${f.code ?? ""} ${f.message ?? ""}`.trim(), 422, f.code, r);
+}
+
+const PM_RX = /property manag|\bmanagement\b|\bhoa\b|homeowners? association|\bpm\b/i;
+/**
+ * The company a job is for. Homebase's account field, else (it's often left empty) a property manager the job's
+ * contacts belong to: the referral account when someone on the job works there, or the primary contact's company
+ * when its name says it's a management company or HOA.
+ */
+export function jobAccount(p: any): any | null {
+  if (p.account && typeof p.account === "object" && p.account.name) return p.account;
+  const contacts: any[] = p.contacts ?? [];
+  const ref = p.referral?.account;
+  if (ref?.name && (ref.isPropertyManager || PM_RX.test(ref.subtype ?? "")) && contacts.some((c) => (ref.id && c.accountId === ref.id) || (c.accountName ?? "").toLowerCase() === ref.name.toLowerCase())) {
+    return { ...ref, isPropertyManager: true };
+  }
+  const primaryCo = contacts.find((c) => c.isPrimary)?.accountName;
+  if (primaryCo && PM_RX.test(primaryCo) && !/claim|risk|waste|insurance/i.test(primaryCo)) return { name: primaryCo, id: contacts.find((c) => c.isPrimary)?.accountId, isPropertyManager: true, subtype: "Property manager (from the contact's company)" };
+  return null;
 }
 
 function toSummary(base: string) {

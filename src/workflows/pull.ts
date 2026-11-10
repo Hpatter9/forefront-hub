@@ -31,6 +31,11 @@ export function customerFor(hb: Pick<JobDetail, "contacts" | "account">): { cust
   };
 }
 
+/** A company's name for lists: without "LLC", "Inc." and the like. */
+export function shortCompany(name: string): string {
+  return name.replace(/,?\s+(llc|l\.l\.c\.|inc\.?|incorporated|co\.|corp\.?|ltd\.?)$/i, "").trim();
+}
+
 export async function pullJob(hub: Hub, jobNumber: number, opts: { quiet?: boolean; lookups?: boolean } = {}): Promise<Job> {
   const say = opts.quiet ? () => {} : hub.say;
   const lookups = opts.lookups ?? true;
@@ -41,8 +46,9 @@ export async function pullJob(hub: Hub, jobNumber: number, opts: { quiet?: boole
   const keep = <T>(fresh: T | undefined | "", old: T | undefined) => (fresh === undefined || fresh === "" ? old : fresh);
 
   let job = hub.jobs.upsert(jobNumber, {
-    // Homebase's own short customer name ("Augustine", "Westward 360"), else the main contact's last name.
-    name: hb.name || prior?.name || lastName(customer?.name ?? "") || "",
+    // Homebase's own short customer name ("Augustine", "Westward 360"), else the main contact's last name. A
+    // property-management job goes by the management company ("Fox Property Management"), not the owner.
+    name: (managed && customer?.company ? shortCompany(customer.company) : "") || hb.name || prior?.name || lastName(customer?.name ?? "") || "",
     homebaseId: hb.id,
     homebaseUrl: hb.url,
     address: keep(hb.address, prior?.address) ?? "",

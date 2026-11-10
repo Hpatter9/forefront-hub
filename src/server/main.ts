@@ -133,7 +133,7 @@ async function jobView(n: number) {
   }
   const primary = (raw?.contacts ?? []).find((c: any) => c.isPrimary) ?? null;
   return {
-    homebase: { ...hb, text: undefined },
+    homebase: { ...hb, name: local.customer.company ? local.name : hb.name, text: undefined },
     local,
     folder: hub.jobs.folder(n),
     projectName: raw?.name ?? "",
@@ -340,7 +340,8 @@ const server = http.createServer(async (req, res) => {
       const jobs = await hub.homebase.listJobs({ openOnly: q("all") !== "1", details: true });
       const local = new Map(hub.jobs.list().map((j) => [j.jobNumber, j]));
       const rem = reminders(hub);
-      return send(res, 200, jobs.map((j) => ({ ...j, flags: [...new Set(rem.filter((r) => r.jobNumber === j.jobNumber).map((r) => r.kind))], lastTouchAt: local.get(j.jobNumber)?.pulse.lastTouchAt || null })));
+      // Property-management jobs go by the management company (job.json), not Homebase's owner name.
+      return send(res, 200, jobs.map((j) => ({ ...j, name: local.get(j.jobNumber)?.customer.company ? local.get(j.jobNumber)!.name : j.name, flags: [...new Set(rem.filter((r) => r.jobNumber === j.jobNumber).map((r) => r.kind))], lastTouchAt: local.get(j.jobNumber)?.pulse.lastTouchAt || null })));
     }
     if (p === "/api/accounts") return send(res, 200, (await hub.homebase.searchAccounts?.(q("q"), q("kind") || undefined)) ?? []);
 

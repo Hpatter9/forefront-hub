@@ -41,3 +41,22 @@ describe("property management jobs", () => {
     expect((await new TemplateWriter().writeEmail({ job: j2, kind: "homeowner", total: 100, attachments: [] })).body).toMatch(/^Hi Morgan,/);
   });
 });
+
+describe("spotting a management company Homebase didn't put in the account field", () => {
+  it("uses the referral account when someone on the job works there", async () => {
+    const { jobAccount } = await import("../src/connectors/homebase/api.js");
+    const p = { account: null, referral: { account: { id: "r1", name: "Fox Property Management", subtype: "Residential property manager" } }, contacts: [{ isPrimary: true, accountName: "Fox Property Management", accountId: "r1" }, { accountName: "USAA - Claims" }] };
+    expect(jobAccount(p)).toMatchObject({ name: "Fox Property Management", isPropertyManager: true });
+  });
+  it("ignores a referral nobody on the job works for, and insurance companies", async () => {
+    const { jobAccount } = await import("../src/connectors/homebase/api.js");
+    expect(jobAccount({ account: null, referral: { account: { name: "Fox Property Management", subtype: "Residential property manager" } }, contacts: [{ isPrimary: true, accountName: null }] })).toBeNull();
+    expect(jobAccount({ account: null, contacts: [{ isPrimary: true, accountName: "Claims Management Services" }] })).toBeNull();
+    expect(jobAccount({ account: null, contacts: [{ isPrimary: true, accountName: "Pioneer Property Management" }] })).toMatchObject({ name: "Pioneer Property Management", isPropertyManager: true });
+  });
+  it("names the job after the company in lists", async () => {
+    const { shortCompany } = await import("../src/workflows/pull.js");
+    expect(shortCompany("Westwind Management Group, LLC")).toBe("Westwind Management Group");
+    expect(shortCompany("Fox Property Management")).toBe("Fox Property Management");
+  });
+});
