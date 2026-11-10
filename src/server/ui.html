@@ -1097,7 +1097,7 @@ async function loadStatus() {
   $("#chips").innerHTML = [
     chip("Homebase", status.homebase !== "mock", `Homebase: ${status.homebase}`),
     chip("Gmail", status.gmail === "google", status.gmail === "google" ? (status.gmailFull ? "Connected" : "Connected for drafts only; reconnect to send from Keystone") : "Not connected (test inbox)"),
-    ...(status.texts ? [chip("Texts", status.texts.connected, status.texts.connected ? `iPhone texts with job contacts, as of the phone's last backup: ${new Date(status.texts.backupAt).toLocaleString()}` : status.texts.problem || "Not connected")] : []),
+    ...(status.texts ? [chip(textsStale() ? "Texts: old backup" : "Texts", status.texts.connected && !textsStale(), status.texts.connected ? `iPhone texts with job contacts, as of the phone's last backup: ${new Date(status.texts.backupAt).toLocaleString()}${textsStale() ? ". That's more than a day old: plug the iPhone into this PC, open Apple Devices and click Back Up Now." : ""}` : status.texts.problem || "Not connected")] : []),
     chip("CompanyCam", status.companycam === "rest", status.companycam === "rest" ? "Connected" : "Not connected"),
     chip(status.ai?.name && status.ai.provider !== "off" ? status.ai.name : "AI", status.agent, status.agent ? `${status.ai?.name || "Claude"} is on (${status.ai?.model || ""})${status.ai?.provider === "gemini" ? (status.estimator ? ". Only the Estimator tab uses the Claude API; everything else is on Gemini (free)." : ". The Estimator tab needs Claude: add ANTHROPIC_API_KEY to Keystone's .env.") : ""}` : status.ai?.offReason || "Off: no AI key on this machine"),
   ].join("");
@@ -1145,6 +1145,7 @@ async function loadToday() {
   $("#today").innerHTML = `
     <div class="todayhead"><div style="flex:1;min-width:240px"><h2>Dashboard</h2><div class="dateline">${esc(longDate)} · ${t.open} open jobs${d.lastSync ? ` · synced ${fmtWhen(d.lastSync)}` : ""}</div></div>
       <button class="btn primary" id="plan" ${status.agent ? "" : `disabled title='${AI()} is off on this machine'`}>Plan my day with ${AI()}</button></div>
+    ${textsStale() ? `<div class="banner" style="border-left-color:var(--bad)"><b>Your iPhone hasn't backed up since ${new Date(status.texts.backupAt).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.</b> Keystone can't see texts newer than that. Plug the phone into this PC, open <b>Apple Devices</b> and click <b>Back Up Now</b>, then <b>Sync now</b> here.</div>` : ""}
     ${!d.autoFiling ? `<div class="banner">Incoming job emails file themselves to Homebase once Gmail is fully connected${status.gmail === "google" ? ": double-click <b>Connect Gmail</b> in the Keystone folder (forefront-hub) once more and click Allow" : ""}.</div>` : ""}
     <div id="brief"></div>
     <div class="strip">
@@ -2439,6 +2440,8 @@ function jobFromText(t) {
 }
 /** The AI that runs the everyday features right now (Gemini or Claude); the Estimator tab is always Claude. */
 const AI = () => (status?.ai && status.ai.provider !== "off" ? status.ai.name : "AI");
+/** The iPhone's last backup is more than a day old (26 hours, to allow for a late night), so texts are behind. */
+const textsStale = () => !!(status.texts?.connected && status.texts.backupAt && Date.now() - Date.parse(status.texts.backupAt) > 26 * 3600e3);
 // ---- Dashboard: My tasks (Google Tasks) and the Huddle list
 function tasksCard(d) {
   if (!d.tasksConnected) return "";
@@ -3196,6 +3199,7 @@ setInterval(() => { loadSyncState(); if (store.get("tab", "today") === "today") 
 
 renderRecent();
 spHandleRedirect().catch((e) => { spLastErr = e.message; log(`Spotify: ${e.message}`, "t-err"); store.set("tab", "music"); }).finally(() => { if (spTok.get() && store.get("tab", "today") !== "music") renderMusic().catch(() => {}); });
+setInterval(() => loadStatus().catch(() => {}), 10 * 60e3); // keeps the chips (and the phone-backup time) current
 loadStatus().then(async () => {
   renderBrief();
   showTab(store.get("tab", "today"));
