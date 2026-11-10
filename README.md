@@ -110,7 +110,9 @@ C:\Jobs\3226 Augustine\
   (`backupCrypto.ts`). Only texts whose phone number belongs to
   someone on a job are kept (job folder `notes/texts.json`); everything else is left unread in the backup. A text
   you sent counts as contact, a text from them with no answer shows under Reply needed, and texts appear on the
-  job's timeline. It's as fresh as the last backup (`IPHONE_BACKUP_DIR` to point at a specific one).
+  job's timeline, one entry per person per day. Texts are not logged to Homebase one by one: after a sync, each
+  finished day of texting on a job gets one short summary note, offered on a single approval card
+  (`logTextDays`; the last 3 days only, and a day that was offered isn't offered again). It's as fresh as the last backup (`IPHONE_BACKUP_DIR` to point at a specific one).
 
 - **My tasks and Huddle** (dashboard): My tasks lists every open Google Task with a checkbox and an add box. Due
   tasks are also in the brief, each tagged so ticking its line checks it off in Google Tasks

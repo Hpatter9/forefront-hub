@@ -1,4 +1,4 @@
-import { jobTexts } from "./texts.js";
+import { textDays, textLog } from "./texts.js";
 import { intakeAddress } from "../connectors/homebase/types.js";
 import type { Hub } from "../hub.js";
 
@@ -61,7 +61,13 @@ export async function timeline(hub: Hub, jobNumber: number): Promise<TimelineIte
   }
 
   // Texts with the people on the job (from the iPhone backup).
-  for (const t of jobTexts(hub, jobNumber)) items.push({ at: t.at, kind: "text", direction: t.fromMe ? "out" : "in", title: t.fromMe ? `Text to ${t.who}` : `Text from ${t.who}`, body: t.text, who: t.role, source: "iphone" });
+  // One entry per person per day (not a line per text): the summary that went to Homebase, else the texts themselves.
+  const tlog = textLog(hub, jobNumber);
+  for (const g of textDays(hub, jobNumber)) {
+    const said = g.texts.map((t) => `${t.fromMe ? "You" : g.who.split(/\s+/)[0]}: ${t.text}`).join("\n");
+    const logged = tlog[`${g.day}|${g.who}`];
+    items.push({ at: g.texts.at(-1)!.at, kind: "text", title: `Texts with ${g.who} (${g.texts.length})`, body: logged?.loggedAt ? `${logged.summary}\n\n${said}` : said, who: g.role, source: "iphone" });
+  }
 
   return items.filter((i) => i.at).sort((a, b) => b.at.localeCompare(a.at));
 }

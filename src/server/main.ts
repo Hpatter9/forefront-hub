@@ -884,6 +884,12 @@ function runSyncAll() {
           ".",
       );
       bus.emit({ type: "changed", what: "job" });
+      // Texting days that are over: one summary each for Homebase, asked on one card.
+      if (hub.texts.kind !== "off") {
+        const { logTextDays } = await import("../workflows/texts.js");
+        const { draftTextSummary } = await import("../agent/summarize.js");
+        logTextDays(hub, (p) => draftTextSummary(hub, p)).then((n) => n && bus.emit({ type: "changed", what: "timeline" })).catch((e) => hub.say(`Text summaries: ${(e as Error).message}`));
+      }
     } finally {
       syncRunning = false;
     }

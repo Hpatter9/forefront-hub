@@ -59,7 +59,7 @@ describe("texts filed to jobs", () => {
     const r = await syncTexts(hub);
     expect(r).toMatchObject({ read: 2, matched: 1, jobs: [6001] });
     expect(JSON.stringify(jobTexts(hub, 6001))).not.toContain("dinner");
-    expect((await timeline(hub, 6001)).find((i) => i.kind === "text")).toMatchObject({ title: "Text to Dana Forbes", direction: "out" });
+    expect((await timeline(hub, 6001)).find((i) => i.kind === "text")).toMatchObject({ title: "Texts with Dana Forbes (1)", body: "You: Sent you the estimate" });
   });
 
   it("a text you sent counts as contact: no follow-up reminder", async () => {
@@ -74,5 +74,41 @@ describe("texts filed to jobs", () => {
     await syncTexts(hub);
     const r = reminders(hub).find((x) => x.jobNumber === 6001 && x.kind === "reply");
     expect(r).toMatchObject({ title: "Text: Can you call me about the tile?", detail: expect.stringContaining("Dana Forbes") });
+  });
+});
+
+describe("a day's texts become one Homebase summary", () => {
+  const setup = (answer = true) => {
+    const t = testHub(answer);
+    t.hub.jobs.upsert(9001, { name: "Forbes", stage: "Proposal Submitted", stageSince: ago(20), customer: { name: "Dana Forbes", email: "", phone: "303-555-0100", company: "", attention: "" } });
+    t.hub.texts = new MockTexts([
+      { id: "1", handle: "3035550100", fromMe: true, at: ago(1.2), text: "Can we walk it Thursday at 9?" },
+      { id: "2", handle: "3035550100", fromMe: false, at: ago(1.19), text: "Yes, 9 works" },
+      { id: "3", handle: "3035550100", fromMe: false, at: ago(0), text: "See you soon" }, // today: not finished yet
+      { id: "4", handle: "3035550100", fromMe: true, at: ago(20), text: "old one" }, // too old to offer
+    ]);
+    return t;
+  };
+
+  it("asks once, posts one note per person per finished day, and doesn't ask again", async () => {
+    const { logTextDays, pendingTextDays, syncTexts: sync } = await import("../src/workflows/texts.js");
+    const t = setup();
+    await sync(t.hub);
+    expect(pendingTextDays(t.hub).map((p) => p.texts.length)).toEqual([2]);
+    expect(await logTextDays(t.hub, async (p) => `Set the scope walk (${p.texts.length} texts).`)).toBe(1);
+    const notes = (await t.homebase.getJob(9001).catch(() => null))?.notes ?? [];
+    const writes = JSON.stringify((t.homebase as any).writes ?? notes);
+    expect(writes).toMatch(/Texts with Dana Forbes \(customer\), .*: Set the scope walk \(2 texts\)\./);
+    expect(pendingTextDays(t.hub)).toEqual([]);
+    expect(await logTextDays(t.hub, async () => "again")).toBe(0);
+    expect((await timeline(t.hub, 9001)).filter((i) => i.kind === "text").map((i) => i.title)).toEqual(["Texts with Dana Forbes (1)", "Texts with Dana Forbes (2)", "Texts with Dana Forbes (1)"]);
+  });
+
+  it("posts nothing when you say no, and doesn't offer that day again", async () => {
+    const { logTextDays, pendingTextDays, syncTexts: sync } = await import("../src/workflows/texts.js");
+    const t = setup(false);
+    await sync(t.hub);
+    expect(await logTextDays(t.hub, async () => "x")).toBe(0);
+    expect(pendingTextDays(t.hub)).toEqual([]);
   });
 });

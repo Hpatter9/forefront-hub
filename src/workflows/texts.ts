@@ -96,3 +96,89 @@ export function summarize(list: JobText[], backupAt: string) {
   const waiting = newest && !newest.fromMe ? { from: newest.who, text: newest.text.slice(0, 160), at: newest.at } : null;
   return { lastAt: newest?.at ?? "", lastFromMeAt: mine?.at ?? "", last: newest ? `${newest.fromMe ? "you texted" : "text from"} ${newest.who}` : "", waiting, checkedAt: backupAt };
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// One summary per day for Homebase (not a line per text)
+
+const dayOf = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Denver" });
+const niceDay = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+
+/** A job's texts by day and person, newest day first: one conversation per person per day. */
+export function textDays(hub: Hub, n: number): { day: string; who: string; role: string; texts: JobText[] }[] {
+  const groups = new Map<string, { day: string; who: string; role: string; texts: JobText[] }>();
+  for (const t of jobTexts(hub, n)) {
+    const k = `${dayOf(t.at)}|${t.who}`;
+    (groups.get(k) ?? groups.set(k, { day: dayOf(t.at), who: t.who, role: t.role, texts: [] }).get(k)!).texts.push(t);
+  }
+  return [...groups.values()].map((g) => ({ ...g, texts: g.texts.sort((a, b) => a.at.localeCompare(b.at)) })).sort((a, b) => b.day.localeCompare(a.day));
+}
+
+interface TextLog {
+  [key: string]: { summary: string; loggedAt?: string; declinedAt?: string };
+}
+const logFile = (hub: Hub, n: number) => hub.jobs.path(n, "notes", "texts-log.json");
+export function textLog(hub: Hub, n: number): TextLog {
+  try {
+    return existsSync(logFile(hub, n)) ? JSON.parse(readFileSync(logFile(hub, n), "utf8")) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** How far back a day's texts still get offered to Homebase (so turning texts on doesn't offer two months at once). */
+export const TEXT_LOG_DAYS = 3;
+
+/** Finished days (before today) of texting that haven't been summarized for Homebase yet. */
+export function pendingTextDays(hub: Hub): { jobNumber: number; name: string; day: string; who: string; role: string; texts: JobText[] }[] {
+  const today = dayOf(new Date().toISOString());
+  const oldest = dayOf(new Date(Date.now() - TEXT_LOG_DAYS * 864e5).toISOString());
+  const out = [];
+  for (const j of hub.jobs.list()) {
+    if (!j.texts.lastAt) continue;
+    const log = textLog(hub, j.jobNumber);
+    for (const g of textDays(hub, j.jobNumber)) if (g.day < today && g.day >= oldest && !log[`${g.day}|${g.who}`]) out.push({ jobNumber: j.jobNumber, name: j.name, ...g });
+  }
+  return out;
+}
+
+/**
+ * Writes one short summary of each finished day's text conversation and, with Hunter's OK (one card for all of
+ * them), posts each as a note on its job in Homebase. A day that's been offered isn't offered again.
+ */
+export async function logTextDays(hub: Hub, summarize: (p: { jobNumber: number; name: string; day: string; who: string; role: string; texts: JobText[] }) => Promise<string>): Promise<number> {
+  const pending = pendingTextDays(hub);
+  if (!pending.length) return 0;
+  const notes: { p: (typeof pending)[number]; body: string }[] = [];
+  for (const p of pending) {
+    let summary = "";
+    try {
+      summary = (await summarize(p)).trim();
+    } catch {
+      summary = "";
+    }
+    // Without the AI: a plain count, so the contact is still on record.
+    if (!summary) summary = `${p.texts.length} text${p.texts.length === 1 ? "" : "s"} back and forth.`;
+    notes.push({ p, body: `Texts with ${p.who} (${p.role}), ${niceDay(p.day)}: ${summary}` });
+  }
+  const yes = await hub.approver.confirm(`Add ${notes.length === 1 ? "this text summary" : `these ${notes.length} text summaries`} to Homebase?`, notes.map((x) => `#${x.p.jobNumber} ${x.p.name}: ${x.body}`));
+  let posted = 0;
+  for (const { p, body } of notes) {
+    const log = textLog(hub, p.jobNumber);
+    const key = `${p.day}|${p.who}`;
+    if (yes) {
+      try {
+        await hub.homebase.addNote(p.jobNumber, { kind: "note", body });
+        log[key] = { summary: body, loggedAt: new Date().toISOString() };
+        hub.jobs.log(p.jobNumber, `Homebase note: ${body}`);
+        posted++;
+      } catch (e) {
+        hub.say(`Couldn't add the text summary to Homebase #${p.jobNumber}: ${(e as Error).message}`);
+        continue; // offered again next time
+      }
+    } else log[key] = { summary: body, declinedAt: new Date().toISOString() };
+    mkdirSync(path.dirname(logFile(hub, p.jobNumber)), { recursive: true });
+    writeFileSync(logFile(hub, p.jobNumber), JSON.stringify(log, null, 2));
+  }
+  if (posted) hub.say(`Added ${posted} text summar${posted === 1 ? "y" : "ies"} to Homebase.`);
+  return posted;
+}

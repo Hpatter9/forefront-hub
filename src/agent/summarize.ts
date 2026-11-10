@@ -24,6 +24,20 @@ ${e.text.slice(0, 6000)}`;
   return out.trim().replace(/^["']|["']$/g, "").split("\n")[0] || null;
 }
 
+/** One or two sentences on a day's text conversation with someone on a job, for the Homebase notes feed. */
+export async function draftTextSummary(hub: Hub, p: { jobNumber: number; name: string; day: string; who: string; role: string; texts: { fromMe: boolean; text: string }[] }): Promise<string> {
+  if (!aiReady(hub)) return "";
+  const first = p.who.split(/\s+/)[0];
+  const out = await complete<string>(hub, {
+    system: "You write short, factual job notes for a restoration contractor's CRM.",
+    fast: true,
+    prompt: `Summarize this day's text conversation between Hunter (the estimator) and ${p.who} (${p.role}) on job #${p.jobNumber} ${p.name}, for the job's Notes feed in Homebase. One or two plain sentences, past tense: what it was about, anything agreed (dates, amounts, choices), and the next step if there is one. Don't quote the texts, don't add anything that isn't in them, no greeting.
+
+${p.texts.map((t) => `${t.fromMe ? "Hunter" : first}: ${t.text}`).join("\n").slice(0, 6000)}`,
+  });
+  return out.trim().replace(/^["']|["']$/g, "").replace(/\s*\n+\s*/g, " ");
+}
+
 /** Drafts the note, asks Hunter (editable), and posts it to Homebase if he says yes. */
 export async function suggestNote(hub: Hub, jobNumber: number, e: NoteEvent): Promise<boolean> {
   let text: string | null;
