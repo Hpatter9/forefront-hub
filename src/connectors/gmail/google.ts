@@ -148,7 +148,7 @@ export class GoogleGmail implements MailClient {
   }
 
   private async summary(id: string): Promise<ThreadSummary> {
-    const th = await this.gmail().users.threads.get({ userId: "me", id, format: "metadata", metadataHeaders: ["Subject", "From", "Date"] });
+    const th = await this.gmail().users.threads.get({ userId: "me", id, format: "metadata", metadataHeaders: ["Subject", "From", "Date", "To", "Cc"] });
     const msgs = th.data.messages ?? [];
     const first = msgs[0];
     const last = msgs.at(-1);
@@ -157,6 +157,8 @@ export class GoogleGmail implements MailClient {
     return {
       id,
       subject: h(first, "Subject"),
+      to: h(last, "To"),
+      cc: h(last, "Cc"),
       from: h(last, "From"),
       date: last?.internalDate ? new Date(Number(last.internalDate)).toISOString() : h(last, "Date"),
       snippet: last?.snippet ?? "",

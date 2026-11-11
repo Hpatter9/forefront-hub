@@ -45,3 +45,15 @@ describe("adding files by hand", () => {
     expect(homebase.writes.at(-1)).toMatchObject({ op: "uploadDocument", args: { file: "Signed Agreement.pdf", kind: "contract" } });
   });
 });
+
+describe("copies forwarded to Homebase stay out of Sent", () => {
+  it("hides a lone forward to the office+ address, and keeps real emails that only BCC it", async () => {
+    const { isHomebaseLog } = await import("../src/workflows/inbox.js");
+    expect(isHomebaseLog({ to: "office+3184@forefrontteam.com", messageCount: 1 })).toBe(true);
+    expect(isHomebaseLog({ to: "Homebase <office+3184@forefrontteam.com>", cc: "", messageCount: 1 })).toBe(true);
+    expect(isHomebaseLog({ to: "Dana Forbes <dana@example.com>", messageCount: 1 })).toBe(false);
+    expect(isHomebaseLog({ to: "dana@example.com, office+3184@forefrontteam.com", messageCount: 1 })).toBe(false);
+    expect(isHomebaseLog({ to: "office+3184@forefrontteam.com", messageCount: 3 })).toBe(false);
+    expect(isHomebaseLog({ messageCount: 1 })).toBe(false);
+  });
+});

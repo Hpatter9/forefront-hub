@@ -140,7 +140,7 @@ export class MockGmail implements MailClient {
       .filter((t) => words.every((w) => JSON.stringify(t.messages).toLowerCase().includes(w)))
       .map((t): ThreadSummary => {
         const last = t.messages.at(-1)!;
-        return { id: t.id, subject: t.messages[0].subject, from: last.from, date: last.date, snippet: last.body.slice(0, 140), messageCount: t.messages.length, unread: t.labelIds.includes("UNREAD"), starred: t.labelIds.includes("STARRED"), labelIds: t.labelIds, hasAttachments: false };
+        return { id: t.id, subject: t.messages[0].subject, to: last.to.join(", "), cc: last.cc.join(", "), from: last.from, date: last.date, snippet: last.body.slice(0, 140), messageCount: t.messages.length, unread: t.labelIds.includes("UNREAD"), starred: t.labelIds.includes("STARRED"), labelIds: t.labelIds, hasAttachments: false };
       })
       .sort((a, b) => b.date.localeCompare(a.date));
     return { threads: all };

@@ -73,6 +73,16 @@ export async function matchJob(hub: Hub, m: Message): Promise<{ jobNumber?: numb
   return { candidates: candidates.length ? candidates : byPerson.map((j) => ({ jobNumber: j.jobNumber, name: j.name })) };
 }
 
+/**
+ * A copy Keystone (or Hunter) forwarded to a job's office+<job#> address just to log it in Homebase: one message,
+ * sent only to that address. Those are record-keeping, not conversations, so the Sent list leaves them out.
+ * A real email that only BCCs the office address still shows (its To line is a person).
+ */
+export function isHomebaseLog(t: { to?: string; cc?: string; messageCount: number }): boolean {
+  const to = (t.to ?? "").match(/[\w.+-]+@[\w.-]+/g) ?? [];
+  return t.messageCount === 1 && to.length > 0 && to.every((a) => /^office\+\d+@/i.test(a)) && !(t.cc ?? "").trim();
+}
+
 /** Forwards one message to the job's office+ address with its attachments, and keeps the attachments in the folder. */
 export async function fileMessage(hub: Hub, threadId: string, messageId: string, jobNumber: number): Promise<string[]> {
   if (!hub.gmail.send) throw new Error("This Gmail connection can't forward.");

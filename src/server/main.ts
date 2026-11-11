@@ -635,6 +635,11 @@ const server = http.createServer(async (req, res) => {
       const list = await hub.gmail.listThreads({ label: q("label") || undefined, q: q("q") || undefined, pageToken: q("page") || undefined });
       const { generatedDrafts } = await import("../workflows/generated.js");
       noteAddresses(hub, list.threads.map((x) => ({ from: x.from, at: x.date })));
+      // Sent: copies forwarded to Homebase just to log them aren't shown (search still finds them).
+      if (q("label") === "SENT" && !q("q")) {
+        const { isHomebaseLog } = await import("../workflows/inbox.js");
+        list.threads = list.threads.filter((x) => !isHomebaseLog(x));
+      }
       const claude = new Set(generatedDrafts(hub).filter((g) => g.state === "draft" && g.threadId).map((g) => g.threadId!));
       return send(res, 200, { ...list, threads: list.threads.map((t) => ({ ...t, hasDraft: !!t.labelIds?.includes("DRAFT"), claudeDraft: claude.has(t.id) })) });
     }
