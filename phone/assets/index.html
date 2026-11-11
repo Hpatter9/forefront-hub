@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Keystone</title>
+<style>
+  :root { --bg:#0a1c36; --panel:#0f2748; --deep:#071428; --line:#1d3a66; --ink:#eaf3ff; --muted:#a9c3e6; --accent:#7fd0ff; --on:#06203c; --warn:#ffb38a; --ok:#9be0b4; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 17px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; overflow: hidden; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; background: var(--deep); border-bottom: 1px solid var(--line); }
+  header b { letter-spacing: .18em; font-size: 15px; }
+  header button { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 8px; min-height: 40px; padding: 0 12px; font: inherit; font-size: 14px; }
+  header button.on { color: var(--accent); border-color: var(--accent); }
+  main { flex: 1; overflow-y: auto; padding: 14px 16px 8px; display: flex; flex-direction: column; gap: 10px; overscroll-behavior: contain; }
+  .msg { max-width: 92%; padding: 10px 14px; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .me { align-self: flex-end; background: #163a6b; border-bottom-right-radius: 4px; }
+  .ai { align-self: flex-start; background: var(--panel); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+  .ai a { color: var(--accent); }
+  .note { align-self: center; color: var(--muted); font-size: 14px; text-align: center; }
+  .err { align-self: flex-start; background: #3a1f12; border: 1px solid var(--warn); color: #ffd9c4; }
+  .card { background: var(--panel); border: 2px solid var(--accent); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .card h3 { margin: 0; font-size: 17px; }
+  .card .ln { color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--deep); border-radius: 8px; padding: 8px 10px; font-size: 16px; }
+  .row { display: flex; gap: 10px; }
+  .btn { flex: 1; min-height: 52px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: inherit; font-weight: 600; }
+  .btn.yes { background: var(--accent); color: var(--on); border-color: var(--accent); }
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 8px 16px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: none; min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1px solid var(--line); background: var(--deep); color: var(--muted); font: inherit; font-size: 15px; }
+  footer { padding: 8px 16px calc(14px + env(safe-area-inset-bottom)); background: var(--deep); border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .type { display: flex; gap: 8px; width: 100%; }
+  .type input { flex: 1; min-width: 0; min-height: 48px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; padding: 0 12px; }
+  .type button { min-width: 64px; min-height: 48px; border-radius: 10px; border: 0; background: var(--accent); color: var(--on); font: inherit; font-weight: 600; }
+  #mic { width: 84px; height: 84px; border-radius: 50%; border: 0; background: var(--accent); color: var(--on); display: grid; place-items: center; box-shadow: 0 0 0 8px rgba(127,208,255,.14); }
+  #mic:disabled { opacity: .5; }
+  #mic svg { width: 38px; height: 38px; }
+  .busy { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); margin-right: 8px; animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .busy { animation: none; } }
+  #pair { flex: 1; overflow-y: auto; padding: 22px 18px; display: flex; flex-direction: column; gap: 14px; }
+  #pair h1 { margin: 0; font-size: 24px; }
+  #pair p { margin: 0; color: var(--muted); }
+  #pair ol { margin: 0; padding-left: 22px; color: var(--muted); display: grid; gap: 6px; }
+  #pair label { display: grid; gap: 6px; color: var(--muted); font-size: 15px; }
+  #pair input { min-height: 54px; border-radius: 10px; border: 1px solid var(--line); background: var(--deep); color: var(--ink); font: inherit; font-size: 20px; padding: 0 14px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header><b>KEYSTONE</b><span class="row" style="gap:8px"><button id="voice" type="button" aria-pressed="true" class="on">Read aloud: on</button><button id="menu" type="button">Setup</button></span></header>
+
+<section id="pair" hidden>
+  <h1>Connect this phone</h1>
+  <p>One time, on the same Wi-Fi as your laptop.</p>
+  <ol><li>On the laptop, open the Keystone folder and double-click <b style="color:var(--ink)">Connect phone</b>.</li><li>It shows an address and a 6-digit code. Type both here.</li></ol>
+  <label>Address on the laptop screen<input id="p-addr" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="192.168.1.23:4320"></label>
+  <label>6-digit code<input id="p-code" inputmode="numeric" autocomplete="off" maxlength="7" placeholder="123456"></label>
+  <button class="btn yes" id="p-go" type="button" style="flex:none">Connect</button>
+  <p id="p-msg" role="status"></p>
+  <button class="btn" id="p-cancel" type="button" style="flex:none" hidden>Cancel</button>
+</section>
+
+<main id="talk" aria-live="polite"></main>
+<div class="chips" id="chips">
+  <button class="chip" type="button" data-say="What's on my calendar today and tomorrow?">My calendar</button>
+  <button class="chip" type="button" data-fill="Where does the  job stand?" data-at="15">Job status</button>
+  <button class="chip" type="button" data-fill="What's the phone number for ">Find a contact</button>
+  <button class="chip" type="button" data-fill="Add a note to the  job: " data-at="18">Add a note</button>
+  <button class="chip" type="button" data-fill="Set up a scope walk with ">Schedule a walk</button>
+</div>
+<footer id="foot">
+  <button id="mic" type="button" aria-label="Talk to Keystone"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 15a3.5 3.5 0 0 0 3.5-3.5v-6a3.5 3.5 0 0 0-7 0v6A3.5 3.5 0 0 0 12 15Zm6-3.5a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V22h2v-2.57A8 8 0 0 0 20 11.500Z"/></svg></button>
+  <form class="type" id="typeform"><input id="text" type="text" autocomplete="off" placeholder="or type here" aria-label="Type to Keystone"><button type="submit">Send</button></form>
+</footer>
+
+<script src="app.js"></script>
+<script>
+"use strict";
+// ---- the bridge to the Android app (window.Native); results come back through window.nativeDone
+const waiting = new Map();
+let seq = 0;
+window.nativeDone = (id, result) => { const w = waiting.get(id); if (w) { waiting.delete(id); w(result); } };
+const call = (fn, ...args) => new Promise((resolve) => { const id = `c${++seq}`; waiting.set(id, resolve); Native[fn](id, ...args); });
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const io = {
+  get: (k) => Native.get(k),
+  set: (k, v) => Native.set(k, v),
+  http: async (r) => {
+    const res = await call("http", r.method, r.url, JSON.stringify(r.headers || {}), r.body ?? null);
+    if (res.error) throw new Error(/Unable to resolve host|timeout|Failed to connect|unreachable/i.test(res.error) ? "No connection. Check your signal and try again." : res.error);
+    return res;
+  },
+  confirm: (title, lines) => new Promise((resolve) => {
+    const el = document.createElement("div");
+    el.className = "card";
+    el.innerHTML = `<h3>${esc(title)}</h3>${lines.map((l) => `<div class="ln">${esc(l)}</div>`).join("")}<div class="row"><button class="btn" type="button" data-a="no">No</button><button class="btn yes" type="button" data-a="yes">Yes</button></div>`;
+    el.addEventListener("click", (e) => {
+      const a = e.target.closest("[data-a]")?.dataset.a; if (!a) return;
+      el.querySelector(".row").outerHTML = `<div class="note" style="align-self:flex-start">${a === "yes" ? "You said yes." : "You said no."}</div>`;
+      el.style.borderColor = "var(--line)";
+      resolve(a === "yes");
+    });
+    $("#talk").appendChild(el); scrollDown();
+    if (readAloud()) Native.speak(`${title} Yes or no?`);
+  }),
+};
+const K = KeystonePhone.create(io);
+
+// ---- screen
+const scrollDown = () => { const t = $("#talk"); t.scrollTop = t.scrollHeight; };
+// Phone numbers and emails in an answer become tappable.
+const linkify = (s) => esc(s).replace(/\(\d{3}\) \d{3}-\d{4}|\b\d{3}-\d{3}-\d{4}\b/g, (m) => `<a href="tel:${m.replace(/\D/g, "")}">${m}</a>`).replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, (m) => `<a href="mailto:${m}">${m}</a>`);
+function add(kind, text, html) { const el = document.createElement("div"); el.className = kind === "note" ? "note" : `msg ${kind}`; if (html) el.innerHTML = html; else el.textContent = text; $("#talk").appendChild(el); scrollDown(); return el; }
+const readAloud = () => Native.get("readAloud") !== "off";
+function showVoice() { const on = readAloud(); $("#voice").textContent = `Read aloud: ${on ? "on" : "off"}`; $("#voice").classList.toggle("on", on); $("#voice").setAttribute("aria-pressed", String(on)); }
+$("#voice").onclick = () => { Native.set("readAloud", readAloud() ? "off" : "on"); if (!readAloud()) Native.quiet(); showVoice(); };
+
+const STEP = { find_jobs: "Looking up the job", get_job: "Reading the job", find_contact: "Looking them up", add_note: "Writing the note", log_call: "Logging the call", calendar_list: "Checking your calendar", calendar_create: "Setting up the event", gmail_draft: "Writing the draft" };
+let history = [], busy = false;
+async function send(text) {
+  text = String(text || "").trim();
+  if (!text || busy) return;
+  busy = true; $("#mic").disabled = true; Native.quiet();
+  add("me", text);
+  const status = add("note", "", `<span class="busy"></span>Thinking…`);
+  try {
+    const r = await K.ask(text, history, (name) => { status.innerHTML = `<span class="busy"></span>${esc(STEP[name] || "Working")}…`; scrollDown(); });
+    history = r.history;
+    status.remove();
+    add("ai", "", linkify(r.text));
+    if (readAloud()) Native.speak(r.text.replace(/[*_#`]/g, ""));
+  } catch (e) {
+    status.remove();
+    add("err", e.message || "Something went wrong.");
+  }
+  busy = false; $("#mic").disabled = false;
+}
+$("#mic").onclick = async () => {
+  if (busy) return;
+  const r = await call("listen");
+  if (r.error) return add("err", r.error);
+  if (r.text) send(r.text);
+};
+$("#typeform").onsubmit = (e) => { e.preventDefault(); const t = $("#text").value; $("#text").value = ""; send(t); };
+$("#chips").onclick = (e) => {
+  const c = e.target.closest(".chip"); if (!c) return;
+  if (c.dataset.say) return send(c.dataset.say);
+  const box = $("#text"); box.value = c.dataset.fill; box.focus();
+  const at = c.dataset.at ? Number(c.dataset.at) : box.value.length; box.setSelectionRange(at, at);
+};
+
+// ---- connecting to Keystone on the laptop
+function showPair(first) {
+  $("#pair").hidden = false; $("#talk").hidden = true; $("#chips").hidden = true; $("#foot").hidden = true;
+  $("#p-cancel").hidden = first; $("#p-msg").textContent = ""; $("#p-addr").value = Native.get("lastAddress") || "";
+}
+function showTalk() {
+  $("#pair").hidden = true; $("#talk").hidden = false; $("#chips").hidden = false; $("#foot").hidden = false;
+  if (!$("#talk").children.length) { const s = K.setup(); add("note", `Connected as ${s?.me?.name || "you"}. Tap the microphone and talk, or type.`); }
+}
+$("#p-go").onclick = async () => {
+  const addr = $("#p-addr").value.trim(), code = $("#p-code").value.trim();
+  if (!addr || code.replace(/\D/g, "").length !== 6) { $("#p-msg").textContent = "Type the address and the 6-digit code from the laptop."; return; }
+  $("#p-go").disabled = true; $("#p-msg").textContent = "Connecting…";
+  const r = await call("pair", addr, code);
+  $("#p-go").disabled = false;
+  if (r.error) { $("#p-msg").textContent = r.error; return; }
+  Native.set("lastAddress", addr); $("#p-code").value = ""; history = []; $("#talk").innerHTML = "";
+  showTalk();
+};
+$("#p-cancel").onclick = showTalk;
+$("#menu").onclick = () => showPair(!K.paired());
+window.onNativeBack = () => { if (!$("#pair").hidden && K.paired()) { showTalk(); return true; } return false; };
+
+showVoice();
+if (K.paired()) showTalk(); else showPair(true);
+</script>
+</body>
+</html>

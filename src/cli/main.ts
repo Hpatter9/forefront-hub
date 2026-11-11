@@ -208,6 +208,7 @@ connect.command("gmail").description("Connect Gmail step by step").action(async 
 connect.command("gemini").description("Use Gemini (Google) for Keystone's AI features").action(async () => (await import("./connect.js")).connectGemini());
 connect.command("texts").description("Read texts with job contacts from the iPhone's backup on this PC").action(async () => (await import("./connect.js")).connectTexts());
 connect.command("walks").description("Pick up walk recordings (from your watch/phone) from a folder on this PC").action(async () => (await import("./connect.js")).connectWalks());
+connect.command("phone").description("Connect the Keystone phone app: shows an address and code, and offers the app's install file").action(async () => (await import("./connect.js")).connectPhone());
 connect.command("companycam").description("Connect CompanyCam with an access token").action(async () => (await import("./connect.js")).connectCompanyCam());
 
 program

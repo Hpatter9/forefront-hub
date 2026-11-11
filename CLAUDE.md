@@ -12,3 +12,7 @@
 - Test data is fictional (fixtures/). Don't commit real customer data, Homebase snapshots, `.env` or `auth/`.
 - Tests expect the estimator repo at `../estimator` (or `ESTIMATOR_DIR`) and `python3` with reportlab, pdfplumber
   and Pillow.
+- `phone/` is the Android app (a WebView shell in Java plus `assets/index.html` and `assets/app.js`; no Gradle, built
+  by `phone/build.sh` with Google's build-tools). It works without the laptop: it calls Homebase, Google and Gemini
+  itself with keys handed over once by `Connect phone` (`src/workflows/phone.ts`). Same rules as here: writes ask
+  first, email is drafts only. `phone/keystone.apk` is the built app; the signing key is never committed.

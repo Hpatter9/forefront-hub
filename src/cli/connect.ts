@@ -248,3 +248,33 @@ export async function connectWalks() {
   console.log(`${audio} recording${audio === 1 ? " is" : "s are"} already in it; those are left alone. Only recordings made from now on are transcribed.`);
   console.log("Restart Keystone (close its black window, then open the Keystone icon). New recordings are picked up at each sync.");
 }
+
+/** Shows the address and code for the Keystone phone app, and serves its install file, for 15 minutes. */
+export async function connectPhone() {
+  const { makeHub } = await import("../hub.js");
+  const { lanAddress, servePairing } = await import("../workflows/phone.js");
+  const hub = makeHub();
+  const ip = lanAddress();
+  if (!ip) return console.log("This computer isn't on a network right now. Connect to your Wi-Fi and try again.");
+  if (!hub.cfg.homebase.apiToken) return console.log("Homebase isn't connected in Keystone yet, so there's nothing to give the phone.");
+  let s;
+  try {
+    s = await servePairing(hub);
+  } catch {
+    return console.log("The Connect phone window is already open somewhere. Close the other one and try again.");
+  }
+  console.log("Connect your phone to Keystone\n");
+  console.log("Do this at home or the office, with the phone on the SAME Wi-Fi as this computer.");
+  console.log("If Windows asks whether to allow Node.js on the network, click Allow (private networks).\n");
+  console.log("FIRST TIME ONLY: install the app");
+  console.log(`  On the phone, open Chrome and go to:   http://${ip}:${s.port}`);
+  console.log("  Tap Download Keystone, open the download, tap Install.\n");
+  console.log("THEN: open Keystone on the phone and type these two things");
+  console.log(`  Address:  ${ip}:${s.port}`);
+  console.log(`  Code:     ${s.code.slice(0, 3)} ${s.code.slice(3)}\n`);
+  console.log(`What the phone gets: Homebase${hub.cfg.ai.geminiKey ? ", the AI (Gemini)" : " (no AI key yet: connect Gemini first)"}${existsSync(hub.cfg.gmail.tokenFile) ? ", your Google calendar and Gmail drafts" : " (no Google yet: connect Gmail first)"}, and a copy of your contacts.`);
+  console.log("The keys are saved only on the phone. This window stops offering them in 15 minutes, or when you close it.");
+  await new Promise((r) => setTimeout(r, 15 * 60_000));
+  s.server.close();
+  console.log("\nDone offering. Double-click Connect phone again if you need more time.");
+}
