@@ -22,6 +22,24 @@ export interface WalkNotes {
   /** Clues to which job this is, as said in the recording. */
   address?: string;
   names?: string[];
+  /** Stretches left out because they weren't the walk (recorder left running: a drive, a call, the radio), described, never transcribed. */
+  leftOut?: string[];
+}
+
+/** Takes the "[Left out: ...]" markers out of a transcript and returns them separately. */
+export function splitLeftOut(raw: string): { transcript: string; leftOut: string[] } {
+  const leftOut: string[] = [];
+  const transcript = raw
+    .split("\n")
+    .filter((line) => {
+      const m = line.trim().match(/^\[\s*left out:?\s*(.*?)\]?$/i);
+      if (m) leftOut.push(m[1].trim() || "something that wasn't the walk");
+      return !m;
+    })
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return { transcript, leftOut };
 }
 
 export interface Walk {
@@ -95,22 +113,28 @@ export async function transcribe(hub: Hub, file: string): Promise<WalkNotes> {
   if (aiProvider(hub) !== "gemini" || !hub.gemini) throw new Error("Transcribing recordings needs Gemini (double-click Connect Gemini).");
   const ext = path.extname(file).slice(1).toLowerCase();
   const up = await hub.gemini.uploadFile(file, MIME[ext] ?? "audio/mp4");
-  const transcript = (
+  const { transcript, leftOut } = splitLeftOut(
     await complete<string>(hub, {
-      system: "You transcribe site-walk recordings for a reconstruction estimator (water, fire and mold repairs). Write down only what is actually said, all of it, in order. Unclear words: [unclear].",
-      prompt: "This is a recording from Hunter's scope walk at a customer's property: his own spoken notes and his conversation with the customer. Transcribe all of it as plain text, one speaker turn per line. Start a line with \"Hunter:\" for the estimator, \"Customer:\" (or the person's name) for others when you can tell, and \"Note:\" when Hunter is talking to himself. No headings, no summary, nothing but the transcript.",
+      system: "You transcribe site-walk recordings for a reconstruction estimator (water, fire and mold repairs). Write down only what is actually said during the walk, all of it, in order. Unclear words: [unclear].",
+      prompt: `This is a recording from Hunter's scope walk at a customer's property: his own spoken notes and his conversation with the customer. Transcribe the walk as plain text, one speaker turn per line. Start a line with "Hunter:" for the estimator, "Customer:" (or the person's name) for others when you can tell, and "Note:" when Hunter is talking to himself.
+
+Hunter sometimes forgets to stop the recorder, or starts it early. Transcribe ONLY the walk itself: time at the property looking at the damage, and talk about this property's damage, repairs, measurements, schedule or price (including a phone call about this same job). Do NOT transcribe anything else, wherever it falls in the recording: an audiobook, podcast, radio, music or TV; a phone call about something else; talk with a coworker or anyone else about other jobs or personal things; driving, errands, or background voices that aren't part of the walk. In place of each such stretch write exactly one line, with no words from it:
+[Left out: <what kind of thing it was, e.g. "audiobook playing while driving" or "phone call not about this job">, about <N> minutes]
+When unsure whether a stretch is about this property, keep it.
+
+No headings, no summary, nothing but the transcript and those lines.`,
       files: [up],
       stream: true,
-    })
-  ).trim();
-  if (!transcript) throw new Error("Nothing could be heard in that recording.");
+    }),
+  );
+  if (!transcript) throw new Error(leftOut.length ? `Nothing in that recording was a walk (left out: ${leftOut.join("; ")}).` : "Nothing could be heard in that recording.");
   const notes = await complete<Omit<WalkNotes, "transcript">>(hub, {
-    system: "You organize site-walk transcripts for a reconstruction estimator. Use only what is in the transcript; never invent rooms, measurements or promises.",
+    system: "You organize site-walk transcripts for a reconstruction estimator. Use only what is in the transcript; never invent rooms, measurements or promises. If part of the transcript plainly isn't about this property (another job, a personal call, something playing in the background), leave it out of the notes.",
     prompt: `From this transcript of Hunter's scope walk, pull out what an estimator needs to write the scope.\n\n${transcript.slice(0, 200_000)}`,
     schema: SCHEMA,
   });
   const n = (notes ?? {}) as Partial<WalkNotes>;
-  return { summary: n.summary ?? "", rooms: n.rooms ?? [], measurements: n.measurements ?? [], customerWants: n.customerWants ?? [], promises: n.promises ?? [], address: n.address, names: n.names, transcript };
+  return { summary: n.summary ?? "", rooms: n.rooms ?? [], measurements: n.measurements ?? [], customerWants: n.customerWants ?? [], promises: n.promises ?? [], address: n.address, names: n.names, transcript, leftOut: leftOut.length ? leftOut : undefined };
 }
 
 /** Which job a recording belongs to: the calendar visit at that time, else the address or names said in it. */
@@ -177,7 +201,7 @@ ${list(n.promises.map((p) => `${p.what}${p.due ? ` (by ${p.due})` : ""}`))}
 
 ## Transcript
 ${n.transcript}
-`;
+${n.leftOut?.length ? `\n## Left out (not part of the walk)\n${list(n.leftOut)}\n` : ""}`;
 }
 
 /** Puts a processed recording in its job: the notes and a copy of the audio in notes/walks/. */
@@ -196,7 +220,7 @@ function fileToJob(hub: Hub, w: Walk, md: string): Walk {
  * Looks for new recordings and processes each once. Returns what's new. Recordings still being written (changed in
  * the last minute) wait for the next pass.
  */
-export async function scanWalks(hub: Hub, opts: { now?: Date; transcriber?: (file: string) => Promise<WalkNotes>; /** Process just this file, even if it's from before set-up. */ only?: string } = {}): Promise<Walk[]> {
+export async function scanWalks(hub: Hub, opts: { now?: Date; transcriber?: (file: string) => Promise<WalkNotes>; /** Process just this file, even if it's from before set-up. */ only?: string; /** With `only`: transcribe it again even though it's been done, keeping the job it's filed to. */ redo?: boolean } = {}): Promise<Walk[]> {
   const st = walksStatus(hub);
   if (!st.on) return [];
   const now = opts.now ?? new Date();
@@ -208,7 +232,8 @@ export async function scanWalks(hub: Hub, opts: { now?: Date; transcriber?: (fil
     const s = statSync(file);
     const id = `${path.basename(file)}:${s.size}`;
     if (opts.only && path.basename(file) !== opts.only) continue;
-    if (seen.has(id) || skipReason(hub, s, now, !!opts.only)) continue;
+    const old = opts.only && opts.redo ? list.find((x) => x.id === id) : undefined;
+    if ((seen.has(id) && !old) || skipReason(hub, s, now, !!opts.only)) continue;
     const at = recordedAt(path.basename(file), s.mtime);
     let w: Walk = { id, file, name: path.basename(file), recordedAt: at.toISOString(), status: "error", processedAt: now.toISOString() };
     try {
@@ -218,7 +243,7 @@ export async function scanWalks(hub: Hub, opts: { now?: Date; transcriber?: (fil
       // One speaker turn per line, however the AI laid it out.
       notes.transcript = notes.transcript.replace(/([.?!\]])\s+(?=(?:Hunter|Customer|Note|Adjuster|[A-Z][a-z]+):\s)/g, "$1\n");
       const md = walkMarkdown(w, notes);
-      const m = await matchWalk(hub, at, notes);
+      const m = old?.jobNumber && hub.jobs.exists(old.jobNumber) ? { jobNumber: old.jobNumber, why: old.why ?? "kept on its job", candidates: [] } : await matchWalk(hub, at, notes);
       w = { ...w, summary: notes.summary, promises: notes.promises, jobNumber: m.jobNumber, why: m.why, candidates: m.candidates };
       if (m.jobNumber) {
         w = fileToJob(hub, w, md);
@@ -242,6 +267,7 @@ export async function scanWalks(hub: Hub, opts: { now?: Date; transcriber?: (fil
       w = { ...w, status: "error", error: msg };
       hub.say(`Walk recording ${w.name}: ${msg}`);
     }
+    if (old) list.splice(list.indexOf(old), 1);
     list.push(w);
     fresh.push(w);
     save(hub, list);

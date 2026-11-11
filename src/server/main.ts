@@ -784,7 +784,8 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/walks/scan" && req.method === "POST") { scanAndOfferWalks(); return send(res, 202, { ok: true }); }
     if (p === "/api/walks/transcribe" && req.method === "POST") {
       if (walksRunning) return send(res, 409, { error: "Keystone is already working on a recording. Try again in a minute." });
-      scanAndOfferWalks(String((await body(req)).name ?? ""));
+      const wb = await body(req);
+      scanAndOfferWalks(String(wb.name ?? ""), !!wb.redo);
       return send(res, 202, { ok: true });
     }
     if (p === "/api/walks/file" && req.method === "POST") {
@@ -945,20 +946,21 @@ const server = http.createServer(async (req, res) => {
 let lastSync: SyncAllResult | null = null;
 let syncRunning = false;
 let walksRunning = false;
-function scanAndOfferWalks(only?: string) {
+function scanAndOfferWalks(only?: string, redo = false) {
   if (walksRunning || !hub.cfg.walks.dir) return;
   walksRunning = true;
   (async () => {
     const w = await import("../workflows/walks.js");
     let fresh: Awaited<ReturnType<typeof w.scanWalks>> = [];
     try {
-      fresh = await w.scanWalks(hub, only ? { only } : {});
+      fresh = await w.scanWalks(hub, only ? { only, redo } : {});
     } finally {
       // The approval cards below wait for you; later recordings shouldn't wait with them.
       walksRunning = false;
       bus.emit({ type: "changed", what: "job" });
     }
-    for (const x of fresh) await w.offerWalkFollowups(hub, x).catch((e) => hub.say(`Walk follow-ups: ${(e as Error).message}`));
+    // (A recording done over doesn't offer its follow-ups a second time.)
+    if (!redo) for (const x of fresh) await w.offerWalkFollowups(hub, x).catch((e) => hub.say(`Walk follow-ups: ${(e as Error).message}`));
   })().catch((e) => {
     walksRunning = false;
     hub.say(`Walk recordings: ${(e as Error).message}`);

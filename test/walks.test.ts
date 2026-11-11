@@ -115,3 +115,27 @@ describe("walk recordings", () => {
     expect(jobWalks(t.hub, 9002)).toHaveLength(1);
   });
 });
+
+describe("only the walk is kept", () => {
+  it("takes out the stretches the transcriber marked as not the walk, and lists what they were", async () => {
+    const { splitLeftOut, walkMarkdown } = await import("../src/workflows/walks.js");
+    const r = splitLeftOut("Hunter: Hall bath, vanity is swollen.\nCustomer: We want the same tile.\n[Left out: audiobook playing while driving, about 25 minutes]\n[Left out: phone call not about this job, about 6 minutes]");
+    expect(r.transcript).toBe("Hunter: Hall bath, vanity is swollen.\nCustomer: We want the same tile.");
+    expect(r.leftOut).toEqual(["audiobook playing while driving, about 25 minutes", "phone call not about this job, about 6 minutes"]);
+    const md = walkMarkdown({ recordedAt: new Date().toISOString(), name: "Voice 1.m4a" }, { transcript: r.transcript, leftOut: r.leftOut, summary: "s", rooms: [], measurements: [], customerWants: [], promises: [] });
+    expect(md).toContain("## Left out (not part of the walk)\n- audiobook playing while driving, about 25 minutes");
+  });
+
+  it("tells Gemini to transcribe only the walk, and a recording can be done over without losing its job", async () => {
+    const t = setup();
+    t.hub.cfg.ai = { provider: "gemini", geminiKey: "k", geminiModel: "m", geminiFastModel: "f" };
+    t.hub.gemini = new MockGemini(() => JSON.stringify(notes()));
+    const f = t.rec("Voice 020.m4a", new Date(Date.now() - 3600e3));
+    await transcribe(t.hub, f);
+    expect(JSON.stringify((t.hub.gemini as MockGemini).requests[0])).toMatch(/audiobook, podcast, radio/);
+    const [first] = await scanWalks(t.hub, { only: "Voice 020.m4a", transcriber: async () => notes() });
+    const [again] = await scanWalks(t.hub, { only: "Voice 020.m4a", redo: true, transcriber: async () => notes({ summary: "Done over." }) });
+    expect(again).toMatchObject({ id: first.id, summary: "Done over.", jobNumber: first.jobNumber });
+    expect(walks(t.hub).filter((w) => w.id === first.id)).toHaveLength(1);
+  });
+});
