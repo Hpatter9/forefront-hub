@@ -164,7 +164,7 @@ export function hubToolDefs(hub: Hub) {
             subject = replySubject(msgs[0].subject || a.subject);
           }
         }
-        const ref = await createGeneratedDraft(hub, { to: a.to, cc: a.cc, bcc, subject, body: a.body, attachments: files, threadId: a.threadId, inReplyTo, references }, { jobNumber: a.jobNumber });
+        const ref = await createGeneratedDraft(hub, { to: a.to, cc: a.cc, bcc, subject, body: a.body, attachments: files, threadId: a.threadId, inReplyTo, references }, { jobNumber: a.jobNumber, toInsurance: a.kind === "adjuster" });
         if (a.jobNumber && hub.jobs.exists(a.jobNumber)) hub.jobs.log(a.jobNumber, `Draft "${a.subject}" to ${a.to.join(", ")}`);
         if (a.jobNumber && hub.jobs.exists(a.jobNumber) && a.kind !== "other") {
           const j = hub.jobs.get(a.jobNumber);

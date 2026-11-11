@@ -1,3 +1,4 @@
+import { applyCarrierRule, isToInsurance, ruleForJob } from "./carriers.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -71,9 +72,17 @@ export function cleanDraftBody(body: string, opts: { companies?: string[] } = {}
   return s;
 }
 
-export async function createGeneratedDraft(hub: Hub, d: DraftInput, meta: { jobNumber?: number; source?: string } = {}): Promise<DraftRef> {
+export async function createGeneratedDraft(hub: Hub, d: DraftInput, meta: { jobNumber?: number; source?: string; /** It's the adjuster's email, even if the address isn't recognisably the carrier's. */ toInsurance?: boolean } = {}): Promise<DraftRef> {
   const job = meta.jobNumber && hub.jobs.exists(meta.jobNumber) ? hub.jobs.get(meta.jobNumber) : null;
   d = { ...d, body: cleanDraftBody(d.body, { companies: [job?.carrier ?? "", job?.customer.company ?? ""] }), subject: d.subject.replace(/\\n/g, " ").trim() };
+  // A new email to the job's insurance follows the carrier's rule (its claims address; the subject it files by).
+  const rule = job && !d.threadId ? ruleForJob(hub, job) : null;
+  if (rule && job && (meta.toInsurance || isToInsurance(rule, job, d.to))) {
+    const fixed = applyCarrierRule(rule, job, d);
+    if (fixed.missing) hub.say(`Heads up: ${fixed.missing}`);
+    else if (fixed.subject !== d.subject || fixed.to.join() !== d.to.join()) hub.say(`${rule.carrier} email: sent to ${rule.to} with the claim number as the subject.`);
+    d = { ...d, to: fixed.to, cc: fixed.cc, subject: fixed.subject };
+  }
   const ref = await hub.gmail.createDraft({ ...d, labels: [GENERATED_LABEL] });
   const list = generatedDrafts(hub);
   list.push({

@@ -6,6 +6,7 @@ import type { SendoffDraft } from "../core/job.js";
 import type { Hub } from "../hub.js";
 import { downloadPhotos } from "./pull.js";
 import type { EmailWriter, PhotoInfo, Recipient } from "./writer.js";
+import { applyCarrierRule, ruleForJob } from "./carriers.js";
 
 export interface SendoffOptions {
   to: Recipient[];
@@ -61,15 +62,18 @@ export async function sendoff(hub: Hub, jobNumber: number, o: SendoffOptions): P
 
   // ---- who gets what
   const plan: { kind: Recipient; to: string; attachments: string[] }[] = [];
+  const rule = ruleForJob(hub, job);
   for (const kind of o.to) {
     if (kind === "homeowner") {
       if (!job.customer.email) problems.push(job.customer.company ? `No email for ${job.customer.company} (the management company) in Homebase: add their contact or billing email.` : "No homeowner email (Homebase contact or `hub job set` it).");
       if (!files.estimate) problems.push("No '<Last Name> - Reconstruction Estimate.pdf' in estimate/.");
       plan.push({ kind, to: job.customer.email, attachments: [files.estimate ?? ""] });
     } else {
-      if (!job.adjuster.email) problems.push("No adjuster email (Homebase contact or `hub job set --adjuster-email`).");
+      // A carrier with its own rule (State Farm's claims inbox) is where the adjuster email goes.
+      if (!rule && !job.adjuster.email) problems.push("No adjuster email (Homebase contact or `hub job set --adjuster-email`).");
+      if (rule && !job.claimNumber.trim()) problems.push(`${rule.carrier} needs the claim number as the subject, and this job has none in Homebase.`);
       if (!files.xactimate) problems.push("No '<Last Name> - Xactimate Estimate.pdf' in estimate/.");
-      plan.push({ kind, to: job.adjuster.email, attachments: [files.xactimate ?? ""] }); // + photo report below
+      plan.push({ kind, to: rule?.to ?? job.adjuster.email, attachments: [files.xactimate ?? ""] }); // + photo report below
     }
   }
   if (total === undefined && o.to.includes("homeowner")) problems.push("No estimate total (no estimate/estimate.json).");
@@ -97,7 +101,7 @@ export async function sendoff(hub: Hub, jobNumber: number, o: SendoffOptions): P
   // ---- drafts
   const drafts: SendoffDraft[] = [];
   for (const p of plan) {
-    const { subject, body } = await o.writer.writeEmail({
+    const written = await o.writer.writeEmail({
       job,
       kind: p.kind,
       total,
@@ -105,8 +109,12 @@ export async function sendoff(hub: Hub, jobNumber: number, o: SendoffOptions): P
       attachments: p.attachments.map((a) => path.basename(a)),
       priceList: est.price_list,
     });
-    const ref = await createGeneratedDraft(hub, { to: [p.to], cc: o.cc, bcc: [bcc], subject, body, attachments: p.attachments }, { jobNumber, source: "Send-off" });
-    const d: SendoffDraft = { id: ref.id, kind: p.kind, to: [p.to], subject, messageId: ref.messageId, attachments: p.attachments.map((a) => path.basename(a)), createdAt: new Date().toISOString() };
+    const body = written.body;
+    // The adjuster's copy follows the carrier's rule: its address, and the subject it files by (the claim number).
+    const addressed = p.kind === "adjuster" && rule ? applyCarrierRule(rule, job, { to: [p.to, job.adjuster.email].filter(Boolean), cc: o.cc, subject: written.subject }) : { to: [p.to], cc: o.cc, subject: written.subject };
+    const subject = addressed.subject;
+    const ref = await createGeneratedDraft(hub, { to: addressed.to, cc: addressed.cc, bcc: [bcc], subject, body, attachments: p.attachments }, { jobNumber, source: "Send-off", toInsurance: p.kind === "adjuster" });
+    const d: SendoffDraft = { id: ref.id, kind: p.kind, to: addressed.to, subject, messageId: ref.messageId, attachments: p.attachments.map((a) => path.basename(a)), createdAt: new Date().toISOString() };
     drafts.push(d);
     writeFileSync(hub.jobs.path(jobNumber, "email", `${d.createdAt.slice(0, 10)}-${p.kind}.txt`), `To: ${p.to}\nBcc: ${bcc}\nSubject: ${subject}\nAttachments: ${d.attachments.join(", ")}\n\n${body}\n`);
     hub.say(`Draft for ${p.kind}: "${subject}" -> ${p.to} (bcc ${bcc})`);

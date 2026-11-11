@@ -137,6 +137,14 @@ C:\Jobs\3226 Augustine\
   sends after you confirm. AI drafts are tidied first (`cleanDraftBody`: real line breaks, no greeting to a
   company, no typed signature).
 
+- **Carrier email rules** (`config/carriers.json`; your own in `.hub/carriers.json` win): how each insurance
+  carrier wants its email. State Farm: the claims inbox, with only the claim number as the subject. Every new email
+  Keystone drafts to a job's insurance follows its carrier's rule (`src/workflows/carriers.ts`), whoever wrote the
+  words; a named adjuster moves to Cc; replies inside a thread are left as they are.
+- **Which job mail belongs to** (`src/workflows/jobMail.ts`): a job's Homebase address, number, claim number or
+  street is a sure sign; the same for another job rules it out; an address or phone number that's on several jobs
+  (a carrier's claims inbox, a property manager) counts only with the customer's name.
+
 - **Morning brief**: Plan my day runs on its own at 7:00 AM Denver time on weekdays and shows as Today's brief on
   the dashboard (`src/workflows/brief.ts`). If Keystone opens later, it runs then (until 5 PM). Change it in `.env`:
   `HUB_BRIEF_TIME=08:00`, `HUB_BRIEF_DAYS=0-6` (every day), or `HUB_BRIEF_TIME=off`.

@@ -1,0 +1,9 @@
+[
+  {
+    "carrier": "State Farm",
+    "match": ["state farm", "statefarm"],
+    "to": "statefarmfireclaims@statefarm.com",
+    "subject": "{claim}",
+    "note": "State Farm files email by the claim number: send to the claims inbox with only the claim number in the subject."
+  }
+]

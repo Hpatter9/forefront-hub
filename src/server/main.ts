@@ -375,7 +375,7 @@ const server = http.createServer(async (req, res) => {
           if (!hub.jobs.exists(n)) await pullJob(hub, n, { quiet: true, lookups: false });
           const { jobConversation } = await import("../workflows/conversation.js");
           const j = hub.jobs.get(n);
-          return send(res, 200, { ...(await jobConversation(hub, n)), job: { jobNumber: n, name: j.name, stage: j.stage, address: j.address, customer: j.customer, adjuster: j.adjuster, occupant: j.occupant, claimNumber: j.claimNumber, carrier: j.carrier, step: (await import("../workflows/reminders.js")).stepFor(j.stage), intake: `office+${n}@forefrontteam.com` }, me: cfg.gmail.address });
+          return send(res, 200, { ...(await jobConversation(hub, n)), job: { jobNumber: n, name: j.name, stage: j.stage, address: j.address, customer: j.customer, adjuster: j.adjuster, occupant: j.occupant, claimNumber: j.claimNumber, carrier: j.carrier, step: (await import("../workflows/reminders.js")).stepFor(j.stage), intake: `office+${n}@forefrontteam.com`, carrierRule: (await import("../workflows/carriers.js")).ruleForJob(hub, j) }, me: cfg.gmail.address });
         }
         if (action === "claude-prompt") {
           const { handoffPrompt, HANDOFF_ACTIONS } = await import("../workflows/claudeHandoff.js");
