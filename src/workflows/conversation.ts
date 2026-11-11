@@ -1,7 +1,7 @@
 import type { Message } from "../connectors/gmail/types.js";
 import type { Hub } from "../hub.js";
 import { allSigns, belongsToJob, jobMailQuery } from "./jobMail.js";
-import { adjusterReview, reminders, stepFor } from "./reminders.js";
+import { reminders, stepFor } from "./reminders.js";
 import { jobTexts } from "./texts.js";
 import { jobWalks } from "./walks.js";
 
@@ -101,7 +101,7 @@ export async function jobConversation(hub: Hub, n: number): Promise<{ items: Con
 }
 
 /** The job list for the By job view: who's waiting on a reply first, then the most recently active. */
-export function mailJobs(hub: Hub): { jobNumber: number; name: string; stage: string; address: string; waiting: boolean; lastAt: string; last: string; quietDays: number | null; step: string }[] {
+export function mailJobs(hub: Hub): { jobNumber: number; name: string; stage: string; address: string; waiting: boolean; lastAt: string; last: string; quietDays: number | null; step: string; people: string }[] {
   const rem = reminders(hub);
   return hub.jobs
     .list()
@@ -113,7 +113,9 @@ export function mailJobs(hub: Hub): { jobNumber: number; name: string; stage: st
         waiting: rem.some((r) => r.jobNumber === j.jobNumber && r.kind === "reply"),
         lastAt, last: j.texts.lastAt && j.texts.lastAt === lastAt ? j.texts.last : j.pulse.lastTouch,
         quietDays: lastAt ? Math.floor((Date.now() - Date.parse(lastAt)) / 864e5) : null,
-        step: adjusterReview(j) && j.stage === "Proposal Submitted" ? stepFor(j.stage) : stepFor(j.stage),
+        step: stepFor(j.stage),
+        // For the search box: everyone and everything the job goes by.
+        people: [j.customer.name, j.customer.attention, j.customer.company, j.customer.email, j.adjuster.name, j.adjuster.email, j.occupant?.name ?? "", j.carrier, j.claimNumber, j.address].filter(Boolean).join(" "),
       };
     })
     .sort((a, b) => Number(b.waiting) - Number(a.waiting) || (b.lastAt || "").localeCompare(a.lastAt || ""));

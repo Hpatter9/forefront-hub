@@ -790,6 +790,8 @@
   .bj-b .acts { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
   .bj-b .att { display: inline-block; border: 1px solid var(--line); border-radius: 8px; padding: 1px 8px; font-size: 12.5px; margin: 6px 6px 0 0; }
   .bj-pill { align-self: center; color: var(--muted); font-size: 13px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 14px; max-width: 80%; text-align: center; }
+  .bj-found { margin: 0 22px 6px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 13.5px; }
+  .bj-found span { flex: 1 1 200px; }
   .bj-day { align-self: center; color: var(--muted); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; margin-top: 6px; }
   .bj-bar { border-top: 1px solid var(--line); padding: 12px 22px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--panel); }
   .bj-facts { border-left: 1px solid var(--line); padding: 18px 16px; overflow: auto; display: flex; flex-direction: column; gap: 14px; font-size: 14px; }
@@ -1635,8 +1637,15 @@ $("#labels").addEventListener("click", (e) => {
   $("#mq").value = ""; $("#mq-clear").hidden = true; mailPages = [null]; mailPage = 0; showList(); loadThreads();
 });
 let mqTimer;
-$("#mq").addEventListener("input", () => { $("#mq-clear").hidden = !$("#mq").value; clearTimeout(mqTimer); mqTimer = setTimeout(() => { mailPages = [null]; mailPage = 0; showList(); loadThreads(); }, 400); });
-$("#mq-clear").addEventListener("click", () => { $("#mq").value = ""; $("#mq-clear").hidden = true; mailPages = [null]; mailPage = 0; loadThreads(); });
+$("#mq").addEventListener("input", () => {
+  $("#mq-clear").hidden = !$("#mq").value; clearTimeout(mqTimer);
+  // By job: the box narrows the jobs and the open conversation as you type. Inbox: it searches Gmail.
+  if ($("#gm").classList.contains("byjob")) { bjSearch($("#mq").value.trim()); return; }
+  mqTimer = setTimeout(() => { mailPages = [null]; mailPage = 0; showList(); loadThreads(); }, 400);
+});
+$("#mq").addEventListener("keydown", (e) => { if (e.key === "Enter" && $("#gm").classList.contains("byjob") && $("#mq").value.trim()) { e.preventDefault(); bjAllMail(); } });
+function bjAllMail() { mailMode = "inbox"; applyMailMode(); mailPages = [null]; mailPage = 0; showList(); loadThreads(); snack("Searching all mail. Press By job to go back."); }
+$("#mq-clear").addEventListener("click", () => { $("#mq").value = ""; $("#mq-clear").hidden = true; if ($("#gm").classList.contains("byjob")) { bjSearch(""); return; } mailPages = [null]; mailPage = 0; loadThreads(); });
 
 function showList() { $("#gm-listview").style.display = "flex"; $("#reader").hidden = true; mailThread = null; if (mailMode === "byjob") applyMailMode(); }
 function renderMailBar() {
@@ -1915,14 +1924,30 @@ let mailMode = store.get("mailmode", "byjob"), bjJob = store.get("bjjob", null),
 function applyMailMode() {
   $("#gm").classList.toggle("byjob", mailMode === "byjob");
   $$(".bj-toggle button").forEach((b) => b.classList.toggle("on", b.dataset.mailmode === mailMode));
-  if (mailMode === "byjob") loadByJob();
+  $("#mq").placeholder = mailMode === "byjob" ? "Search jobs and this conversation (Enter searches all mail)" : "Search mail";
+  if (mailMode === "byjob") loadByJob(); else bjSearch("");
+}
+/** The search box in By job: narrows the job list (number, name, address, people, claim) and the open conversation. */
+function bjSearch(q) {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const hit = (text) => words.every((w) => text.includes(w));
+  let jobsShown = 0;
+  $$("#bj-jobs .bj-job[data-bjjob]").forEach((b) => { const ok = !words.length || hit(b.dataset.search || ""); b.hidden = !ok; if (ok) jobsShown++; });
+  let n = 0;
+  $$("#bj-stream .bj-b, #bj-stream .bj-pill").forEach((el) => { const ok = !words.length || hit(el.textContent.toLowerCase()); el.hidden = !ok; if (ok) n++; });
+  $$("#bj-stream .bj-day").forEach((el) => (el.hidden = !!words.length));
+  let bar = $("#bj-found");
+  if (!words.length) { bar?.remove(); return; }
+  if (!bar) { bar = document.createElement("div"); bar.id = "bj-found"; bar.className = "bj-found"; $("#bj-stream").before(bar); }
+  bar.innerHTML = `<span>${jobsShown} job${jobsShown === 1 ? "" : "s"} and ${n} message${n === 1 ? "" : "s"} here match “${esc(q)}”</span><button class="btn small" type="button" data-bjall="1">Search all mail</button><button class="btn small" type="button" data-bjclear="1">Clear</button>`;
 }
 function setMailMode(m) { mailMode = m; store.set("mailmode", m); applyMailMode(); }
 $$(".bj-toggle button").forEach((b) => b.addEventListener("click", () => setMailMode(b.dataset.mailmode)));
 async function loadByJob() {
   try { bjList = await api("/api/mail/jobs"); } catch (e) { $("#bj-jobs").innerHTML = `<p class="muted small">${esc(e.message)}</p>`; return; }
   if (!bjList.some((j) => j.jobNumber === bjJob)) bjJob = bjList[0]?.jobNumber ?? null;
-  $("#bj-jobs").innerHTML = (bjList.map((j) => `<button type="button" class="bj-job ${j.jobNumber === bjJob ? "on" : ""}" data-bjjob="${j.jobNumber}"><span class="top"><b>#${j.jobNumber} ${esc(j.name)}</b>${j.waiting ? `<span class="wait">waiting on you</span>` : j.quietDays != null ? `<span class="small muted">${j.quietDays === 0 ? "today" : `quiet ${j.quietDays}d`}</span>` : ""}</span><span class="small muted">${esc(j.stage)} · ${esc(j.address)}</span></button>`).join("") || `<p class="muted small" style="padding:8px">No open jobs yet. They show up after the first sync.</p>`) + `<button type="button" class="bj-job" data-mailmode-go="inbox" style="border-style:dashed;color:var(--muted);margin-top:6px">Everything else: open the Inbox</button>`;
+  $("#bj-jobs").innerHTML = (bjList.map((j) => `<button type="button" class="bj-job ${j.jobNumber === bjJob ? "on" : ""}" data-bjjob="${j.jobNumber}" data-search="${esc(`#${j.jobNumber} ${j.name} ${j.stage} ${j.people || ""}`.toLowerCase())}"><span class="top"><b>#${j.jobNumber} ${esc(j.name)}</b>${j.waiting ? `<span class="wait">waiting on you</span>` : j.quietDays != null ? `<span class="small muted">${j.quietDays === 0 ? "today" : `quiet ${j.quietDays}d`}</span>` : ""}</span><span class="small muted">${esc(j.stage)} · ${esc(j.address)}</span></button>`).join("") || `<p class="muted small" style="padding:8px">No open jobs yet. They show up after the first sync.</p>`) + `<button type="button" class="bj-job" data-mailmode-go="inbox" style="border-style:dashed;color:var(--muted);margin-top:6px">Everything else: open the Inbox</button>`;
+  if ($("#mq").value.trim()) bjSearch($("#mq").value.trim());
   if (bjJob) openBj(bjJob); else { $("#bj-head").innerHTML = ""; $("#bj-stream").innerHTML = ""; $("#bj-bar").innerHTML = ""; $("#bj-facts").innerHTML = ""; }
 }
 const bjWhen = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -1958,6 +1983,7 @@ async function openBj(n, quiet) {
   const atts = [...new Set(d.items.flatMap((x) => x.attachments || []))].slice(0, 12);
   $("#bj-facts").innerHTML = `<div><div class="k">Stage</div>${esc(j.stage)}</div><div><div class="k">Next step</div><span style="color:var(--accent)">${esc(j.step)}</span></div>${person("Customer", j.customer)}${person("Adjuster", j.adjuster)}${person("On site", j.occupant)}${j.claimNumber ? `<div><div class="k">Claim</div>${esc(j.claimNumber)}${j.carrier ? `<br><span class="small muted">${esc(j.carrier)}</span>` : ""}</div>` : ""}${j.carrierRule ? `<div><div class="k">Emailing ${esc(j.carrierRule.carrier)}</div><span class="small">New emails go to ${esc(j.carrierRule.to)}${j.carrierRule.subject === "{claim}" ? ", with only the claim number as the subject" : ""}.</span></div>` : ""}${atts.length ? `<div><div class="k">Attachments in this conversation</div>${atts.map((a) => esc(a)).join("<br>")}</div>` : ""}`;
   if (!quiet) { const st = $("#bj-stream"); st.scrollTop = st.scrollHeight; }
+  if ($("#mq").value.trim()) bjSearch($("#mq").value.trim());
 }
 function bjReply(id, all) {
   const x = bjData?.items.find((i) => i.id === id); if (!x) return;
@@ -1971,6 +1997,8 @@ function bjReply(id, all) {
 document.addEventListener("click", (e) => {
   const jb = e.target.closest("[data-bjjob]"); if (jb) { openBj(Number(jb.dataset.bjjob)); return; }
   if (e.target.closest("[data-mailmode-go]")) { setMailMode("inbox"); return; }
+  if (e.target.closest("[data-bjall]")) { bjAllMail(); return; }
+  if (e.target.closest("[data-bjclear]")) { $("#mq").value = ""; $("#mq-clear").hidden = true; bjSearch(""); return; }
   const rp = e.target.closest("[data-bjreply]"); if (rp) { bjReply(rp.dataset.bjreply, !!rp.dataset.all); return; }
   const op = e.target.closest("[data-bjopen]"); if (op) { openThread(op.dataset.bjopen); return; }
   const mr = e.target.closest("[data-bjmore]"); if (mr) { const x = bjData?.items.find((i) => i.id === mr.dataset.bjmore); const el = mr.closest(".bj-b")?.querySelector(".body"); if (x && el) { el.textContent = x.full || x.body; mr.remove(); } return; }
@@ -3176,7 +3204,7 @@ async function showPerson(id, refresh) {
 $("#ppl-card").addEventListener("click", (e) => {
   const m = e.target.closest("[data-pmail]"); if (m) { openCompose({ to: m.dataset.pmail }); return; }
   const r = e.target.closest("[data-prefresh]"); if (r) { showPerson(r.dataset.prefresh, true); return; }
-  const f = e.target.closest("[data-pfind]"); if (f) { e.preventDefault(); showTab("mail"); $("#mq").value = f.dataset.pfind; $("#mq").dispatchEvent(new Event("input")); }
+  const f = e.target.closest("[data-pfind]"); if (f) { e.preventDefault(); showTab("mail"); mailMode = "inbox"; applyMailMode(); $("#mq").value = f.dataset.pfind; $("#mq").dispatchEvent(new Event("input")); }
 });
 
 // ============================================================= job pickers you can type in
