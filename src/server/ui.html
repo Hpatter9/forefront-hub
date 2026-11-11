@@ -3094,11 +3094,12 @@ async function teamNotesCard() {
   let d; try { d = await api("/api/notes/recent?days=14"); } catch { return ""; }
   notesPeople = d.people || notesPeople;
   const seen = store.get("notesSeen", "");
-  const others = d.notes.filter((x) => !x.mine);
-  const rows = [...others.filter((x) => x.mentionsMe), ...others.filter((x) => !x.mentionsMe)].slice(0, 10);
+  // Only notes that tag you (@your name). Everything else stays on the job's Notes tab.
+  const others = d.notes.filter((x) => !x.mine && x.mentionsMe);
+  const rows = others.slice(0, 10);
   const fresh = others.filter((x) => x.at > seen).length;
-  return `<div class="card" id="teamnotes"><h3><span>Team notes ${fresh ? `<span class="tag in">${fresh} new</span>` : ""}</span>${fresh ? `<button class="btn small" data-do="notesseen">Mark read</button>` : ""}</h3>
-    ${rows.length ? `<div class="tnotes">${rows.map((x) => `<a href="#" class="tn ${x.at > seen ? "new" : ""} ${x.mentionsMe ? "me" : ""}" data-do="opennotes" data-n="${x.jobNumber}"><span class="av" style="background:${avatarColor(x.author)}">${esc(initials(x.author))}</span><span class="tb"><span class="th"><b>${esc(x.author)}</b> on #${x.jobNumber} ${esc(x.name)}${x.mentionsMe ? ` <span class="tag in">@you</span>` : ""}<span class="when">${fmtWhen(x.at)}</span></span>${x.thread ? `<span class="small muted">↳ reply to “${esc(x.thread.slice(0, 60))}”</span>` : ""}<span class="tx">${esc(x.body.slice(0, 180))}</span></span></a>`).join("")}</div>` : `<p class="muted" style="margin:0">No notes from the team in the last two weeks.</p>`}</div>`;
+  return `<div class="card" id="teamnotes"><h3><span>Notes that tag you ${fresh ? `<span class="tag in">${fresh} new</span>` : ""}</span>${fresh ? `<button class="btn small" data-do="notesseen">Mark read</button>` : ""}</h3>
+    ${rows.length ? `<div class="tnotes">${rows.map((x) => `<a href="#" class="tn ${x.at > seen ? "new" : ""} ${x.mentionsMe ? "me" : ""}" data-do="opennotes" data-n="${x.jobNumber}"><span class="av" style="background:${avatarColor(x.author)}">${esc(initials(x.author))}</span><span class="tb"><span class="th"><b>${esc(x.author)}</b> on #${x.jobNumber} ${esc(x.name)}${x.mentionsMe ? ` <span class="tag in">@you</span>` : ""}<span class="when">${fmtWhen(x.at)}</span></span>${x.thread ? `<span class="small muted">↳ reply to “${esc(x.thread.slice(0, 60))}”</span>` : ""}<span class="tx">${esc(x.body.slice(0, 180))}</span></span></a>`).join("")}</div>` : `<p class="muted" style="margin:0">Nobody has tagged you in a note in the last two weeks.</p>`}</div>`;
 }
 document.addEventListener("click", (e) => {
   const a = e.target.closest("[data-do=opennotes],[data-do=notesseen]"); if (!a) return;
