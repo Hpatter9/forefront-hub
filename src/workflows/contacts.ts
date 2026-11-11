@@ -15,7 +15,7 @@ export interface Person {
   id: string; // the first email seen, lowercased, or "hb:<Homebase id>" when there's no email
   name: string;
   emails: string[];
-  phones: { number: string; label?: string; from: "homebase" | "email" | "job" }[];
+  phones: { number: string; label?: string; from: "homebase" | "email" | "job" | "you" }[];
   title?: string;
   company?: string;
   homebaseId?: string;
@@ -200,6 +200,34 @@ export function noteHomebasePeople(hub: Hub, people: HbPerson[]) {
     for (const ph of h.phones) addPhone(p, ph.number, "homebase", ph.label && ph.label !== "main" ? ph.label : undefined);
   }
   save(hub);
+}
+
+/**
+ * A phone number Hunter put a name to (from the Unknown numbers list): added to that person if they're already in
+ * the contacts by that name, else as a new person, and tied to a job when one is given so their texts file there.
+ */
+export function addPhoneContact(hub: Hub, o: { name: string; phone: string; jobNumber?: number; jobName?: string; role?: string }): Person {
+  const s = load(hub);
+  const name = cleanName(o.name) || o.name.trim();
+  const d = digits(o.phone);
+  if (!name) throw new Error("Type a name first.");
+  if (d.length < 10) throw new Error("That isn't a full phone number.");
+  let p = Object.values(s.people).find((x) => x.phones.some((ph) => digits(ph.number) === d)) ?? Object.values(s.people).find((x) => x.name && x.name.toLowerCase() === name.toLowerCase());
+  const now = new Date().toISOString();
+  if (!p) {
+    p = { id: `tel:${d}`, name, emails: [], phones: [], jobs: [], emailCount: 0, firstSeen: now, lastSeen: now };
+    s.people[p.id] = p;
+  }
+  if (!p.name || p.id.startsWith("tel:")) p.name = name;
+  addPhone(p, o.phone, "you");
+  if (o.jobNumber) {
+    const j = p.jobs.find((x) => x.jobNumber === o.jobNumber);
+    if (j) Object.assign(j, { name: o.jobName ?? j.name, role: o.role || j.role });
+    else p.jobs.push({ jobNumber: o.jobNumber, name: o.jobName ?? "", role: o.role || "Contact" });
+  }
+  if (now > p.lastSeen) p.lastSeen = now;
+  save(hub, true);
+  return p;
 }
 
 export function allContacts(hub: Hub): Person[] {

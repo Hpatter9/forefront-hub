@@ -564,6 +564,30 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/mail/jobs") return send(res, 200, (await import("../workflows/conversation.js")).mailJobs(hub));
     if (p === "/api/mail/labels") return send(res, 200, (await hub.gmail.labels?.()) ?? []);
     // ---- contacts: everyone from email and Homebase, filled out as more turns up
+    // ---- unknown numbers: people texting about work who aren't named anywhere yet
+    if (p === "/api/contacts/unknown" && req.method === "GET") return send(res, 200, await (await import("../workflows/unknownNumbers.js")).unknownNumbers(hub));
+    if (p === "/api/contacts/unknown/skip" && req.method === "POST") {
+      const b = await body(req);
+      (await import("../workflows/unknownNumbers.js")).skipNumber(hub, String(b.key), !!b.undo);
+      return send(res, 200, { ok: true });
+    }
+    if (p === "/api/contacts/unknown/name" && req.method === "POST") {
+      const b = await body(req);
+      const jobNumber = b.job ? Number(String(b.job).match(/\d{4}/)?.[0]) || undefined : undefined;
+      const r = await (await import("../workflows/unknownNumbers.js")).nameNumber(hub, { key: String(b.key), name: String(b.name ?? ""), jobNumber, role: b.role ? String(b.role) : undefined });
+      bus.emit({ type: "changed", what: "job" });
+      // Homebase too, if asked: it asks first, like every Homebase change.
+      if (b.homebase && jobNumber && hub.homebase.createContact) {
+        const { fmtPhone } = await import("../workflows/contacts.js");
+        task(`Add ${r.name} to Homebase #${jobNumber}`, jobNumber, async () => {
+          if (!(await approver.confirm(`Add ${r.name} to Homebase job #${jobNumber} as a contact?`, [`${r.name} · ${fmtPhone(String(b.key))}`, b.role ? `Role: ${b.role}` : ""].filter(Boolean)))) return hub.say("Not added to Homebase. They're still in Keystone's contacts.");
+          const [first, ...rest] = r.name.split(/\s+/);
+          await hub.homebase.createContact!(jobNumber, { first, last: rest.join(" ") || "(unknown)", phone: fmtPhone(String(b.key)), title: b.role ? String(b.role) : undefined });
+          hub.say(`Added ${r.name} to Homebase #${jobNumber}.`);
+        }, "job");
+      }
+      return send(res, 200, r);
+    }
     if (p === "/api/contacts") {
       const query = q("q").trim();
       const list = query ? await findContacts(hub, query, { homebase: q("homebase") !== "0" }) : allContacts(hub).slice(0, 500);

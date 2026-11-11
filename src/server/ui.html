@@ -874,7 +874,7 @@
   <!-- TODAY -->
   <section class="view" id="v-people" hidden>
     <div class="ppl">
-      <aside class="ppl-list"><div class="pad"><input type="search" id="ppl-q" placeholder="Search name, email, company, phone or #job"><div class="small muted" id="ppl-count"></div></div><div class="list" id="ppl-rows"></div></aside>
+      <aside class="ppl-list"><div class="pad"><input type="search" id="ppl-q" placeholder="Search name, email, company, phone or #job"><div class="small muted" id="ppl-count"></div><button type="button" class="btn small" id="unk-open" hidden style="margin-top:8px;width:100%"></button></div><div class="list" id="ppl-rows"></div></aside>
       <div class="scroll"><div class="ppl-card" id="ppl-card"><div class="empty">Pick someone on the left, or search. Everyone you email, and everyone on your Homebase jobs, lands here on their own.</div></div></div>
     </div>
   </section>
@@ -1146,7 +1146,7 @@ function showTab(t) {
   $$("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === t));
   for (const v of ["today", "brief", "jobs", "est", "mail", "people", "cal", "walks", "music"]) $("#v-" + v).hidden = v !== t;
   if (t === "walks") loadWalks();
-  if (t === "people") loadPeople();
+  if (t === "people") { loadPeople(); loadUnknown(false); }
   if (t === "brief") renderBrief();
   document.querySelector(".askbar form").hidden = t === "est";
   if (t === "est") loadEst();
@@ -3171,6 +3171,52 @@ document.addEventListener("click", async (e) => {
 
 // ============================================================= Contacts: everyone from email + Homebase
 let pplList = [], pplSel = store.get("pplsel", null), pplTimer = null;
+// ---- Unknown numbers: people texting about work who aren't named yet
+let unkList = [];
+async function loadUnknown(show) {
+  let r; try { r = await api("/api/contacts/unknown"); } catch (e) { r = { connected: false, items: [], problem: e.message }; }
+  unkList = r.items || [];
+  const btn = $("#unk-open");
+  btn.hidden = !r.connected;
+  btn.textContent = unkList.length ? `${unkList.length} unknown number${unkList.length === 1 ? "" : "s"} texting about work` : "No unknown work numbers";
+  btn.classList.toggle("primary", !!unkList.length);
+  if (show) renderUnknown(r);
+}
+function renderUnknown(r) {
+  pplSel = null; $$("#ppl-rows .job").forEach((x) => x.classList.remove("sel"));
+  const jobOpts = `<datalist id="dl-unkjobs">${jobs.map((j) => `<option value="#${j.jobNumber} ${esc(j.name)}">`).join("")}</datalist>`;
+  $("#ppl-card").innerHTML = `<h2 style="margin:0 0 4px">Unknown numbers</h2>
+    <p class="muted" style="margin:0 0 14px">Numbers in your texts that aren't on any job or in your contacts, where the conversation is clearly about work. Name one and pick its job, and its whole conversation files to that job. Skip the ones that don't matter. This list is worked out on this PC; nothing here goes to an AI.</p>${jobOpts}
+    ${unkList.map((u) => `<div class="card unk" data-unk="${esc(u.key)}" style="margin-bottom:12px">
+      <div class="row" style="justify-content:space-between;gap:10px;flex-wrap:wrap"><b style="font-size:17px">${esc(u.phone)}</b><span class="small muted">${u.texts} text${u.texts === 1 ? "" : "s"} · last ${fmtDate(u.lastAt)} · ${esc(u.why)}</span></div>
+      <div class="small" style="margin:8px 0;display:grid;gap:3px">${u.sample.map((m) => `<div><span class="muted">${m.fromMe ? "You" : "Them"}:</span> ${esc(m.text)}</div>`).join("")}</div>
+      <div class="row" style="gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <label style="flex:1 1 180px"><span class="small muted">Name${u.nameFrom ? ` · ${esc(u.nameFrom)}` : ""}</span><input type="text" class="unk-name" value="${esc(u.suggestedName)}" placeholder="Who is this?" style="width:100%"></label>
+        <label style="flex:1 1 200px"><span class="small muted">Job${u.jobFrom ? ` · ${esc(u.jobFrom)}` : ""}</span><input type="text" class="unk-job" list="dl-unkjobs" value="${u.suggestedJob ? esc(`#${u.suggestedJob} ${jobs.find((j) => j.jobNumber === u.suggestedJob)?.name || ""}`) : ""}" placeholder="Job # or name (optional)" style="width:100%"></label>
+        <label style="flex:0 1 150px"><span class="small muted">Their role</span><input type="text" class="unk-role" list="dl-unkroles" placeholder="e.g. Homeowner" style="width:100%"></label>
+      </div>
+      <div class="row" style="gap:10px;margin-top:10px;flex-wrap:wrap;align-items:center"><button class="btn primary" type="button" data-unksave="1">Save</button><label class="small row" style="gap:6px"><input type="checkbox" class="unk-hb"> also add to the job in Homebase (asks first)</label><span style="flex:1"></span><button class="btn" type="button" data-unkskip="1">Skip: not a job</button></div>
+    </div>`).join("") || `<div class="empty">${r?.connected === false ? esc(r.problem || "iPhone texts aren't connected.") : "Nothing unknown right now. Every work number in your recent texts is tied to a job."}</div>`}
+    <datalist id="dl-unkroles"><option value="Homeowner"><option value="Tenant"><option value="Adjuster"><option value="Property manager"><option value="Subcontractor"><option value="Vendor"><option value="Coworker"></datalist>
+    ${r?.skipped ? `<p class="small muted">${r.skipped} skipped number${r.skipped === 1 ? "" : "s"} stay hidden.</p>` : ""}`;
+}
+document.addEventListener("click", async (e) => {
+  if (e.target.id === "unk-open") { loadUnknown(true); return; }
+  const card = e.target.closest(".unk"); if (!card) return;
+  const key = card.dataset.unk;
+  if (e.target.closest("[data-unkskip]")) { await api("/api/contacts/unknown/skip", { method: "POST", body: { key } }).catch(() => {}); card.remove(); loadUnknown(false); snack("Skipped. It won't be listed again."); return; }
+  if (e.target.closest("[data-unksave]")) {
+    const name = card.querySelector(".unk-name").value.trim(), job = card.querySelector(".unk-job").value.trim();
+    if (!name) { snack("Type a name first."); return; }
+    const n = job ? Number(job.match(/\d{4}/)?.[0]) || jobs.find((j) => j.name.toLowerCase() === job.toLowerCase())?.jobNumber : undefined;
+    if (job && !n) { snack("Pick the job from the list, or leave it empty."); return; }
+    try {
+      const r = await api("/api/contacts/unknown/name", { method: "POST", body: { key, name, job: n, role: card.querySelector(".unk-role").value.trim() || undefined, homebase: card.querySelector(".unk-hb").checked } });
+      card.remove(); loadUnknown(false); loadPeople();
+      snack(n ? `${r.name} saved. Their texts now file to #${n}.` : `${r.name} saved to your contacts.`);
+    } catch (err) { snack(err.message); }
+  }
+});
 async function loadPeople(q = $("#ppl-q").value.trim(), homebase = false) {
   let r; try { r = await api(`/api/contacts?${new URLSearchParams({ q, homebase: homebase ? "1" : "0" })}`); } catch (e) { $("#ppl-rows").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
   pplList = r.contacts;
