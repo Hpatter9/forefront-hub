@@ -32,6 +32,22 @@ describe("a job's conversation", () => {
 });
 
 describe("replies stay in their thread", () => {
+  it("leaves out copies forwarded to the job's office+ address (Homebase logging)", async () => {
+    const t = testHub();
+    t.hub.jobs.upsert(9001, { name: "Sample", address: "123 Main St, Denver, CO 80211", adjuster: { name: "Alex Adjuster", email: "alex.adjuster@carrier.example", phone: "303-555-0111", company: "", attention: "" } });
+    const before = (await jobConversation(t.hub, 9001)).items.filter((x) => x.kind === "email").length;
+    expect(before).toBeGreaterThan(0);
+    const real = t.hub.gmail.getThread.bind(t.hub.gmail);
+    t.hub.gmail.getThread = async (id: string) => {
+      const th = await real(id);
+      return { ...th, messages: [...th.messages, { ...th.messages[0], id: `${id}-fwd`, from: t.hub.cfg.gmail.address, to: ["office+9001@forefrontteam.com"], cc: [], subject: `Fwd: ${th.messages[0].subject}` }] };
+    };
+    const after = (await jobConversation(t.hub, 9001)).items.filter((x) => x.kind === "email");
+    expect(after.length).toBeGreaterThanOrEqual(before);
+    expect(after.some((x) => (x.to ?? []).some((a) => a.startsWith("office+")))).toBe(false);
+    expect(after.some((x) => x.id.endsWith("-fwd"))).toBe(false);
+  });
+
   it("builds References from the original's chain plus the original, each id once", () => {
     expect(replyReferences({ references: "<a@x> <b@x>", messageIdHeader: "<c@x>" })).toBe("<a@x> <b@x> <c@x>");
     expect(replyReferences({ messageIdHeader: "<c@x>" })).toBe("<c@x>");

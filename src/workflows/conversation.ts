@@ -78,6 +78,8 @@ export async function jobConversation(hub: Hub, n: number): Promise<{ items: Con
       if (seen.has(m.id)) continue;
       seen.add(m.id);
       const fromMe = addr(m.from) === me;
+      // A copy forwarded to the job's office+ address only logs the email in Homebase: not part of the conversation.
+      if (fromMe && m.to.length > 0 && !m.cc.length && m.to.every((a) => /^office\+\d+@/i.test(addr(a)))) continue;
       const body = stripQuoted(m.body ?? "");
       items.push({
         kind: "email", id: m.id, threadId: th.id, at: new Date(m.date).toISOString(), fromMe,
