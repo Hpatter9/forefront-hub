@@ -64,3 +64,28 @@ describe("unknown numbers that look like work", () => {
     expect(await unknownNumbers(hub)).toMatchObject({ connected: false, items: [] });
   });
 });
+
+describe("texts with coworkers", () => {
+  it("are filed only on days the conversation names a job; the rest never come in", async () => {
+    const { syncTexts } = await import("../src/workflows/texts.js");
+    const CO = "+13035550166";
+    const hub = setup([
+      { handle: CO, text: "Can you grab the moisture readings at 412 Maple St today?", fromMe: true, daysAgo: 3 },
+      { handle: CO, text: "Yep, heading there at 2", fromMe: false, daysAgo: 3 },
+      { handle: CO, text: "Lunch tomorrow? Also need your timesheet", fromMe: false, daysAgo: 1 },
+    ]);
+    // Added as a coworker on the Forbes job: still only the day that names the job is filed.
+    await nameNumber(hub, { key: "3035550166", name: "Riley Park", jobNumber: 6001, role: "Coworker" });
+    const r = await syncTexts(hub);
+    expect(r).toMatchObject({ matched: 2, unassigned: 1 });
+    const filed = jobTexts(hub, 6001);
+    expect(filed.map((t) => t.who)).toEqual(["Riley Park", "Riley Park"]);
+    expect(JSON.stringify(filed)).not.toContain("Lunch");
+  });
+
+  it("a coworker with no job on their card still files to the job their texts name", async () => {
+    const hub = setup([{ handle: "+13035550166", text: "Forbes called, she wants the estimate today", fromMe: false, daysAgo: 1 }, { handle: "+13035550166", text: "see you at huddle", fromMe: false, daysAgo: 2 }]);
+    await nameNumber(hub, { key: "3035550166", name: "Riley Park", role: "Coworker" });
+    expect(jobTexts(hub, 6001).map((t) => t.text)).toEqual(["Forbes called, she wants the estimate today"]);
+  });
+});

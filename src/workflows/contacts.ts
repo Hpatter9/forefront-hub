@@ -286,6 +286,7 @@ export function addPhoneContact(hub: Hub, o: { name: string; phone: string; jobN
   }
   if (!p.name || p.id.startsWith("tel:")) p.name = name;
   addPhone(p, o.phone, "you");
+  if (/co-?worker/i.test(o.role ?? "") && !p.company) p.company = "Forefront Building + Restoration";
   if (o.jobNumber) {
     const j = p.jobs.find((x) => x.jobNumber === o.jobNumber);
     if (j) Object.assign(j, { name: o.jobName ?? j.name, role: o.role || j.role });
@@ -294,6 +295,12 @@ export function addPhoneContact(hub: Hub, o: { name: string; phone: string; jobN
   if (now > p.lastSeen) p.lastSeen = now;
   save(hub, true);
   return p;
+}
+
+/** Someone at Forefront: a company email address, Forefront as their company, or added as a coworker. */
+export function isCoworker(hub: Hub, p: Person): boolean {
+  const domain = hub.cfg.gmail.address.split("@")[1]?.toLowerCase() || "forefrontteam.com";
+  return p.emails.some((e) => e.endsWith(`@${domain}`)) || /\bforefront\b/i.test(p.company ?? "") || p.jobs.some((j) => /co-?worker/i.test(j.role));
 }
 
 export function allContacts(hub: Hub): Person[] {

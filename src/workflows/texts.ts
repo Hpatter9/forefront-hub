@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { TextMessage } from "../connectors/texts/index.js";
 import type { Hub } from "../hub.js";
-import { allContacts } from "./contacts.js";
+import { allContacts, isCoworker } from "./contacts.js";
 import { allSigns, sureSign } from "./jobMail.js";
 
 /**
@@ -46,6 +46,13 @@ export function jobPhones(hub: Hub): Map<string, { jobNumber: number; who: strin
   return out;
 }
 
+/** Coworkers' numbers -> their name. Their texts are only filed when the conversation names a job. */
+export function coworkerPhones(hub: Hub): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const p of allContacts(hub)) if (isCoworker(hub, p)) for (const ph of p.phones) if (phoneKey(ph.number)) out.set(phoneKey(ph.number), p.name || "Coworker");
+  return out;
+}
+
 const file = (hub: Hub, n: number) => hub.jobs.path(n, "notes", "texts.json");
 export function jobTexts(hub: Hub, n: number): JobText[] {
   try {
@@ -72,6 +79,7 @@ export async function syncTexts(hub: Hub, days = 60): Promise<TextsSync> {
   if (!st.connected) return { connected: false, problem: st.problem, backupAt: st.backupAt, read: 0, matched: 0, jobs: [] };
   const all = await hub.texts.messages(new Date(Date.now() - days * 864e5));
   const phones = jobPhones(hub);
+  const coworkers = coworkerPhones(hub);
   const byJob = new Map<number, JobText[]>();
   let matched = 0, unassigned = 0;
   // A number on several jobs (the same adjuster or property manager): a day's texts with them go to the job that
@@ -81,7 +89,7 @@ export async function syncTexts(hub: Hub, days = 60): Promise<TextsSync> {
   const dayText = new Map<string, string>();
   for (const m of all) {
     const hits = phones.get(phoneKey(m.handle));
-    if (hits && hits.length > 1 && m.text) dayText.set(`${phoneKey(m.handle)}|${dayOfText(m.at)}`, `${dayText.get(`${phoneKey(m.handle)}|${dayOfText(m.at)}`) ?? ""}\n${m.text}`);
+    if (((hits && hits.length > 1) || coworkers.has(phoneKey(m.handle))) && m.text) dayText.set(`${phoneKey(m.handle)}|${dayOfText(m.at)}`, `${dayText.get(`${phoneKey(m.handle)}|${dayOfText(m.at)}`) ?? ""}\n${m.text}`);
   }
   const namedIn = (jobNumber: number, text: string) => {
     const s = signs.get(jobNumber);
@@ -91,8 +99,15 @@ export async function syncTexts(hub: Hub, days = 60): Promise<TextsSync> {
   };
   for (const m of all) {
     let hits = phones.get(phoneKey(m.handle));
-    if (!hits || !m.text) continue; // not someone on a job: never kept
-    if (hits.length > 1) {
+    const coworker = coworkers.get(phoneKey(m.handle));
+    if (coworker && m.text) {
+      // A coworker talks about every job and plenty that isn't one: a day's texts with them are filed only to
+      // the jobs that day's texts plainly name, whichever jobs they're listed on. Otherwise they aren't brought in.
+      const text = dayText.get(`${phoneKey(m.handle)}|${dayOfText(m.at)}`) ?? "";
+      hits = [...signs.keys()].filter((n) => namedIn(n, text)).map((jobNumber) => ({ jobNumber, who: coworker, role: "Coworker" }));
+      if (!hits.length) { unassigned++; continue; }
+    } else if (!hits || !m.text) continue; // not someone on a job: never kept
+    else if (hits.length > 1) {
       const text = dayText.get(`${phoneKey(m.handle)}|${dayOfText(m.at)}`) ?? "";
       hits = hits.filter((h) => namedIn(h.jobNumber, text));
       if (!hits.length) { unassigned++; continue; }
