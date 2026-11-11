@@ -43,9 +43,75 @@ function load(hub: Hub): Store {
     // start over
   }
   cache = { dir: hub.cfg.stateDir, s };
+  mergeDuplicates(s);
   return s;
 }
+
+const NOT_ONE_PERSON = /\b(service|support|claims?|team|office|billing|accounts?|info|admin|department|dept|desk|sales|dispatch|scheduling|reception)\b/i;
+const normName = (n: string) => n.toLowerCase().replace(/[^a-z\s'-]/g, "").replace(/\s+/g, " ").trim();
+/** Two names that can be the same person: equal, or one is just the other's first name, or one is missing. */
+function namesAgree(a: string, b: string) {
+  const x = normName(a), y = normName(b);
+  if (!x || !y || x === y) return true;
+  const [xf, yf] = [x.split(" ")[0], y.split(" ")[0]];
+  return xf === yf && (!x.includes(" ") || !y.includes(" "));
+}
+function absorb(into: Person, other: Person) {
+  const n = other.name;
+  if (n && (!into.name || (n.split(" ").length > into.name.split(" ").length && n.length > into.name.length))) into.name = n;
+  for (const e of other.emails) if (!into.emails.includes(e)) into.emails.push(e);
+  for (const ph of other.phones) addPhone(into, ph.number, ph.from, ph.label);
+  for (const j of other.jobs) {
+    const have = into.jobs.find((x) => x.jobNumber === j.jobNumber);
+    if (!have) into.jobs.push(j);
+    else if (have.role === "Contact" && j.role !== "Contact") have.role = j.role;
+  }
+  into.title ||= other.title;
+  into.company ||= other.company;
+  into.homebaseId ||= other.homebaseId;
+  into.emailCount += other.emailCount;
+  if (other.firstSeen < into.firstSeen) into.firstSeen = other.firstSeen;
+  if (other.lastSeen > into.lastSeen) into.lastSeen = other.lastSeen;
+  if (other.lastEmailAt && (!into.lastEmailAt || other.lastEmailAt > into.lastEmailAt)) into.lastEmailAt = other.lastEmailAt;
+}
+/**
+ * One person, one card. Two entries are the same person when they share an email address or a Homebase record,
+ * share a phone number and their names agree (an office line shared by two differently named people doesn't
+ * count), or have the same full name (unless Homebase holds them as two separate people, or the "name" is a
+ * shared mailbox like "Claims Team"). The entry with the most behind it is kept and the other folds into it.
+ * Returns how many were folded in.
+ */
+export function mergeDuplicates(s: Store): number {
+  let merged = 0;
+  for (let pass = 0; pass < 4; pass++) {
+    let changed = false;
+    const seen = new Map<string, Person>();
+    // Email and Homebase entries first, so a number-only or name-only entry folds into the fuller one.
+    const rank = (p: Person) => (p.homebaseId ? 0 : p.emails.length ? 1 : 2);
+    for (const p of Object.values(s.people).sort((a, b) => rank(a) - rank(b) || a.firstSeen.localeCompare(b.firstSeen))) {
+      const full = normName(p.name);
+      const keys: { k: string; ok: (q: Person) => boolean }[] = [
+        ...p.emails.map((e) => ({ k: `e:${e}`, ok: () => true })),
+        ...(p.homebaseId ? [{ k: `h:${p.homebaseId}`, ok: () => true }] : []),
+        ...p.phones.map((ph) => ({ k: `p:${digits(ph.number)}`, ok: (q: Person) => namesAgree(p.name, q.name) && !(p.homebaseId && q.homebaseId && p.homebaseId !== q.homebaseId) })),
+        ...(full.includes(" ") && !NOT_ONE_PERSON.test(full) ? [{ k: `n:${full}`, ok: (q: Person) => !(p.homebaseId && q.homebaseId && p.homebaseId !== q.homebaseId) }] : []),
+      ];
+      const hit = keys.map((x) => ({ q: seen.get(x.k), ok: x.ok })).find((x) => x.q && x.q !== p && x.ok(x.q));
+      if (hit?.q) {
+        absorb(hit.q, p);
+        delete s.people[p.id];
+        merged++;
+        changed = true;
+        continue;
+      }
+      for (const x of keys) if (!seen.has(x.k)) seen.set(x.k, p);
+    }
+    if (!changed) break;
+  }
+  return merged;
+}
 function save(hub: Hub, now = false) {
+  mergeDuplicates(load(hub));
   const write = () => {
     mkdirSync(hub.cfg.stateDir, { recursive: true });
     writeFileSync(file(hub), JSON.stringify(load(hub), null, 1));
