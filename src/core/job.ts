@@ -76,6 +76,8 @@ export const JobSchema = z.object({
   lookupsAt: z.string().default(""),
   /** Follow-ups: when Hunter last ticked one off in the brief (counts as contact), and when the brief last asked. */
   followups: z.object({ doneAt: z.string().default(""), nudgedAt: z.string().default("") }).default({ doneAt: "", nudgedAt: "" }),
+  /** When Hunter said what was waiting on him is handled, or wasn't for him: anything up to then stops counting. */
+  waitingCleared: z.object({ at: z.string().default(""), why: z.string().default("") }).default({ at: "", why: "" }),
   /** Texts with the people on the job, from the iPhone backup (as of `checkedAt`, the backup's time). */
   texts: z
     .object({
@@ -93,7 +95,7 @@ export const JobSchema = z.object({
       lastTouchAt: z.string().default(""),
       lastTouch: z.string().default(""),
       /** The newest email from someone else on the job that has no answer from Hunter after it. */
-      waiting: z.object({ from: z.string(), subject: z.string(), at: z.string(), threadId: z.string().default("") }).nullable().default(null),
+      waiting: z.object({ from: z.string(), subject: z.string(), at: z.string(), threadId: z.string().default(""), snippet: z.string().optional() }).nullable().default(null),
       proposalAmount: z.number().nullable().default(null),
       checkedAt: z.string().default(""),
       gmailCheckedAt: z.string().default(""),

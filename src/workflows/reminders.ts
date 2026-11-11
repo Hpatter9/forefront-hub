@@ -24,6 +24,30 @@ export interface Reminder {
   step: string;
   /** When the brief last asked for this job's follow-up (so it comes up about twice a week, not daily). */
   nudgedAt?: string;
+  /** For a reply: why it's on the list, in a sentence (who wrote, when, what they said). */
+  why?: string;
+}
+
+const when = (iso: string) => new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Denver" });
+/**
+ * What's waiting on Hunter for a job, if anything: an email or a text from someone on the job with nothing from him
+ * after it, unless he's said it's handled or wasn't for him (that clears everything up to that moment; a newer
+ * message brings it back).
+ */
+export function waitingOn(j: Job): { email: NonNullable<Job["pulse"]["waiting"]> | null; text: NonNullable<Job["texts"]["waiting"]> | null } {
+  const p = j.pulse, tx = j.texts, cleared = j.waitingCleared?.at || "";
+  // An email waits on a reply unless you texted them after it; a text waits unless you emailed, called or noted after it.
+  const email = p.waiting && !(tx?.lastFromMeAt && tx.lastFromMeAt > p.waiting.at) && !(cleared && cleared >= p.waiting.at) ? p.waiting : null;
+  const text = tx?.waiting && days(tx.waiting.at) <= REPLY_DAYS && !(p.lastTouchAt && p.lastTouchAt > tx.waiting.at && !/^email from|^email:/.test(p.lastTouch)) && !(cleared && cleared >= tx.waiting.at) ? tx.waiting : null;
+  return { email, text };
+}
+/** Why a job says it's waiting on you, in plain words. */
+export function waitingWhy(j: Job): string {
+  const w = waitingOn(j);
+  const parts: string[] = [];
+  if (w.email) parts.push(`${w.email.from} emailed you ${when(w.email.at)} (“${w.email.subject || "no subject"}”) and nothing has gone back from you since${w.email.snippet ? `. It says: “${w.email.snippet.slice(0, 220)}”` : "."}`);
+  if (w.text) parts.push(`${w.text.from} texted you ${when(w.text.at)} and you haven't answered: “${w.text.text}”`);
+  return parts.join(" ");
 }
 
 /** The next step for each stage, in order: walk first, then the estimate, then the proposal. */
@@ -65,12 +89,10 @@ export function reminders(hub: Hub, extras: { needsUpload?: Set<number> } = {}):
     if (DONE.has(j.stage)) continue;
     const base = { jobNumber: j.jobNumber, name: j.name, stage: j.stage, step: stepFor(j.stage), nudgedAt: j.followups?.nudgedAt || undefined };
     const p = j.pulse;
-    // An email waits on a reply unless you texted them after it; a text waits unless you emailed, called or noted after it.
     const tx = j.texts;
-    const emailWaiting = p.waiting && !(tx?.lastFromMeAt && tx.lastFromMeAt > p.waiting.at) ? p.waiting : null;
-    const textWaiting = tx?.waiting && days(tx.waiting.at) <= REPLY_DAYS && !(p.lastTouchAt && p.lastTouchAt > tx.waiting.at && !/^email from|^email:/.test(p.lastTouch)) ? tx.waiting : null;
-    if (emailWaiting) out.push({ ...base, kind: "reply", title: emailWaiting.subject || "(no subject)", detail: `from ${emailWaiting.from}`, days: days(emailWaiting.at), threadId: emailWaiting.threadId || undefined });
-    if (textWaiting) out.push({ ...base, kind: "reply", title: `Text: ${textWaiting.text}`, detail: `text from ${textWaiting.from} (answer on your phone)`, days: days(textWaiting.at) });
+    const { email: emailWaiting, text: textWaiting } = waitingOn(j);
+    if (emailWaiting) out.push({ ...base, kind: "reply", title: emailWaiting.subject || "(no subject)", detail: `from ${emailWaiting.from}`, days: days(emailWaiting.at), threadId: emailWaiting.threadId || undefined, why: `${emailWaiting.from} emailed you ${when(emailWaiting.at)} and nothing has gone back from you since${emailWaiting.snippet ? `. It says: “${emailWaiting.snippet.slice(0, 220)}”` : "."}` });
+    if (textWaiting) out.push({ ...base, kind: "reply", title: `Text: ${textWaiting.text}`, detail: `text from ${textWaiting.from} (answer on your phone)`, days: days(textWaiting.at), why: `${textWaiting.from} texted you ${when(textWaiting.at)} and you haven't answered.` });
     const waitingOnMe = !!(emailWaiting || textWaiting);
 
     const sent = j.sendoff.drafts.filter((d) => d.sentAt);
@@ -220,13 +242,13 @@ export async function pulse(hub: Hub, j: Job): Promise<Job["pulse"]> {
       const at = new Date(t.date).toISOString();
       touches.push({ at, what: `email: ${t.subject}` });
       if (!t.from.toLowerCase().includes(me) && !isAutomated(t.from, "", t.subject) && addressedToMe(t, me) && days(at) <= REPLY_DAYS && (!waiting || at > waiting.at)) {
-        waiting = { from: t.from.replace(/<.*>/, "").trim() || t.from, subject: t.subject, at, threadId: t.id };
+        waiting = { from: t.from.replace(/<.*>/, "").trim() || t.from, subject: t.subject, at, threadId: t.id, snippet: (t.snippet || "").replace(/\s+/g, " ").trim().slice(0, 240) };
       }
     }
   } else {
     // Without Gmail: the newest filed email from a person (not a system notice) and nothing went out after it.
     const sorted = [...emails].filter((e) => !(e.direction === "in" && isAutomated(e.from, e.fromName ?? "", e.subject))).sort((a, b) => b.sentAt.localeCompare(a.sentAt));
-    if (sorted[0]?.direction === "in") waiting = { from: sorted[0].fromName || sorted[0].from, subject: sorted[0].subject, at: sorted[0].sentAt, threadId: "" };
+    if (sorted[0]?.direction === "in") waiting = { from: sorted[0].fromName || sorted[0].from, subject: sorted[0].subject, at: sorted[0].sentAt, threadId: "", snippet: "" };
   }
   // A note, call or email from Hunter after it answers it.
   if (waiting) {

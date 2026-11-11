@@ -91,3 +91,21 @@ describe("job steps and follow-up cadence", () => {
     expect(rem(hub).some((x) => x.jobNumber === 5004 && x.kind === "followup")).toBe(false);
   });
 });
+
+describe("why a job is waiting on you, and clearing it", () => {
+  it("says who wrote and when, and Handled / Not for me take it off until something newer arrives", async () => {
+    const { testHub } = await import("./helpers.js");
+    const { reminders, waitingOn, waitingWhy } = await import("../src/workflows/reminders.js");
+    const { hub } = testHub();
+    const at = new Date(Date.now() - 2 * 864e5).toISOString();
+    hub.jobs.upsert(6100, { name: "Okafor", stage: "Estimating", pulse: { waiting: { from: "Sam Okafor", subject: "Tile question", at, threadId: "t1", snippet: "Can you match the hall bath tile?" } } as never });
+    const r = reminders(hub).find((x) => x.jobNumber === 6100 && x.kind === "reply");
+    expect(r?.why).toMatch(/Sam Okafor emailed you .* nothing has gone back .*match the hall bath tile/);
+    expect(waitingWhy(hub.jobs.get(6100))).toContain("Tile question");
+    hub.jobs.upsert(6100, { waitingCleared: { at: new Date().toISOString(), why: "notmine" } });
+    expect(reminders(hub).some((x) => x.jobNumber === 6100 && x.kind === "reply")).toBe(false);
+    // A newer email brings it back.
+    hub.jobs.upsert(6100, { pulse: { ...hub.jobs.get(6100).pulse, waiting: { from: "Sam Okafor", subject: "Tile question", at: new Date(Date.now() + 60000).toISOString(), threadId: "t1" } } });
+    expect(waitingOn(hub.jobs.get(6100)).email).not.toBeNull();
+  });
+});

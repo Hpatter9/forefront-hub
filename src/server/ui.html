@@ -1196,7 +1196,7 @@ $("#syncnow").addEventListener("click", async () => { try { await api("/api/sync
 
 // ============================================================= TODAY
 const ACTIONS = {
-  reply: (r) => `${r.threadId ? `<button class="btn small primary" data-do="thread" data-thread="${esc(r.threadId)}">Reply</button>` : ""}<button class="btn small" data-do="claude" data-p="Read the latest email on job #${r.jobNumber} and draft my reply in Gmail (draft only).">Draft reply with ${AI()}</button>`,
+  reply: (r) => `${r.threadId ? `<button class="btn small primary" data-do="thread" data-thread="${esc(r.threadId)}">Reply</button>` : ""}<button class="btn small" data-do="claude" data-p="Read the latest email on job #${r.jobNumber} and draft my reply in Gmail (draft only).">Draft reply with ${AI()}</button><button class="btn small" data-do="handled" data-n="${r.jobNumber}" title="You dealt with it (called, texted, talked in person). Takes it off your list.">Handled</button><button class="btn small" data-do="notmine" data-n="${r.jobNumber}" title="It isn't yours to answer. Takes it off your list.">Not for me</button>`,
   log: (r) => `<button class="btn small primary" data-do="logsent" data-n="${r.jobNumber}">Log in Homebase</button>`,
   walk: (r) => `<button class="btn small" data-do="open" data-n="${r.jobNumber}">Open job to schedule the walk</button>`,
   estimate: (r) => `<button class="btn small" data-do="claude" data-p="Start the estimate for job #${r.jobNumber}: check what's in the job folder (ESX, photos, notes) and tell me what's missing before you price it.">Start estimate with Claude</button>`,
@@ -1207,7 +1207,7 @@ const ACTIONS = {
   stale: (r) => `<button class="btn small" data-do="claude" data-p="Job #${r.jobNumber} hasn't been touched in a week. Look at where it stands and tell me the next step; draft any email that's needed (draft only).">What's next?</button>`,
 };
 function remRow(r) {
-  return `<div class="rem"><div class="l"><div class="ttl"><a href="#" data-do="open" data-n="${r.jobNumber}">#${r.jobNumber} ${esc(r.name)}</a> · ${esc(r.title)}</div><div class="small muted">${esc(r.detail)}${r.detail ? " · " : ""}<span class="stage">${esc(r.stage)}</span>${r.days && r.days < 999 ? ` · ${r.days} day${r.days === 1 ? "" : "s"}` : ""}</div></div><div class="r">${ACTIONS[r.kind]?.(r) ?? ""}</div></div>`;
+  return `<div class="rem"><div class="l"><div class="ttl"><a href="#" data-do="open" data-n="${r.jobNumber}">#${r.jobNumber} ${esc(r.name)}</a> · ${esc(r.title)}</div><div class="small muted">${esc(r.detail)}${r.detail ? " · " : ""}<span class="stage">${esc(r.stage)}</span>${r.days && r.days < 999 ? ` · ${r.days} day${r.days === 1 ? "" : "s"}` : ""}</div>${r.why ? `<div class="small" style="margin-top:4px"><b>Why:</b> ${esc(r.why)}</div>` : ""}</div><div class="r">${ACTIONS[r.kind]?.(r) ?? ""}</div></div>`;
 }
 let dashFilter = null;
 async function loadToday() {
@@ -1283,6 +1283,13 @@ document.addEventListener("click", async (e) => {
   const n = Number(b.dataset.n);
   try {
     if (b.dataset.do === "open") { showTab("jobs"); openJob(n); }
+    if (b.dataset.do === "handled" || b.dataset.do === "notmine") {
+      const r = await api(`/api/jobs/${n}/waiting`, { method: "POST", body: { why: b.dataset.do } });
+      const again = () => { loadToday(); if (view?.homebase?.jobNumber === n) openJob(n); };
+      again();
+      snack(b.dataset.do === "handled" ? `#${n} marked handled. It's off your list.` : `#${n} marked not for you. It's off your list.`, async () => { await api(`/api/jobs/${n}/waiting`, { method: "POST", body: { undo: true, ...r } }); again(); });
+      return;
+    }
     if (b.dataset.do === "thread") { if (!mailLoaded) await loadMail(); showTab("mail"); openThread(b.dataset.thread); }
     if (b.dataset.do === "claude") { await askClaude(b.dataset.p, n || undefined); }
     if (b.dataset.do === "logsent") await api(`/api/jobs/${n}/sync`, { method: "POST" });
@@ -1402,7 +1409,7 @@ function renderOverview(el) {
   const { homebase: h, local: l, fields: f, customer: c, adjusters, carrier } = view;
   const adj = adjusters.filter(Boolean);
   const drafts = l?.sendoff?.drafts || [];
-  const waiting = l?.pulse?.waiting;
+  const ww = view.waitingWhy, waiting = ww?.email;
   const pen = `<button class="pencil" data-sub="details" title="Edit under Details">✎</button>`;
   const row = (k, v) => `<dt>${k}</dt><dd>${v || `<span class="muted">—</span>`}</dd>`;
   el.innerHTML = `
@@ -1413,7 +1420,8 @@ function renderOverview(el) {
       <div class="tile" style="cursor:default"><span class="k">Days in stage</span><span class="v">${daysSince(h.stageSince) ?? "—"}</span><span class="k">${esc(h.stage)}</span></div>
       <div class="tile" style="cursor:default"><span class="k">Last touched</span><span class="v">${l?.pulse?.lastTouchAt ? daysSince(l.pulse.lastTouchAt) + "d" : "—"}</span><span class="k">${esc((l?.pulse?.lastTouch || "").slice(0, 34))}</span></div>
     </div>
-    ${waiting ? `<div class="banner" style="border-left-color:var(--bad)"><b>${esc(waiting.from)}</b> is waiting on you · ${esc(waiting.subject)} · ${fmtDate(waiting.at)} <span class="row" style="display:inline-flex;margin-left:8px">${waiting.threadId ? `<button class="btn small primary" data-do="thread" data-thread="${esc(waiting.threadId)}">Open &amp; reply</button>` : ""}<button class="btn small" data-do="claude" data-n="${h.jobNumber}" data-p="Read the latest email on job #${h.jobNumber} and draft my reply in Gmail (draft only).">Draft reply with ${AI()}</button></span></div>` : ""}
+    ${!waiting && ww?.text ? `<div class="banner" style="border-left-color:var(--bad)"><b>${esc(ww.text.from)}</b> is waiting on you (text) <div class="small" style="margin:6px 0"><b>Why:</b> ${esc(ww.why)}</div><span class="row" style="display:inline-flex"><button class="btn small" data-do="handled" data-n="${h.jobNumber}" title="You dealt with it (called, texted, talked in person). Takes it off your list.">Handled</button><button class="btn small" data-do="notmine" data-n="${h.jobNumber}" title="It isn't yours to answer. Takes it off your list.">Not for me</button></span></div>` : ""}
+    ${waiting ? `<div class="banner" style="border-left-color:var(--bad)"><b>${esc(waiting.from)}</b> is waiting on you · ${esc(waiting.subject)} · ${fmtDate(waiting.at)} <span class="row" style="display:inline-flex;margin-left:8px">${waiting.threadId ? `<button class="btn small primary" data-do="thread" data-thread="${esc(waiting.threadId)}">Open &amp; reply</button>` : ""}<button class="btn small" data-do="claude" data-n="${h.jobNumber}" data-p="Read the latest email on job #${h.jobNumber} and draft my reply in Gmail (draft only).">Draft reply with ${AI()}</button><button class="btn small" data-do="handled" data-n="${h.jobNumber}" title="You dealt with it (called, texted, talked in person). Takes it off your list.">Handled</button><button class="btn small" data-do="notmine" data-n="${h.jobNumber}" title="It isn't yours to answer. Takes it off your list.">Not for me</button></span><div class="small" style="margin-top:6px"><b>Why:</b> ${esc(ww.why)}</div></div>` : ""}
     <div class="grid" style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)">
       <div class="side">
         <div class="card"><h3>Customer ${pen}</h3>

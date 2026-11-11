@@ -15,7 +15,7 @@ import { syncFiles, uploadToHomebase } from "../workflows/files.js";
 import { syncAll, type SyncAllResult } from "../workflows/background.js";
 import { editContact, editFields, FIELDS, fieldValues, SECTIONS, setAdjuster } from "../workflows/fields.js";
 import { timeline } from "../workflows/timeline.js";
-import { briefItems, REMINDER_GROUPS, reminders } from "../workflows/reminders.js";
+import { briefItems, REMINDER_GROUPS, reminders, waitingOn, waitingWhy } from "../workflows/reminders.js";
 import { checkEmailButtons } from "../workflows/briefEmails.js";
 import { replyReferences } from "../workflows/conversation.js";
 import { huddleAdd, huddleClearDone, huddleList, huddleRemove, huddleUpdate } from "../workflows/huddle.js";
@@ -272,7 +272,7 @@ const server = http.createServer(async (req, res) => {
       }).filter((x) => x.count);
       const proposals = open
         .filter((j) => j.stage === "Proposal Submitted")
-        .map((j) => ({ jobNumber: j.jobNumber, name: j.name, amount: j.pulse.proposalAmount, lastTouchAt: j.pulse.lastTouchAt || j.stageSince, lastTouch: j.pulse.lastTouch, waiting: !!j.pulse.waiting }))
+        .map((j) => ({ jobNumber: j.jobNumber, name: j.name, amount: j.pulse.proposalAmount, lastTouchAt: j.pulse.lastTouchAt || j.stageSince, lastTouch: j.pulse.lastTouch, waiting: !!(waitingOn(j).email || waitingOn(j).text) }))
         .sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0));
       const activity = all
         .flatMap((j) => j.log.filter((l) => !/^(Pulled from Homebase|From Homebase:)/.test(l.what)).map((l) => ({ ...l, jobNumber: j.jobNumber, name: j.name })))
@@ -368,8 +368,23 @@ const server = http.createServer(async (req, res) => {
     if (m) {
       const n = Number(m[1]);
       const action = m[2] ?? "";
+      // "Handled" or "Not for me" on something that says it's waiting on Hunter (undo puts it back).
+      if (action === "waiting" && req.method === "POST") {
+        const b = await body(req);
+        const j = hub.jobs.get(n);
+        const prev = j.waitingCleared;
+        if (b.undo) hub.jobs.upsert(n, { waitingCleared: { at: String(b.prevAt ?? ""), why: String(b.prevWhy ?? "") }, ...(b.prevDoneAt !== undefined ? { followups: { ...j.followups, doneAt: String(b.prevDoneAt) } } : {}) });
+        else {
+          const now = new Date().toISOString(), handled = b.why !== "notmine";
+          // Handled counts as being in touch (so no follow-up nag right after); "not for me" doesn't.
+          hub.jobs.upsert(n, { waitingCleared: { at: now, why: handled ? "handled" : "notmine" }, ...(handled ? { followups: { ...j.followups, doneAt: now } } : {}) });
+          hub.jobs.log(n, handled ? "Marked handled: what was waiting on you" : "Marked not for you: what was waiting on you");
+        }
+        bus.emit({ type: "changed", what: "job" });
+        return send(res, 200, { ok: true, prevAt: prev.at, prevWhy: prev.why, prevDoneAt: j.followups.doneAt });
+      }
       if (req.method === "GET") {
-        if (action === "") return send(res, 200, await jobView(n));
+        if (action === "") return send(res, 200, { ...(await jobView(n)), waitingWhy: hub.jobs.exists(n) ? { ...waitingOn(hub.jobs.get(n)), why: waitingWhy(hub.jobs.get(n)) } : null });
         if (action === "timeline") return send(res, 200, await timeline(hub, n));
         if (action === "conversation") {
           if (!hub.jobs.exists(n)) await pullJob(hub, n, { quiet: true, lookups: false });
