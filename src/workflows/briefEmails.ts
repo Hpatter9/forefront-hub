@@ -1,5 +1,6 @@
 import { intakeAddress } from "../connectors/homebase/types.js";
 import type { Hub } from "../hub.js";
+import { allSigns, belongsToJob } from "./jobMail.js";
 
 /**
  * Checks every "View email" button in a brief before it's shown, so each one opens the email the line is about.
@@ -12,11 +13,12 @@ export async function checkEmailButtons(hub: Hub, text: string, known: { threadI
   let fixed = 0;
   let dropped = 0;
   const knownIds = new Set(known.map((k) => k.threadId).filter(Boolean));
-  const cache = new Map<string, string | null>();
+  const cache = new Map<string, { text: string; people: string[] } | null>();
+  const all = allSigns(hub);
   const threadText = async (id: string) => {
     if (!cache.has(id)) {
       const t = await hub.gmail.getThread(id).catch(() => null);
-      cache.set(id, t ? t.messages.map((m) => [m.subject, m.from, ...m.to, ...m.cc, ...(m.bcc ?? [])].join(" ")).join(" ").toLowerCase() : null);
+      cache.set(id, t ? { text: t.messages.map((m) => [m.subject, m.body, ...m.to, ...m.cc, ...(m.bcc ?? [])].join(" ")).join("\n"), people: t.messages.flatMap((m) => [m.from, ...m.to, ...m.cc]) } : null);
     }
     return cache.get(id)!;
   };
@@ -34,9 +36,8 @@ export async function checkEmailButtons(hub: Hub, text: string, known: { threadI
       if (body !== null) {
         if (!job) ok = knownIds.has(id);
         else {
-          const street = job.address.split(",")[0].trim().toLowerCase();
-          const marks = [job.customer.email, job.adjuster.email, intakeAddress(job.jobNumber), `#${job.jobNumber}`, `${job.jobNumber} `, street.length >= 6 ? street : ""].map((x) => x.toLowerCase()).filter(Boolean);
-          ok = id === jobWaiting || marks.some((m) => body.includes(m));
+          // The same test as everywhere else: an address shared with other jobs isn't enough on its own.
+          ok = id === jobWaiting || belongsToJob(all, job.jobNumber, body.text, body.people).belongs;
         }
       }
       if (ok) continue;

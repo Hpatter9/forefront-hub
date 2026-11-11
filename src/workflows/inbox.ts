@@ -53,7 +53,8 @@ export async function matchJob(hub: Hub, m: Message): Promise<{ jobNumber?: numb
   const text = `${m.subject}\n${m.body}`;
   const open = new Map(hub.jobs.list().map((j) => [j.jobNumber, j]));
   // 1. A job number written in the email ("#3226", "job 3226", "3226 - Augustine").
-  for (const x of text.matchAll(/(?:#|\bjob\s*#?\s*|^)(\d{4})\b/gim)) if (open.has(Number(x[1]))) return { jobNumber: Number(x[1]), candidates: [] };
+  // (A bare number at the start of a line only counts as "3226 - Augustine": "6924 Sierra Meadows Dr" is an address.)
+  for (const x of text.matchAll(/(?:#|\bjob\s*#?\s*)(\d{4})\b|^(\d{4})\s*[-–—]\s*[A-Za-z]/gim)) { const n = Number(x[1] ?? x[2]); if (open.has(n)) return { jobNumber: n, candidates: [] }; }
   // 2. A claim number on exactly one job.
   const norm = (s: string) => s.replace(/[\s-]/g, "").toLowerCase();
   const t = norm(text);

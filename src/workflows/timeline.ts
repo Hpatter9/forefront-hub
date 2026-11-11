@@ -1,3 +1,4 @@
+import { allSigns, jobMailQuery, summaryBelongs } from "./jobMail.js";
 import { textDays, textLog } from "./texts.js";
 import { jobWalks } from "./walks.js";
 import { intakeAddress } from "../connectors/homebase/types.js";
@@ -46,10 +47,10 @@ export async function timeline(hub: Hub, jobNumber: number): Promise<TimelineIte
 
   // Gmail: conversations with the job's people or mentioning its address (when Gmail is connected).
   if (hub.gmail.kind === "google" && job) {
-    const people = [job.customer.email, job.adjuster.email].filter(Boolean);
-    const street = job.address.split(",")[0];
-    const q = [...people.map((p) => `from:${p} OR to:${p}`), `"${intakeAddress(jobNumber)}"`, street ? `"${street}"` : ""].filter(Boolean).join(" OR ");
-    const threads = await hub.gmail.search(`(${q}) newer_than:180d`, 20).catch(() => []);
+    // Only this job's mail (an address shared with other jobs isn't enough on its own: jobMail.ts).
+    const all = allSigns(hub);
+    const q = jobMailQuery(all, jobNumber);
+    const threads = q ? (await hub.gmail.search(`(${q}) newer_than:180d`, 25).catch(() => [])).filter((t) => summaryBelongs(all, jobNumber, t)) : [];
     for (const t of threads) {
       if (seen.has(key(t.subject, new Date(t.date).toISOString()))) continue;
       items.push({ at: new Date(t.date).toISOString(), kind: "email", title: t.subject, body: t.snippet, who: t.from, source: "gmail", threadId: t.id });

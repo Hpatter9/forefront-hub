@@ -20,9 +20,10 @@ describe("a job's conversation", () => {
     t.hub.texts = new MockTexts([{ id: "1", handle: "3035550111", fromMe: true, at: new Date().toISOString(), text: "Sending those photos now" }]);
     await syncTexts(t.hub);
     const c = await jobConversation(t.hub, 9001);
-    expect(c.items.map((x) => x.kind)).toEqual(["email", "text"]);
-    expect(c.items[0]).toMatchObject({ fromMe: false, who: "Alex Adjuster", threadId: "mock-thread-1" });
-    expect(c.items[1]).toMatchObject({ fromMe: true, who: "to Alex Adjuster", body: "Sending those photos now" });
+    // The adjuster's email, the sketch delivery that names the job's street, and the text: all this job's.
+    expect(c.items.at(-1)).toMatchObject({ kind: "text", fromMe: true, who: "to Alex Adjuster", body: "Sending those photos now" });
+    expect(c.items.find((x) => x.threadId === "mock-thread-1")).toMatchObject({ fromMe: false, who: "Alex Adjuster" });
+    expect(c.items.every((x) => x.threadId !== "mock-thread-2")).toBe(true);
     expect(c.replyTo?.threadId).toBe("mock-thread-1");
     // The other job's thread isn't mixed in.
     expect((await jobConversation(t.hub, 9002)).items.every((x) => x.threadId !== "mock-thread-1")).toBe(true);

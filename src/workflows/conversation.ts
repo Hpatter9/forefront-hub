@@ -1,6 +1,6 @@
-import { intakeAddress } from "../connectors/homebase/types.js";
 import type { Message } from "../connectors/gmail/types.js";
 import type { Hub } from "../hub.js";
+import { allSigns, belongsToJob, jobMailQuery } from "./jobMail.js";
 import { adjusterReview, reminders, stepFor } from "./reminders.js";
 import { jobTexts } from "./texts.js";
 import { jobWalks } from "./walks.js";
@@ -45,30 +45,28 @@ export function stripQuoted(body: string): string {
 const addr = (s: string) => s.match(/[\w.+-]+@[\w.-]+/)?.[0]?.toLowerCase() ?? "";
 const nameOf = (s: string) => s.replace(/<.*>/, "").replace(/"/g, "").trim() || addr(s);
 
-/** The Gmail threads that belong to a job (the same test the reminders use), newest first. */
+/** The Gmail threads that belong to a job (jobMail.ts decides: an address shared with other jobs isn't enough), newest first. */
 async function jobThreads(hub: Hub, n: number): Promise<{ id: string; messages: Message[] }[]> {
-  const job = hub.jobs.get(n);
-  const people = [job.customer.email, job.adjuster.email, job.occupant?.email ?? ""].filter(Boolean).map((x) => x.toLowerCase());
-  const street = job.address.split(",")[0].trim();
-  const intake = intakeAddress(n).toLowerCase();
+  const all = allSigns(hub);
+  let candidates: { id: string; messages: Message[] }[] = [];
   if (hub.gmail.kind === "google") {
-    const q = [...people.map((p) => `from:${p} OR to:${p} OR cc:${p}`), `"${intake}"`, street ? `subject:"${street}"` : ""].filter(Boolean).join(" OR ");
+    const q = jobMailQuery(all, n);
     if (!q) return [];
-    const found = await hub.gmail.search(`(${q}) newer_than:120d`, 12).catch(() => []);
-    const out = [];
-    for (const t of found) out.push(await hub.gmail.getThread(t.id).catch(() => ({ id: t.id, messages: [] as Message[] })));
-    return out;
+    const found = await hub.gmail.search(`(${q}) newer_than:120d`, 15).catch(() => []);
+    for (const t of found) candidates.push(await hub.gmail.getThread(t.id).catch(() => ({ id: t.id, messages: [] as Message[] })));
+  } else {
+    // The test inbox: look through all of it.
+    const list = (await hub.gmail.listThreads?.({}).catch(() => ({ threads: [] })))?.threads ?? [];
+    for (const t of list) {
+      const th = await hub.gmail.getThread(t.id).catch(() => null);
+      if (th) candidates.push(th);
+    }
   }
-  // The test inbox: look through it and keep what's about this job.
-  const all = (await hub.gmail.listThreads?.({}).catch(() => ({ threads: [] })))?.threads ?? [];
-  const out = [];
-  for (const t of all) {
-    const th = await hub.gmail.getThread(t.id).catch(() => null);
-    if (!th) continue;
-    const text = th.messages.map((m) => `${m.subject} ${m.from} ${m.to.join(" ")} ${m.cc.join(" ")} ${(m.bcc ?? []).join(" ")}`).join(" ").toLowerCase();
-    if (people.some((p) => text.includes(p)) || text.includes(intake) || (street.length >= 6 && th.messages.some((m) => m.subject.toLowerCase().includes(street.toLowerCase()))) || new RegExp(`#${n}\\b`).test(text)) out.push(th);
-  }
-  return out;
+  return candidates.filter((th) => {
+    const text = th.messages.map((m) => `${m.subject}\n${m.body}\n${m.to.join(" ")} ${m.cc.join(" ")} ${(m.bcc ?? []).join(" ")}`).join("\n");
+    const people = th.messages.flatMap((m) => [m.from, ...m.to, ...m.cc]);
+    return belongsToJob(all, n, text, people).belongs;
+  });
 }
 
 export async function jobConversation(hub: Hub, n: number): Promise<{ items: ConvItem[]; replyTo: ConvItem | null }> {

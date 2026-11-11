@@ -2,6 +2,7 @@ import { intakeAddress } from "../connectors/homebase/types.js";
 import type { Job } from "../core/job.js";
 import type { Hub } from "../hub.js";
 import { STANDARD_FILES } from "./files.js";
+import { allSigns, jobMailQuery, summaryBelongs } from "./jobMail.js";
 
 /**
  * The Today screen: what needs Hunter's attention, worked out from each job folder's job.json (kept fresh by the
@@ -199,17 +200,19 @@ export async function pulse(hub: Hub, j: Job): Promise<Job["pulse"]> {
     waiting = j.pulse.waiting;
   } else if (hub.gmail.kind === "google") {
     const people = [j.customer.email, j.adjuster.email].filter(Boolean);
-    const street = j.address.split(",")[0];
-    // The street only counts in the subject: "123 Main St" in someone's signature or an unrelated email isn't this job.
-    const q = [...people.map((p) => `from:${p}`), `"${intakeAddress(j.jobNumber)}"`, street ? `subject:"${street}"` : ""].filter(Boolean).join(" OR ");
-    const threads = q ? await hub.gmail.search(`(${q}) newer_than:60d -from:me`, 5).catch(() => []) : [];
+    // Which mail is this job's: jobMail.ts decides. An adjuster or company address that's on several jobs isn't
+    // enough on its own; the email has to say which job (street, claim, job number, the customer's name).
+    const all = allSigns(hub);
+    const mine = <T extends { subject: string; snippet?: string; from: string; to?: string; cc?: string }>(list: T[]) => list.filter((t) => summaryBelongs(all, j.jobNumber, t));
+    const q = jobMailQuery(all, j.jobNumber);
+    const threads = q ? mine(await hub.gmail.search(`(${q}) newer_than:60d -from:me`, 8).catch(() => [])).slice(0, 5) : [];
     if (adjEmail) {
-      const [last] = await hub.gmail.search(`(from:${adjEmail} OR to:${adjEmail} OR cc:${adjEmail}) newer_than:180d`, 1).catch(() => []);
+      const [last] = mine(await hub.gmail.search(`(from:${adjEmail} OR to:${adjEmail} OR cc:${adjEmail}) newer_than:180d`, all.shared.has(adjEmail) ? 8 : 1).catch(() => []));
       if (last) adjTouches.push({ at: new Date(last.date).toISOString(), what: `${last.from.toLowerCase().includes(me) ? "you emailed" : "they emailed"}: ${last.subject}` });
     }
     // Emails you sent yourself (a new email, not a reply) count as contact too: the search above skips them.
     if (people.length) {
-      const sent = await hub.gmail.search(`from:me (${people.map((p) => `to:${p} OR cc:${p}`).join(" OR ")}) newer_than:60d`, 3).catch(() => []);
+      const sent = mine(await hub.gmail.search(`from:me (${people.map((p) => `to:${p} OR cc:${p}`).join(" OR ")}) newer_than:60d`, 8).catch(() => [])).slice(0, 3);
       for (const t of sent) touches.push({ at: new Date(t.date).toISOString(), what: `you emailed: ${t.subject}` });
     }
     for (const t of threads) {

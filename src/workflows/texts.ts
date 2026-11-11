@@ -3,6 +3,7 @@ import path from "node:path";
 import type { TextMessage } from "../connectors/texts/index.js";
 import type { Hub } from "../hub.js";
 import { allContacts } from "./contacts.js";
+import { allSigns, sureSign } from "./jobMail.js";
 
 /**
  * Texts with the people on Hunter's jobs. Keystone reads the iPhone's backup, keeps ONLY the conversations whose
@@ -60,6 +61,8 @@ export interface TextsSync {
   backupAt?: string;
   read: number;
   matched: number;
+  /** Texts with someone who's on several jobs, where nothing said which job. */
+  unassigned?: number;
   jobs: number[];
 }
 
@@ -70,23 +73,44 @@ export async function syncTexts(hub: Hub, days = 60): Promise<TextsSync> {
   const all = await hub.texts.messages(new Date(Date.now() - days * 864e5));
   const phones = jobPhones(hub);
   const byJob = new Map<number, JobText[]>();
-  let matched = 0;
+  let matched = 0, unassigned = 0;
+  // A number on several jobs (the same adjuster or property manager): a day's texts with them go to the job that
+  // day's texts name (street, job number, the customer's name). If nothing says which job, they aren't filed to any.
+  const signs = allSigns(hub, true).signs;
+  const dayOfText = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Denver" });
+  const dayText = new Map<string, string>();
   for (const m of all) {
     const hits = phones.get(phoneKey(m.handle));
+    if (hits && hits.length > 1 && m.text) dayText.set(`${phoneKey(m.handle)}|${dayOfText(m.at)}`, `${dayText.get(`${phoneKey(m.handle)}|${dayOfText(m.at)}`) ?? ""}\n${m.text}`);
+  }
+  const namedIn = (jobNumber: number, text: string) => {
+    const s = signs.get(jobNumber);
+    if (!s) return false;
+    const t = text.toLowerCase();
+    return !!sureSign(s, text) || s.names.some((n) => new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(t));
+  };
+  for (const m of all) {
+    let hits = phones.get(phoneKey(m.handle));
     if (!hits || !m.text) continue; // not someone on a job: never kept
+    if (hits.length > 1) {
+      const text = dayText.get(`${phoneKey(m.handle)}|${dayOfText(m.at)}`) ?? "";
+      hits = hits.filter((h) => namedIn(h.jobNumber, text));
+      if (!hits.length) { unassigned++; continue; }
+    }
     matched++;
     for (const h of hits) (byJob.get(h.jobNumber) ?? byJob.set(h.jobNumber, []).get(h.jobNumber)!).push({ at: m.at, fromMe: m.fromMe, who: h.who, role: h.role, text: m.text });
   }
   for (const j of hub.jobs.list()) {
     const list = (byJob.get(j.jobNumber) ?? []).sort((a, b) => b.at.localeCompare(a.at));
     if (!list.length && !j.texts.lastAt) continue;
-    if (list.length) {
+    // (Also when it's now empty: texts filed here earlier by a shared number are taken back out.)
+    if (list.length || existsSync(file(hub, j.jobNumber))) {
       mkdirSync(path.dirname(file(hub, j.jobNumber)), { recursive: true });
       writeFileSync(file(hub, j.jobNumber), JSON.stringify(list.slice(0, 400), null, 2));
     }
     hub.jobs.upsert(j.jobNumber, { texts: summarize(list, st.backupAt ?? "") });
   }
-  return { connected: true, backupAt: st.backupAt, read: all.length, matched, jobs: [...byJob.keys()] };
+  return { connected: true, backupAt: st.backupAt, read: all.length, matched, unassigned, jobs: [...byJob.keys()] };
 }
 
 /** The job's texting state: the last text either way, your last text, and a text of theirs you haven't answered. */
