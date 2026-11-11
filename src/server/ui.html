@@ -14,16 +14,24 @@
    * flipped: light sidebar, dark navy work area. data-theme="homebase" switches to Homebase's own (unflipped) colors.
    */
   :root {
+    /* Blueprint (the default): deep drafting blue, sky-blue lines and buttons. */
+    --side-bg: #071428; --side-ink: #eaf3ff; --side-muted: #a9c3e6; --side-active: #12305a;
+    --bg: #0a1c36; --panel: #0f2748; --panel-2: #14315a; --ink: #eaf3ff; --muted: #a9c3e6; --line: #1d3a66; --soft: #102b50;
+    --brand: #7fd0ff; --brand-ink: #06203c;
+    --accent: #7fd0ff; --accent-ink: #06203c; --link: #7fd0ff; --focus: #7fd0ff;
+    --ok: #6fc394; --warn: #ffb38a; --bad: #ff9f8a; --pill: #163a6b;
+    --shadow: none; color-scheme: dark;
+    --sans: "Jost", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; --mono: ui-monospace, Consolas, Menlo, monospace;
+  }
+  /* Homebase's layout with its colors flipped: light sidebar, dark work area. */
+  /* Navy: Keystone's earlier colors. */
+  :root[data-theme="navy"] {
     --side-bg: #0a1020; --side-ink: #e6e9f0; --side-muted: #8b95a8; --side-active: #18223a;
     --bg: #0e1526; --panel: #151e33; --panel-2: #1b2640; --ink: #e9ecf2; --muted: #95a0b3; --line: #253150; --soft: #18223a;
     --brand: #e9ecf2; --brand-ink: #0e1526;
     --accent: #e9ecf2; --accent-ink: #0e1526; --link: #b4cdff; --focus: #b4cdff;
     --ok: #6fc394; --warn: #e6ad55; --bad: #f08479; --pill: #212c49;
-    --shadow: none; color-scheme: dark;
-    --sans: "Jost", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; --mono: ui-monospace, Consolas, Menlo, monospace;
   }
-  /* Homebase's layout with its colors flipped: light sidebar, dark work area. */
-  :root[data-theme="flipped"] { --side-bg: #f2f1ee; --side-ink: #141d33; --side-muted: #5d6578; --side-active: #e3e1db; }
   :root[data-theme="homebase"] {
     --side-bg: #121a2e; --side-ink: #eceef3; --side-muted: #a3acbd; --side-active: #1f2b47;
     --bg: #f2f1ee; --panel: #ffffff; --panel-2: #f7f6f3; --ink: #1a2133; --muted: #686f7e; --line: #dedbd3; --soft: #eeece7;
@@ -68,6 +76,28 @@
   .crumbs { color: var(--muted); font-size: 14px; }
   .crumbs b { color: var(--ink); font-weight: 500; }
   .topright { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 0; }
+
+  /* ---- Top tabs (the default layout): the menu runs across the top, so the page gets the full width. */
+  :root[data-layout="top"] .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  :root[data-layout="top"] .side-nav { flex-direction: row; align-items: center; flex-wrap: wrap; padding: 0 18px; gap: 0 14px; border-bottom: 1px solid var(--line); min-height: 56px; }
+  :root[data-layout="top"] .logo { padding: 0; grid-auto-flow: column; align-items: center; gap: 8px; margin-right: 6px; }
+  :root[data-layout="top"] .logo svg { width: 28px; height: 26px; }
+  :root[data-layout="top"] .logo b { font-size: 17px; letter-spacing: 3px; }
+  :root[data-layout="top"] .logo span { display: none; }
+  :root[data-layout="top"] nav.tabs { display: flex; flex-wrap: wrap; gap: 0; padding: 0; flex: 1 1 auto; }
+  :root[data-layout="top"] nav.tabs button { padding: 17px 12px 14px; border-radius: 0; border-bottom: 3px solid transparent; gap: 7px; color: var(--side-muted); }
+  :root[data-layout="top"] nav.tabs button .ms { font-size: 19px; }
+  :root[data-layout="top"] nav.tabs button .count { margin-left: 0; background: var(--accent); color: var(--accent-ink); }
+  :root[data-layout="top"] nav.tabs button:hover { background: transparent; color: var(--side-ink); }
+  :root[data-layout="top"] nav.tabs button.active { background: transparent; color: var(--side-ink); border-bottom-color: var(--accent); }
+  :root[data-layout="top"] .navlabel, :root[data-layout="top"] .recent, :root[data-layout="top"] .side-nav > .zgrip, :root[data-layout="top"] .zmenu[data-zone-toggle="nav"] { display: none !important; }
+  :root[data-layout="top"] .mini { margin: 0 !important; padding: 4px 8px; grid-template-columns: 30px minmax(0, 150px) auto; }
+  :root[data-layout="top"] .mini img { width: 30px; height: 30px; }
+  :root[data-layout="top"] .side-search { padding: 0; width: 190px; }
+  :root[data-layout="top"] .side-foot { padding: 0 6px 0 0; align-items: center; gap: 10px; }
+  :root[data-layout="top"] .side-foot button { color: var(--muted); }
+  :root[data-layout="top"] .side-foot .tsize button { color: var(--ink); border-color: var(--line); }
+  :root[data-layout="top"] .topbar { min-height: 42px; padding-left: 28px; }
   .chip { font-size: 12px; padding: 2px 9px; border-radius: 999px; background: var(--pill); color: var(--ink); white-space: nowrap; }
   .chip.off { color: var(--muted); }
   .topbtn { border: 1px solid var(--line); background: transparent; color: var(--ink); padding: 5px 11px; border-radius: 6px; cursor: pointer; font-size: 13px; }
@@ -825,7 +855,7 @@
     <div class="navlabel" id="wherelabel" style="margin-top:auto">Where you were</div>
     <div class="recent" id="recent" style="margin-top:0"></div>
     <div class="side-search"><input type="search" id="globalq" placeholder="Search everything"></div>
-    <div class="side-foot"><button type="button" id="themebtn">Homebase colors</button><span class="tsize" title="Text size"><button type="button" data-tsize="-1" aria-label="Smaller text">A−</button><button type="button" data-tsize="1" aria-label="Larger text">A+</button></span></div>
+    <div class="side-foot"><button type="button" id="themebtn">Theme</button><button type="button" id="layoutbtn">Menu</button><span class="tsize" title="Text size"><button type="button" data-tsize="-1" aria-label="Smaller text">A−</button><button type="button" data-tsize="1" aria-label="Larger text">A+</button></span></div>
   </nav>
   <div class="mainc">
   <div class="topbar">
@@ -2030,15 +2060,29 @@ $("#filedlg").addEventListener("close", async () => {
 });
 
 // ============================================================= theme: dark (default) / flipped / Homebase
-const THEMES = [["dark", "Dark"], ["flipped", "Light sidebar"], ["homebase", "Homebase colors"]];
+const THEMES = [["dark", "Blueprint"], ["navy", "Navy"], ["homebase", "Light"]];
 function applyTheme(t) {
+  if (!THEMES.some(([k]) => k === t)) t = "dark"; // an older saved choice
   if (t === "dark") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", t);
   const next = THEMES[(THEMES.findIndex(([k]) => k === t) + 1) % THEMES.length];
-  $("#themebtn").textContent = `Theme: ${THEMES.find(([k]) => k === t)[1]} (switch to ${next[1].toLowerCase()})`;
+  $("#themebtn").textContent = `Colors: ${THEMES.find(([k]) => k === t)[1]}`;
+  $("#themebtn").title = `Click to switch to ${next[1]}`;
   $("#themebtn").dataset.next = next[0];
 }
+// ---- layout: menu across the top (default) or down the side
+function applyLayout(l) {
+  document.documentElement.setAttribute("data-layout", l === "side" ? "side" : "top");
+  $("#layoutbtn").textContent = l === "side" ? "Menu: side" : "Menu: top";
+  $("#layoutbtn").title = l === "side" ? "Click to move the menu to the top" : "Click to move the menu to the side";
+  // The small controls (colors, menu, text size) sit in the status row when the menu is on top, at the foot of the side menu otherwise.
+  const foot = $(".side-foot");
+  if (l === "side") $(".side-nav").appendChild(foot); else $(".topbar .topright").prepend(foot);
+  try { zapply("nav"); } catch { /* the panels aren't set up yet on first load; they apply this themselves */ }
+}
+$("#layoutbtn").addEventListener("click", () => { const l = store.get("layout", "top") === "top" ? "side" : "top"; store.set("layout", l); applyLayout(l); });
 $("#themebtn").addEventListener("click", () => { const t = $("#themebtn").dataset.next; store.set("theme", t); applyTheme(t); });
 applyTheme(store.get("theme", "dark"));
+applyLayout(store.get("layout", "top"));
 
 // ============================================================= player: Spotify (embedded) + Audible (its own window)
 function spotifyEmbed(link) {
@@ -2909,7 +2953,9 @@ const ZONES = {
 };
 const zstate = () => store.get("zones", {});
 function zapply(k) {
-  const z = ZONES[k], st = zstate()[k] || {}, box = $(z.box); if (!box) return;
+  const z = ZONES[k], box = $(z.box); if (!box) return;
+  // With the menu across the top there's no side panel to fold or size.
+  const st = k === "nav" && document.documentElement.getAttribute("data-layout") === "top" ? {} : zstate()[k] || {};
   const folded = !!st.folded && !z.noFold;
   box.classList.toggle("z-" + k, folded);
   if (folded) box.style.setProperty(z.v, (z.rail || 0) + "px");
