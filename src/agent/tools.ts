@@ -37,6 +37,15 @@ export function hubToolDefs(hub: Hub) {
     tool("job_list", "List the local job folders (job.json summaries).", {}, wrap(async () =>
       hub.jobs.list().map((j) => ({ jobNumber: j.jobNumber, name: j.name, address: j.address, stage: j.stage, estimate: j.estimate.status, folder: hub.jobs.folder(j.jobNumber) })),
     )),
+    tool(
+      "job_review",
+      "Gather EVERYTHING Keystone has on a job in one call, to go through before scoping, pricing or revising an estimate: every file in the job folder (sketch, photos incl. subfolders, estimate, files, notes, email attachments), CompanyCam photos (links the project and copies previews into photos/previews), the emails and texts with the job's people, calls, walk-recording transcripts, the team's Homebase notes, shop stock that might fit, and a `missing` list of what couldn't be checked. Open and read the files it lists that matter (PDFs, notes, walk transcripts, photos).",
+      { jobNumber },
+      wrap(async ({ jobNumber: n }) => {
+        if (!hub.jobs.exists(n)) await pullJob(hub, n, { quiet: true });
+        return (await import("../workflows/dossier.js")).jobDossier(hub, n);
+      }),
+    ),
     tool("job_get", "Read a job's job.json plus the files in its folder (sketch, photos, estimate, email, notes).", { jobNumber }, wrap(async ({ jobNumber: n }) => ({
       folder: hub.jobs.folder(n),
       job: hub.jobs.get(n),

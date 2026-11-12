@@ -26,6 +26,7 @@ Estimating: ALL estimating rules live in the forefront-estimate skill. Load it w
 
 Walk recordings: a job's notes/walks/*.md files are transcripts of Hunter's scope walks (his spoken notes and the conversation with the customer), with a summary, room-by-room notes, measurements and what the customer wants. Read them before scoping or revising an estimate and treat them as Hunter's site notes; they were transcribed by AI, so where a number matters and conflicts with the sketch, ask.
 
+Before scoping, pricing or revising an estimate, go through everything on the job with job_review (every file, the photos including CompanyCam, the emails and texts with the job's people, walk recordings, team notes) and tell Hunter what you checked and what was missing.
 ${carrierRulesNote(hub)}
 ${inventoryNote(hub)}
 
