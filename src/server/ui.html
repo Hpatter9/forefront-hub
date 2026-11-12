@@ -345,6 +345,15 @@
   .gcomp .gc-ghost { background: transparent; border: 0; color: var(--muted); cursor: pointer; padding: 6px 10px; border-radius: 18px; font: 14px var(--sans); }
   .gcomp .gc-ghost:hover { background: var(--soft); color: var(--ink); }
   .gcomp.min form > :not(.gc-h) { display: none; }
+  /* Bigger: the expand button fills most of the screen; the corner grip drags it to any size. */
+  dialog.gcomp.big { inset: 4% 5% 0 5%; width: auto; height: auto; max-height: none; }
+  dialog.gcomp.big form { height: 100%; max-height: none; }
+  dialog.gcomp.sized form { max-height: none; }
+  dialog.gcomp.min, dialog.gcomp.min form { height: auto !important; }
+  dialog.gcomp.min { inset: auto 24px 0 auto; width: min(560px, calc(100vw - 24px)) !important; }
+  .gcomp .gc-grip { position: absolute; left: 0; top: 0; width: 22px; height: 22px; cursor: nwse-resize; border-radius: 16px 0 0 0; touch-action: none; z-index: 1; }
+  .gcomp .gc-grip::after { content: ""; position: absolute; left: 6px; top: 6px; width: 8px; height: 8px; border-left: 2px solid var(--muted); border-top: 2px solid var(--muted); border-radius: 2px 0 0 0; }
+  .gcomp.big .gc-grip, .gcomp.min .gc-grip { display: none; }
   @media (max-width: 980px) { .gm { grid-template-columns: 1fr; grid-template-rows: auto auto minmax(0, 1fr); } .gm-brand { display: none; } .gm-rail { display: flex; overflow-x: auto; padding: 0 8px 8px; } .gm-compose { margin: 0 8px 0 0; height: 40px; flex: none; } .gm-lab { border-radius: 16px; flex: none; padding: 0 12px; } .gm-labh { display: none; } .gm-main { margin: 0 8px 8px; } .gr { grid-template-columns: 28px 28px minmax(80px, 120px) minmax(0, 1fr) 64px; } .gm-th h1, .gm-filebar { margin-left: 16px; margin-right: 16px; } .gm-replies { padding-left: 16px; } }
   /* calendar */
   .calwrap { display: grid; grid-template-columns: var(--w-cal, 210px) minmax(0, 1fr); height: 100%; min-height: 0; position: relative; }
@@ -1085,7 +1094,8 @@
   </div><div class="foot"><button class="btn" value="delete" id="tk-del" style="margin-right:auto">Delete</button><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="save">Save</button></div></form></dialog>
 
 <dialog id="composedlg" class="gcomp"><form method="dialog" id="composeform">
-  <div class="gc-h"><span id="cp-title">New Message</span><button type="button" id="cp-min" title="Minimize"><span class="ms">minimize</span></button><button value="cancel" title="Save &amp; close"><span class="ms">close</span></button></div>
+  <div class="gc-grip" id="cp-grip" title="Drag to resize"></div>
+  <div class="gc-h"><span id="cp-title">New Message</span><button type="button" id="cp-big" title="Make bigger"><span class="ms">open_in_full</span></button><button type="button" id="cp-min" title="Minimize"><span class="ms">minimize</span></button><button value="cancel" title="Save &amp; close"><span class="ms">close</span></button></div>
   <div class="gc-f"><span>Job</span><select id="cp-job"><option value="">(none)</option></select></div>
   <div class="gc-f"><span>To</span><input type="text" id="cp-to" autocomplete="off"></div>
   <div class="gc-f"><span>Cc</span><input type="text" id="cp-cc" autocomplete="off"></div>
@@ -2024,6 +2034,7 @@ const refsFor = (m) => [...new Set((`${m.references || ""} ${m.messageIdHeader |
 function openCompose(o) {
   $("#cp-title").textContent = o.reply ? (o.subject || "Reply") : o.subject?.startsWith("Fwd:") ? o.subject : "New Message";
   $("#composedlg").classList.remove("min");
+  applyComposeSize();
   $("#cp-job").innerHTML = `<option value="">(none)</option>` + jobs.map((j) => `<option value="${j.jobNumber}" ${o.job === j.jobNumber ? "selected" : ""}>#${j.jobNumber} ${esc(j.name)}</option>`).join("");
   $("#cp-to").value = o.to || ""; $("#cp-cc").value = o.cc || ""; $("#cp-subject").value = o.subject || ""; $("#cp-body").value = o.body || "";
   $("#cp-thread").value = o.threadId || ""; $("#cp-reply").value = o.inReplyTo || "";
@@ -2061,6 +2072,31 @@ $("#composedlg").addEventListener("close", async () => {
   } catch (e) { log(e.message, "t-err"); $("#composedlg").show(); }
 });
 $("#cp-min").addEventListener("click", () => $("#composedlg").classList.toggle("min"));
+// ---- the new-email window's size: Expand fills the screen; the top-left corner drags to any size. Both are remembered.
+function applyComposeSize() {
+  const d = $("#composedlg"), big = store.get("composeBig", "") === "1", sz = big ? null : JSON.parse(store.get("composeSize", "null") || "null");
+  d.classList.toggle("big", big);
+  d.classList.toggle("sized", !!sz);
+  // (Sizes are layout pixels: the window's size divided by the text-size zoom.)
+  d.style.width = sz ? `${Math.min(sz.w, innerWidth / ZOOM() - 24)}px` : "";
+  d.querySelector("form").style.height = sz ? `${Math.min(sz.h, innerHeight / ZOOM() - 16)}px` : "";
+  $("#cp-big").title = big ? "Back to small" : "Make bigger";
+  $("#cp-big .ms").textContent = big ? "close_fullscreen" : "open_in_full";
+}
+$("#cp-big").addEventListener("click", () => { $("#composedlg").classList.remove("min"); store.set("composeBig", store.get("composeBig", "") === "1" ? "" : "1"); applyComposeSize(); $("#cp-body").focus(); });
+$("#cp-grip").addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  const d = $("#composedlg"), r = d.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY, g = e.currentTarget;
+  g.setPointerCapture(e.pointerId);
+  const move = (ev) => {
+    const z = ZOOM(), w = Math.max(380, (r.width + (x0 - ev.clientX)) / z), h = Math.max(320, (r.height + (y0 - ev.clientY)) / z);
+    store.set("composeSize", JSON.stringify({ w: Math.round(w), h: Math.round(h) })); applyComposeSize();
+  };
+  const up = () => { g.removeEventListener("pointermove", move); g.removeEventListener("pointerup", up); };
+  g.addEventListener("pointermove", move); g.addEventListener("pointerup", up);
+});
+$("#cp-grip").addEventListener("dblclick", () => { store.set("composeSize", ""); applyComposeSize(); });
+addEventListener("resize", () => { if ($("#composedlg").open) applyComposeSize(); });
 
 // ============================================================= adding files (drag & drop anywhere, or Add files)
 let pickTarget = null, pendingFiles = [], dragDepth = 0, recentFiles = [];
