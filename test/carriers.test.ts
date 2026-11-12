@@ -40,4 +40,23 @@ describe("carrier email rules", () => {
     expect(drafts[1]).toMatchObject({ to: ["ed@young.example"], subject: "Your Reconstruction Estimate – 6924 Sierra Meadows Drive" });
     expect(drafts[2]).toMatchObject({ to: ["dana.desk@statefarm.com"], subject: "Re: Photos" });
   });
+
+  it("copies the homeowner on every draft to insurance (new or a reply, any carrier), and not on their own email", async () => {
+    const t = setup();
+    const owner = { name: "Ed Young", email: "ed@young.example", phone: "", company: "", attention: "" };
+    t.hub.jobs.upsert(7201, { customer: owner });
+    t.hub.jobs.upsert(7202, { customer: { ...owner, name: "Pat Other", email: "owner@other.example" } });
+    const mk = (to: string, job: number, extra: object = {}) => createGeneratedDraft(t.hub, { to: [to], bcc: [], subject: "Estimate", body: "Hello,\n\nAttached.\n\nThanks,", attachments: [], ...extra }, { jobNumber: job });
+    await mk("dana.desk@statefarm.com", 7201);
+    await mk("dana.desk@statefarm.com", 7201, { threadId: "t-1", subject: "Re: Photos" });
+    await mk("pat@acme.example", 7202);
+    await mk("ed@young.example", 7201);
+    await mk("pat@acme.example", 7202, { cc: ["Owner <owner@other.example>"] });
+    const drafts = (t.gmail as any).load().map((d: any) => ({ to: d.input.to, cc: d.input.cc ?? [] }));
+    expect(drafts[0]).toEqual({ to: [SF], cc: ["dana.desk@statefarm.com", "ed@young.example"] });
+    expect(drafts[1].cc).toEqual(["ed@young.example"]);
+    expect(drafts[2]).toEqual({ to: ["pat@acme.example"], cc: ["owner@other.example"] });
+    expect(drafts[3].cc).toEqual([]);
+    expect(drafts[4].cc).toEqual(["Owner <owner@other.example>"]);
+  });
 });

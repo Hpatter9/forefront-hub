@@ -76,12 +76,24 @@ export async function createGeneratedDraft(hub: Hub, d: DraftInput, meta: { jobN
   const job = meta.jobNumber && hub.jobs.exists(meta.jobNumber) ? hub.jobs.get(meta.jobNumber) : null;
   d = { ...d, body: cleanDraftBody(d.body, { companies: [job?.carrier ?? "", job?.customer.company ?? ""] }), subject: d.subject.replace(/\\n/g, " ").trim() };
   // A new email to the job's insurance follows the carrier's rule (its claims address; the subject it files by).
-  const rule = job && !d.threadId ? ruleForJob(hub, job) : null;
+  const adjuster = job?.adjuster.email.trim().toLowerCase() ?? "";
+  const anyRule = job ? ruleForJob(hub, job) : null;
+  const toInsurance = !!job && ((!!adjuster && d.to.some((a) => a.toLowerCase().includes(adjuster))) || (!!anyRule && isToInsurance(anyRule, job, d.to)));
+  const rule = job && !d.threadId ? anyRule : null;
   if (rule && job && (meta.toInsurance || isToInsurance(rule, job, d.to))) {
     const fixed = applyCarrierRule(rule, job, d);
     if (fixed.missing) hub.say(`Heads up: ${fixed.missing}`);
     else if (fixed.subject !== d.subject || fixed.to.join() !== d.to.join()) hub.say(`${rule.carrier} email: sent to ${rule.to} with the claim number as the subject.`);
     d = { ...d, to: fixed.to, cc: fixed.cc, subject: fixed.subject };
+  }
+  // Anything drafted to insurance (the adjuster or the carrier's inbox, new or a reply) copies the homeowner.
+  if (job && (meta.toInsurance || toInsurance)) {
+    const owner = job.customer.email.trim();
+    const has = (list: string[] | undefined) => (list ?? []).some((a) => a.toLowerCase().includes(owner.toLowerCase()));
+    if (owner && !has(d.to) && !has(d.cc)) {
+      d = { ...d, cc: [...(d.cc ?? []), owner] };
+      hub.say(`Copied ${job.customer.attention || job.customer.name || "the homeowner"} (${owner}) on the email to insurance.`);
+    } else if (!owner) hub.say(`Heads up: #${job.jobNumber} has no email for the homeowner in Homebase, so they aren't copied on this email to insurance.`);
   }
   const ref = await hub.gmail.createDraft({ ...d, labels: [GENERATED_LABEL] });
   const list = generatedDrafts(hub);
