@@ -16,3 +16,6 @@
   by `phone/build.sh` with Google's build-tools). It works without the laptop: it calls Homebase, Google and Gemini
   itself with keys handed over once by `Connect phone` (`src/workflows/phone.ts`). Same rules as here: writes ask
   first, email is drafts only. `phone/keystone.apk` is the built app; the signing key is never committed.
+- The shop's overstock is the newest `.xlsx` in `inventory/` on the PC (git-ignored: its notes can name customers),
+  read by `src/workflows/inventory.ts`. Keystone only reminds (job page card, `shop_stock` tool, a line in the AI's
+  instructions); it never puts stock on an estimate itself.

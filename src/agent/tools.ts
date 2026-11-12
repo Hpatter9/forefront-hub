@@ -257,6 +257,16 @@ export function hubToolDefs(hub: Hub) {
         return { added: huddleAdd(hub, text).text };
       }),
     ),
+    tool(
+      "shop_stock",
+      "The shop's overstock (leftover flooring, tile, carpet tile, cove base, grout, waterproofing, adhesive, paint) that Hunter wants to use on jobs when it fits. Give words to narrow it (\"LVP\", \"tile beige\", \"cove base black\") or leave query empty for everything. Each item has the product, color, how much is on hand, where it is, and notes.",
+      { query: z.string().default("").describe("words to match, or empty for all") },
+      wrap(async ({ query }) => {
+        const { findStock, inventory } = await import("../workflows/inventory.js");
+        const inv = inventory(hub);
+        return inv.problem ? { problem: inv.problem } : { asOf: inv.updatedAt, items: findStock(hub, query).slice(0, 60) };
+      }),
+    ),
     tool("huddle_list", "Hunter's huddle list: what he wants to bring up at the team huddle, and what's already been brought up.", {}, wrap(async () => (await import("../workflows/huddle.js")).huddleList(hub))),
     tool(
       "calendar_free_time",

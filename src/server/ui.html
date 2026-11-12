@@ -1420,6 +1420,16 @@ function renderJobTab() {
   if (t === "files") return renderFiles(el);
 }
 
+// Shop overstock that could go on this job: the kinds its scope mentions, and anything set aside for this customer.
+function stockCard(st, n) {
+  if (!st || (!st.kinds?.length && !st.named?.length)) return "";
+  const line = (x) => `<li><b>${esc(x.product)}</b>${x.color && !/^n\/a$/i.test(x.color) ? `, ${esc(x.color)}` : ""} <span class="muted">· ${esc(x.amount || "not counted yet")}${x.location ? ` · ${esc(x.location)}` : ""}${x.status ? ` · ${esc(x.status)}` : ""}</span>${x.notes ? `<div class="small muted">${esc(x.notes)}</div>` : ""}</li>`;
+  const total = st.kinds.reduce((t, k) => t + k.items.length, 0) + st.named.length;
+  return `<details class="banner" style="border-left-color:var(--accent)"><summary style="cursor:pointer"><b>Shop stock that could work here</b> · ${[...(st.named.length ? [`${st.named.length} set aside for this job`] : []), ...st.kinds.map((k) => `${k.items.length} ${esc(k.kind)}`)].join(" · ")} <span class="small muted">(tap to see)</span></summary>
+    ${st.named.length ? `<p style="margin:10px 0 2px"><b>Noted for this job</b></p><ul style="margin:0;padding-left:20px;display:grid;gap:6px">${st.named.map(line).join("")}</ul>` : ""}
+    ${st.kinds.map((k) => `<p style="margin:10px 0 2px"><b>${esc(k.kind[0].toUpperCase() + k.kind.slice(1))}</b></p><ul style="margin:0;padding-left:20px;display:grid;gap:6px">${k.items.map(line).join("")}</ul>`).join("")}
+    <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn small" data-do="claude" data-n="${n}" data-p="Look at job #${n}'s scope and the shop's overstock (shop_stock). Tell me which stock items could be used on this job: the product and color, how much we have against what the job needs, and anything to check first. Don't change the estimate.">Ask ${AI()} what fits</button><span class="small muted">From the shop inventory sheet${st.updatedAt ? `, saved ${fmtDate(st.updatedAt)}` : ""}. ${total} item${total === 1 ? "" : "s"}.</span></div></details>`;
+}
 function renderOverview(el) {
   const { homebase: h, local: l, fields: f, customer: c, adjusters, carrier } = view;
   const adj = adjusters.filter(Boolean);
@@ -1435,6 +1445,7 @@ function renderOverview(el) {
       <div class="tile" style="cursor:default"><span class="k">Days in stage</span><span class="v">${daysSince(h.stageSince) ?? "—"}</span><span class="k">${esc(h.stage)}</span></div>
       <div class="tile" style="cursor:default"><span class="k">Last touched</span><span class="v">${l?.pulse?.lastTouchAt ? daysSince(l.pulse.lastTouchAt) + "d" : "—"}</span><span class="k">${esc((l?.pulse?.lastTouch || "").slice(0, 34))}</span></div>
     </div>
+    ${stockCard(view.stock, h.jobNumber)}
     ${!waiting && ww?.text ? `<div class="banner" style="border-left-color:var(--bad)"><b>${esc(ww.text.from)}</b> is waiting on you (text) <div class="small" style="margin:6px 0"><b>Why:</b> ${esc(ww.why)}</div><span class="row" style="display:inline-flex"><button class="btn small" data-do="handled" data-n="${h.jobNumber}" title="You dealt with it (called, texted, talked in person). Takes it off your list.">Handled</button><button class="btn small" data-do="notmine" data-n="${h.jobNumber}" title="It isn't yours to answer. Takes it off your list.">Not for me</button></span></div>` : ""}
     ${waiting ? `<div class="banner" style="border-left-color:var(--bad)"><b>${esc(waiting.from)}</b> is waiting on you · ${esc(waiting.subject)} · ${fmtDate(waiting.at)} <span class="row" style="display:inline-flex;margin-left:8px">${waiting.threadId ? `<button class="btn small primary" data-do="thread" data-thread="${esc(waiting.threadId)}">Open &amp; reply</button>` : ""}<button class="btn small" data-do="claude" data-n="${h.jobNumber}" data-p="Read the latest email on job #${h.jobNumber} and draft my reply in Gmail (draft only).">Draft reply with ${AI()}</button><button class="btn small" data-do="handled" data-n="${h.jobNumber}" title="You dealt with it (called, texted, talked in person). Takes it off your list.">Handled</button><button class="btn small" data-do="notmine" data-n="${h.jobNumber}" title="It isn't yours to answer. Takes it off your list.">Not for me</button></span><div class="small" style="margin-top:6px"><b>Why:</b> ${esc(ww.why)}</div></div>` : ""}
     <div class="grid" style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)">

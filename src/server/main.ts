@@ -137,6 +137,7 @@ async function jobView(n: number) {
   return {
     homebase: { ...hb, name: local.customer.company ? local.name : hb.name, text: undefined },
     local,
+    stock: (await import("../workflows/inventory.js")).stockForJob(hub, n),
     folder: hub.jobs.folder(n),
     projectName: raw?.name ?? "",
     fields: raw ? fieldValues(raw) : {},
