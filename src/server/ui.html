@@ -1942,7 +1942,7 @@ async function openThread(id) {
 $("#reader").addEventListener("click", async (e) => {
   const ds = e.target.closest("[data-dsend]"), dd = e.target.closest("[data-ddel]"), de = e.target.closest("[data-dedit]");
   if (ds) { try { await api(`/api/mail/drafts/${encodeURIComponent(ds.dataset.dsend)}/send?thread=${encodeURIComponent(mailThread)}`, { method: "POST", body: {} }); } catch (err) { log(err.message, "t-err"); } return; }
-  if (dd) { if (!confirm("Delete this draft?")) return; try { await api(`/api/mail/drafts/${encodeURIComponent(dd.dataset.ddel)}/delete?thread=${encodeURIComponent(mailThread)}`, { method: "POST", body: {} }); snack("Draft deleted."); openThread(mailThread); } catch (err) { log(err.message, "t-err"); } return; }
+  if (dd) { if (!confirm("Delete this draft?")) return; try { await api(`/api/mail/drafts/${encodeURIComponent(dd.dataset.ddel)}/delete?thread=${encodeURIComponent(mailThread)}`, { method: "POST", body: {} }); snack("Draft deleted."); if ((threadView?.messages || []).filter((x) => x.id !== dd.dataset.ddel).length) openThread(mailThread); else { showList(); loadThreads(); } } catch (err) { log(err.message, "t-err"); } return; }
   if (de) { editDraftInline(Number(de.dataset.dedit)); return; }
   const dsave = e.target.closest("[data-dsave]");
   if (dsave) { await saveDraftInline(Number(dsave.dataset.dsave), dsave.dataset.how === "send"); return; }

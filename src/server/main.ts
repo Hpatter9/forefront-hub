@@ -663,6 +663,10 @@ const server = http.createServer(async (req, res) => {
     if (t && req.method === "GET") return send(res, 200, await mailThread(t[1]));
     if (t && t[2] === "modify" && req.method === "POST") {
       const b = await body(req);
+      if (b.trash) {
+        const { deleteThread } = await import("../workflows/generated.js");
+        return send(res, 200, { ok: true, ...(await deleteThread(hub, t[1])) });
+      }
       await hub.gmail.modifyThread?.(t[1], b);
       return send(res, 200, { ok: true });
     }

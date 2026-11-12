@@ -72,6 +72,31 @@ export function cleanDraftBody(body: string, opts: { companies?: string[] } = {}
   return s;
 }
 
+/**
+ * Deleting a conversation from the mail list. Gmail's "move to Trash" doesn't remove drafts (they stay in Drafts),
+ * so any drafts in the conversation are deleted as drafts; the rest of it, if there is any, goes to Trash.
+ * A conversation that was only a draft is gone for good, like discarding a draft in Gmail.
+ */
+export async function deleteThread(hub: Hub, threadId: string): Promise<{ drafts: number; trashed: boolean }> {
+  const th = await hub.gmail.getThread(threadId).catch(() => null);
+  const isDraft = (m: { labelIds?: string[] }) => !!m.labelIds?.includes("DRAFT");
+  let drafts = 0;
+  // (A lone draft can be its own "thread" with nothing else to read: its id is tried as the draft's message id.)
+  for (const id of th ? th.messages.filter(isDraft).map((m) => m.id) : [threadId]) {
+    const draftId = await hub.gmail.draftIdFor?.(id).catch(() => null);
+    if (!draftId) continue;
+    await hub.gmail.deleteDraft?.(draftId);
+    drafts++;
+  }
+  // (The AI drafts list can hand over the draft's own id.)
+  if (!th && !drafts && hub.gmail.deleteDraft) {
+    try { await hub.gmail.deleteDraft(threadId); drafts++; } catch { /* not a draft id either */ }
+  }
+  const others = th ? th.messages.some((m) => !isDraft(m)) : false;
+  if (others || !drafts) await hub.gmail.modifyThread?.(threadId, { trash: true });
+  return { drafts, trashed: others || !drafts };
+}
+
 export async function createGeneratedDraft(hub: Hub, d: DraftInput, meta: { jobNumber?: number; source?: string; /** It's the adjuster's email, even if the address isn't recognisably the carrier's. */ toInsurance?: boolean } = {}): Promise<DraftRef> {
   const job = meta.jobNumber && hub.jobs.exists(meta.jobNumber) ? hub.jobs.get(meta.jobNumber) : null;
   d = { ...d, body: cleanDraftBody(d.body, { companies: [job?.carrier ?? "", job?.customer.company ?? ""] }), subject: d.subject.replace(/\\n/g, " ").trim() };

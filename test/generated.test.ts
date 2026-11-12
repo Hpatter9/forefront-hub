@@ -59,3 +59,19 @@ describe("AI email text is tidied before it becomes a draft", () => {
     expect(cleanDraftBody("Hi Acme Casualty,\n\nSee attached.\n\nThanks,\nHunter Patterson", { companies: ["Acme Casualty"] })).toBe("Hello,\n\nSee attached.\n\nThanks,");
   });
 });
+
+describe("deleting from the mail list", () => {
+  it("really deletes a draft (Trash alone leaves it in Drafts), and trashes an ordinary conversation", async () => {
+    const { deleteThread } = await import("../src/workflows/generated.js");
+    const { testHub } = await import("./helpers.js");
+    const t = testHub();
+    const ref = await t.hub.gmail.createDraft({ to: ["dana@example.com"], bcc: [], subject: "Tile", body: "Hi Dana,", attachments: [] });
+    const drafts = async () => ((await t.hub.gmail.listThreads!({ label: "DRAFT" })).threads ?? []).map((x) => x.id);
+    expect(await drafts()).toContain(ref.id);
+    expect(await deleteThread(t.hub, ref.id)).toMatchObject({ drafts: 1, trashed: false });
+    expect(await drafts()).not.toContain(ref.id);
+    const inbox = (await t.hub.gmail.listThreads!({ label: "INBOX" })).threads[0];
+    expect(await deleteThread(t.hub, inbox.id)).toMatchObject({ drafts: 0, trashed: true });
+    expect((await t.hub.gmail.listThreads!({ label: "INBOX" })).threads.some((x) => x.id === inbox.id)).toBe(false);
+  });
+});
