@@ -53,15 +53,30 @@ function send(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body));
 }
 
-async function rawBody(req: IncomingMessage, limit = 30 * 1024 * 1024): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  let n = 0;
-  for await (const c of req) {
-    n += c.length;
-    if (n > limit) throw new Error("That file is over 30 MB.");
-    chunks.push(c as Buffer);
+/**
+ * Saves an upload straight to a temporary file as it arrives, so a big file (a zip of every photo on a job) never
+ * has to fit in memory. Over the limit, the rest is read and thrown away so the page gets a proper answer.
+ */
+async function saveUpload(req: IncomingMessage, limit = 2 * 1024 ** 3): Promise<{ tmp: string }> {
+  const { createWriteStream, mkdtempSync, rmSync } = await import("node:fs");
+  const os = await import("node:os");
+  const tmp = path.join(mkdtempSync(path.join(os.tmpdir(), "keystone-up-")), "file");
+  const out = createWriteStream(tmp);
+  let n = 0, over = false;
+  try {
+    for await (const c of req) {
+      n += c.length;
+      if (n > limit) { over = true; continue; }
+      if (!out.write(c)) await new Promise((r) => out.once("drain", r));
+    }
+  } finally {
+    await new Promise((r) => out.end(r));
   }
-  return Buffer.concat(chunks);
+  if (over) {
+    rmSync(path.dirname(tmp), { recursive: true, force: true });
+    throw new Error("That file is over 2 GB, which is more than Keystone can take in one piece.");
+  }
+  return { tmp };
 }
 
 function listTree(dir: string, base = ""): { name: string; size: number; modified: string }[] {
@@ -438,8 +453,8 @@ const server = http.createServer(async (req, res) => {
       if (req.method !== "POST") return send(res, 405, { error: "method" });
       if (action === "upload") {
         const name = decodeURIComponent(String(req.headers["x-filename"] ?? "file"));
-        const bytes = await rawBody(req);
-        return send(res, 202, task(`Add ${name} to #${n}`, n, () => addFile(hub, n, name, bytes, { toHomebase: q("homebase") !== "0" }), "job"));
+        const saved = await saveUpload(req);
+        return send(res, 202, task(`Add ${name} to #${n}`, n, () => addFile(hub, n, name, saved, { toHomebase: q("homebase") !== "0" }), "job"));
       }
       const b = await body(req);
       if (action === "open-folder") {
@@ -874,7 +889,7 @@ const server = http.createServer(async (req, res) => {
       if (req.method !== "POST") return send(res, 405, { error: "method" });
       if (st[2] === "upload") {
         const name = decodeURIComponent(String(req.headers["x-filename"] ?? "file"));
-        const r = await addFile(hub, n, name, await rawBody(req), { toHomebase: false });
+        const r = await addFile(hub, n, name, await saveUpload(req), { toHomebase: false });
         return send(res, 200, { path: path.relative(hub.jobs.folder(n), r.file).split(path.sep).join("/"), sub: r.sub });
       }
       if (st[2] === "stop") return send(res, 200, (await studio.stop(n), { ok: true }));

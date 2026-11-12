@@ -86,3 +86,25 @@ describe("background sync", () => {
     expect(homebase.writes).toEqual([]);
   });
 });
+
+describe("a zip of photos dropped on a job", () => {
+  it("is saved whole, and its pictures are unpacked into the job's photos folder", async () => {
+    const { execFileSync } = await import("node:child_process");
+    const { existsSync, mkdtempSync, readdirSync, readFileSync } = await import("node:fs");
+    const os = await import("node:os");
+    const nodePath = await import("node:path");
+    const { addFile } = await import("../src/workflows/uploads.js");
+    const { testHub, PYTHON } = await import("./helpers.js");
+    const t = testHub(false); // "also add to Homebase?" -> no
+    t.hub.jobs.upsert(6300, { name: "Sample" });
+    const zip = nodePath.join(mkdtempSync(nodePath.join(os.tmpdir(), "zip-")), "5545290_Sample_all_images.zip");
+    execFileSync(PYTHON, ["-c", "import sys,zipfile\nz=zipfile.ZipFile(sys.argv[1],'w',zipfile.ZIP_DEFLATED)\nz.writestr('rooms/kitchen 1.jpg',b'\\xff\\xd8'+b'k'*5000)\nz.writestr('rooms/bath/IMG_2.PNG',b'png'*100)\nz.writestr('__MACOSX/rooms/._kitchen 1.jpg',b'x')\nz.writestr('readme.txt',b'not a photo')\nz.close()", zip]);
+    const r = await addFile(t.hub, 6300, "5545290_Sample_all_images.zip", { tmp: zip });
+    expect(r).toMatchObject({ sub: "files", photos: 2, uploaded: false });
+    expect(existsSync(r.file)).toBe(true);
+    expect(existsSync(zip)).toBe(false); // moved, not copied
+    const dir = t.hub.jobs.path(6300, "photos", "5545290_Sample_all_images");
+    expect(readdirSync(dir).sort()).toEqual(["IMG_2.PNG", "kitchen 1.jpg"]);
+    expect(readFileSync(nodePath.join(dir, "kitchen 1.jpg")).length).toBe(5002);
+  });
+});
