@@ -345,6 +345,11 @@
   .gcomp .gc-ghost { background: transparent; border: 0; color: var(--muted); cursor: pointer; padding: 6px 10px; border-radius: 18px; font: 14px var(--sans); }
   .gcomp .gc-ghost:hover { background: var(--soft); color: var(--ink); }
   .gcomp.min form > :not(.gc-h) { display: none; }
+  /* Names from your contacts as you type in To / Cc / Bcc. */
+  .addr-pop { position: fixed; z-index: 60; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.45); padding: 4px; max-height: 280px; overflow-y: auto; font: 14px var(--sans); }
+  .addr-pop button { display: block; width: 100%; text-align: left; background: transparent; border: 0; color: var(--ink); padding: 8px 10px; border-radius: 7px; cursor: pointer; font: inherit; }
+  .addr-pop button.on, .addr-pop button:hover { background: var(--soft); }
+  .addr-pop .sub { display: block; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Bigger: the expand button fills most of the screen; the corner grip drags it to any size. */
   dialog.gcomp.big { inset: 4% 5% 0 5%; width: auto; height: auto; max-height: none; }
   dialog.gcomp.big form { height: 100%; max-height: none; }
@@ -2072,6 +2077,52 @@ $("#composedlg").addEventListener("close", async () => {
   } catch (e) { log(e.message, "t-err"); $("#composedlg").show(); }
 });
 $("#cp-min").addEventListener("click", () => $("#composedlg").classList.toggle("min"));
+// ---- To / Cc / Bcc: type part of a name and pick the person; their address goes in. Works on the name being typed
+// (after the last comma), so several people can be added one after another.
+const addrPop = document.createElement("div"); addrPop.className = "addr-pop"; addrPop.hidden = true; document.body.appendChild(addrPop);
+let addrFor = null, addrHits = [], addrAt = 0, addrSeq = 0;
+const addrToken = (el) => { const before = el.value.slice(0, el.selectionStart ?? el.value.length); const start = Math.max(before.lastIndexOf(","), before.lastIndexOf(";")) + 1; return { start, text: before.slice(start).trim() }; };
+function addrHide() { addrPop.hidden = true; addrFor = null; addrHits = []; }
+function addrDraw() {
+  addrPop.innerHTML = addrHits.map((h, i) => `<button type="button" data-addr="${i}" class="${i === addrAt ? "on" : ""}"><b>${esc(h.name || h.email)}</b><span class="sub">${esc(h.email)}${h.sub ? ` · ${esc(h.sub)}` : ""}</span></button>`).join("");
+  const r = addrFor.getBoundingClientRect(), z = ZOOM();
+  Object.assign(addrPop.style, { left: `${r.left / z}px`, top: `${r.bottom / z + 2}px`, width: `${Math.min(460, Math.max(280, r.width / z))}px` });
+  addrPop.hidden = !addrHits.length;
+}
+async function addrSearch(el) {
+  const t = addrToken(el).text, my = ++addrSeq;
+  if (t.length < 2 || t.includes("@") && /@[\w.-]+\.\w{2,}$/.test(t)) return addrHide();
+  const look = async (homebase) => (await api(`/api/contacts?q=${encodeURIComponent(t)}&homebase=${homebase ? 1 : 0}`).catch(() => ({ contacts: [] }))).contacts || [];
+  // Your own contacts first (instant); if nobody matches, Homebase is asked too.
+  let people = await look(false);
+  if (!people.some((p) => p.emails?.length) && t.length >= 3) people = await look(true);
+  if (my !== addrSeq || document.activeElement !== el) return;
+  const already = el.value.toLowerCase();
+  addrHits = people.flatMap((p) => (p.emails || []).map((email) => ({ name: p.name, email, sub: [p.company, p.jobs?.[0] ? `#${p.jobs[0].jobNumber} ${p.jobs[0].name}` : ""].filter(Boolean).join(" · ") }))).filter((h) => !already.includes(h.email.toLowerCase())).slice(0, 7);
+  addrFor = el; addrAt = 0; addrDraw();
+}
+function addrPick(i) {
+  const h = addrHits[i], el = addrFor; if (!h || !el) return;
+  const { start } = addrToken(el), end = el.selectionStart ?? el.value.length;
+  const name = (h.name || "").replace(/[,;<>"]/g, "").trim();
+  const put = `${start ? " " : ""}${name ? `${name} <${h.email}>` : h.email}, `;
+  el.value = el.value.slice(0, start) + put + el.value.slice(end).replace(/^[\s,;]+/, "");
+  const at = start + put.length; el.focus(); el.setSelectionRange(at, at);
+  addrHide();
+}
+for (const id of ["cp-to", "cp-cc", "cp-bcc"]) {
+  const el = $("#" + id);
+  let timer;
+  el.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => addrSearch(el), 120); });
+  el.addEventListener("keydown", (e) => {
+    if (addrPop.hidden || addrFor !== el) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); addrAt = (addrAt + (e.key === "ArrowDown" ? 1 : addrHits.length - 1)) % addrHits.length; addrDraw(); }
+    else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); addrPick(addrAt); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); addrHide(); }
+  });
+  el.addEventListener("blur", () => setTimeout(() => { if (addrFor === el) addrHide(); }, 150));
+}
+addrPop.addEventListener("mousedown", (e) => { const b = e.target.closest("[data-addr]"); if (b) { e.preventDefault(); addrPick(Number(b.dataset.addr)); } });
 // ---- the new-email window's size: Expand fills the screen; the top-left corner drags to any size. Both are remembered.
 function applyComposeSize() {
   const d = $("#composedlg"), big = store.get("composeBig", "") === "1", sz = big ? null : JSON.parse(store.get("composeSize", "null") || "null");
