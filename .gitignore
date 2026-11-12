@@ -12,4 +12,4 @@ jobs/
 estimator/
 .venv-py/
 # The shop inventory spreadsheet lives here on the PC (never in GitHub: its notes can name customers)
-inventory/
+/inventory/
