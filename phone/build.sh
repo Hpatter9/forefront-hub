@@ -2,10 +2,11 @@
 # Builds the Keystone phone app (keystone.apk) with Google's Android build tools: no Gradle, no libraries.
 #   ANDROID_TOOLS  folder with aapt2, d8, zipalign, apksigner (build-tools)
 #   ANDROID_JAR    the platform's android.jar
-#   KEYSTORE       the signing key (made on first use; keep it: an update must be signed with the same key)
+#   KEYSTORE       the signing key (default signing/keystone.jks, kept in the repo by Hunter's choice so every
+#                  update installs over the last one; an update signed with a different key won't install)
 set -euo pipefail
 cd "$(dirname "$0")"
-T="${ANDROID_TOOLS:?set ANDROID_TOOLS}"; JAR="${ANDROID_JAR:?set ANDROID_JAR}"; KS="${KEYSTORE:?set KEYSTORE}"
+T="${ANDROID_TOOLS:?set ANDROID_TOOLS}"; JAR="${ANDROID_JAR:?set ANDROID_JAR}"; KS="${KEYSTORE:-signing/keystone.jks}"
 OUT="${OUT:-build}"; rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/dex"
 [ -f "$KS" ] || keytool -genkeypair -keystore "$KS" -storepass keystone -keypass keystone -alias keystone -keyalg RSA -keysize 2048 -validity 20000 -dname "CN=Keystone" >/dev/null 2>&1
 "$T/aapt2" compile --dir res -o "$OUT/res.zip"

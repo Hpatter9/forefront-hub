@@ -8,8 +8,10 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.util.Base64;
 import android.webkit.JavascriptInterface;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -70,12 +72,21 @@ public class MainActivity extends Activity {
         return true;
       }
     });
+    web.setWebChromeClient(new WebChromeClient()); // so the page's own "are you sure?" boxes show
     web.addJavascriptInterface(new Bridge(), "Native");
     setContentView(web);
     web.loadUrl("file:///android_asset/index.html");
     tts = new TextToSpeech(this, status -> {
       ttsReady = status == TextToSpeech.SUCCESS;
-      if (ttsReady) tts.setLanguage(Locale.US);
+      if (!ttsReady) return;
+      tts.setLanguage(Locale.US);
+      // The page is told when an answer has finished being read (hands-free listens again then).
+      tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+        @Override public void onStart(String id) { }
+        @Override public void onDone(String id) { spoken(true); }
+        @Override public void onError(String id) { spoken(false); }
+        @Override public void onStop(String id, boolean interrupted) { spoken(false); }
+      });
     });
   }
 
@@ -91,6 +102,10 @@ public class MainActivity extends Activity {
     web.evaluateJavascript("window.onNativeBack ? window.onNativeBack() : false", handled -> {
       if (!"true".equals(handled)) moveTaskToBack(true);
     });
+  }
+
+  private void spoken(boolean finished) {
+    runOnUiThread(() -> web.evaluateJavascript("window.onSpoken && window.onSpoken(" + finished + ")", null));
   }
 
   private void open(String url) {
@@ -233,7 +248,18 @@ public class MainActivity extends Activity {
 
     @JavascriptInterface
     public void speak(String text) {
-      if (ttsReady && text != null) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "keystone");
+      if (ttsReady && text != null && !text.isEmpty()) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "keystone");
+      else spoken(false);
+    }
+
+    /** The app's version, shown on the Setup screen. */
+    @JavascriptInterface
+    public String version() {
+      try {
+        return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+      } catch (Exception e) {
+        return "";
+      }
     }
 
     @JavascriptInterface

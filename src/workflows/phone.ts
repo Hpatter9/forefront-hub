@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import type { Hub } from "../hub.js";
 import { allContacts } from "./contacts.js";
+import { inventory } from "./inventory.js";
 
 /**
  * Connecting the Keystone phone app (phone/). The phone works without the laptop: it talks to Homebase, Google and
@@ -21,6 +22,8 @@ export interface PhoneSetup {
   google: { clientId: string; clientSecret: string; refreshToken: string } | null;
   gemini: { key: string; model: string; fallbacks: string[] } | null;
   contacts: { name: string; company?: string; title?: string; emails: string[]; phones: string[]; jobs: { jobNumber: number; name: string; role: string }[] }[];
+  /** The shop's overstock, as of now (from the inventory sheet on the laptop). */
+  stock: { type: string; product: string; color: string; amount: string; location: string; status: string; notes: string }[];
   madeAt: string;
 }
 
@@ -42,6 +45,7 @@ export function phoneSetup(hub: Hub): PhoneSetup {
       .filter((p) => p.name && (p.phones.length || p.emails.length))
       .slice(0, 1500)
       .map((p) => ({ name: p.name, company: p.company, title: p.title, emails: p.emails.slice(0, 3), phones: p.phones.map((x) => x.number), jobs: p.jobs.slice(0, 6) })),
+    stock: inventory(hub).items.slice(0, 300).map((x) => ({ type: x.type, product: x.product, color: x.color, amount: x.amount || "not counted yet", location: x.location, status: x.status, notes: x.notes.slice(0, 300) })),
     madeAt: new Date().toISOString(),
   };
 }

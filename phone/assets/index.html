@@ -9,71 +9,115 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; margin: 0; }
   body { background: var(--bg); color: var(--ink); font: 17px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; overflow: hidden; }
-  header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; background: var(--deep); border-bottom: 1px solid var(--line); }
+  a { color: var(--accent); }
+  h2 { margin: 0; font-size: 20px; }
+  h3 { margin: 0; font-size: 15px; color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; background: var(--deep); border-bottom: 1px solid var(--line); }
   header b { letter-spacing: .18em; font-size: 15px; }
-  header button { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 8px; min-height: 40px; padding: 0 12px; font: inherit; font-size: 14px; }
-  header button.on { color: var(--accent); border-color: var(--accent); }
-  main { flex: 1; overflow-y: auto; padding: 14px 16px 8px; display: flex; flex-direction: column; gap: 10px; overscroll-behavior: contain; }
+  .hbtn { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 8px; min-height: 40px; padding: 0 10px; font: inherit; font-size: 13px; }
+  .hbtn.on { color: var(--accent); border-color: var(--accent); }
+  .view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .scroll { flex: 1; overflow-y: auto; padding: 14px 16px 18px; display: flex; flex-direction: column; gap: 12px; overscroll-behavior: contain; }
+  .muted { color: var(--muted); } .small { font-size: 14px; }
   .msg { max-width: 92%; padding: 10px 14px; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .me { align-self: flex-end; background: #163a6b; border-bottom-right-radius: 4px; }
   .ai { align-self: flex-start; background: var(--panel); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
-  .ai a { color: var(--accent); }
   .note { align-self: center; color: var(--muted); font-size: 14px; text-align: center; }
   .err { align-self: flex-start; background: #3a1f12; border: 1px solid var(--warn); color: #ffd9c4; }
-  .card { background: var(--panel); border: 2px solid var(--accent); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
-  .card h3 { margin: 0; font-size: 17px; }
-  .card .ln { color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--deep); border-radius: 8px; padding: 8px 10px; font-size: 16px; }
-  .row { display: flex; gap: 10px; }
-  .btn { flex: 1; min-height: 52px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: inherit; font-weight: 600; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .card.ask { border: 2px solid var(--accent); }
+  .card .ln { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--deep); border-radius: 8px; padding: 8px 10px; font-size: 16px; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .btn { flex: 1; min-height: 50px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: inherit; font-weight: 600; padding: 0 12px; }
   .btn.yes { background: var(--accent); color: var(--on); border-color: var(--accent); }
-  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 8px 16px; scrollbar-width: none; }
+  .btn.sm { flex: none; min-height: 44px; font-size: 15px; font-weight: 500; }
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 8px 16px; scrollbar-width: none; flex: none; }
   .chips::-webkit-scrollbar { display: none; }
   .chip { flex: none; min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1px solid var(--line); background: var(--deep); color: var(--muted); font: inherit; font-size: 15px; }
-  footer { padding: 8px 16px calc(14px + env(safe-area-inset-bottom)); background: var(--deep); border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .chip.on { color: var(--accent); border-color: var(--accent); }
+  .talkfoot { padding: 8px 16px 10px; background: var(--deep); border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; align-items: center; flex: none; }
   .type { display: flex; gap: 8px; width: 100%; }
-  .type input { flex: 1; min-width: 0; min-height: 48px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; padding: 0 12px; }
+  input[type=text], input[type=search] { flex: 1; min-width: 0; min-height: 48px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; padding: 0 12px; }
   .type button { min-width: 64px; min-height: 48px; border-radius: 10px; border: 0; background: var(--accent); color: var(--on); font: inherit; font-weight: 600; }
-  #mic { width: 84px; height: 84px; border-radius: 50%; border: 0; background: var(--accent); color: var(--on); display: grid; place-items: center; box-shadow: 0 0 0 8px rgba(127,208,255,.14); }
+  #mic { width: 78px; height: 78px; border-radius: 50%; border: 0; background: var(--accent); color: var(--on); display: grid; place-items: center; box-shadow: 0 0 0 8px rgba(127,208,255,.14); }
   #mic:disabled { opacity: .5; }
-  #mic svg { width: 38px; height: 38px; }
+  #mic svg { width: 36px; height: 36px; }
   .busy { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); margin-right: 8px; animation: pulse 1s infinite; }
   @keyframes pulse { 50% { opacity: .25; } }
   @media (prefers-reduced-motion: reduce) { .busy { animation: none; } }
-  #pair { flex: 1; overflow-y: auto; padding: 22px 18px; display: flex; flex-direction: column; gap: 14px; }
-  #pair h1 { margin: 0; font-size: 24px; }
+  nav { display: flex; background: var(--deep); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); flex: none; }
+  nav button { flex: 1; min-height: 58px; background: none; border: 0; color: var(--muted); font: inherit; font-size: 13px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+  nav button svg { width: 24px; height: 24px; }
+  nav button.on { color: var(--accent); }
+  .item { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); min-height: 48px; }
+  .item:first-of-type { border-top: 0; }
+  .item .b { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .item input[type=checkbox] { width: 26px; height: 26px; margin: 2px 0 0; flex: none; accent-color: var(--accent); }
+  .item.done .b { text-decoration: line-through; color: var(--muted); }
+  .time { color: var(--accent); font-weight: 600; white-space: nowrap; min-width: 74px; }
+  .tag { display: inline-block; border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; font-size: 13px; color: var(--muted); }
+  .tag.w { border-color: var(--warn); color: var(--warn); }
+  .job { display: block; width: 100%; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; color: var(--ink); font: inherit; }
+  .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .acts a, .acts button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--deep); color: var(--accent); text-decoration: none; font: inherit; font-size: 15px; }
+  dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; } dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
+  #pair { padding: 22px 18px; gap: 14px; }
   #pair p { margin: 0; color: var(--muted); }
   #pair ol { margin: 0; padding-left: 22px; color: var(--muted); display: grid; gap: 6px; }
   #pair label { display: grid; gap: 6px; color: var(--muted); font-size: 15px; }
-  #pair input { min-height: 54px; border-radius: 10px; border: 1px solid var(--line); background: var(--deep); color: var(--ink); font: inherit; font-size: 20px; padding: 0 14px; }
+  #pair input { min-height: 54px; font-size: 20px; background: var(--deep); flex: none; }
+  .sheet { position: fixed; inset: 0; background: rgba(3,10,22,.7); display: flex; align-items: flex-end; z-index: 10; }
+  .sheet > div { background: var(--panel); border-radius: 16px 16px 0 0; width: 100%; max-height: 80%; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .sheet .opt { min-height: 48px; text-align: left; background: var(--deep); border: 1px solid var(--line); border-radius: 10px; color: var(--ink); font: inherit; padding: 0 14px; }
+  .sheet .opt.cur { border-color: var(--accent); color: var(--accent); }
   [hidden] { display: none !important; }
 </style>
 </head>
 <body>
-<header><b>KEYSTONE</b><span class="row" style="gap:8px"><button id="voice" type="button" aria-pressed="true" class="on">Read aloud: on</button><button id="menu" type="button">Setup</button></span></header>
+<header><b>KEYSTONE</b><span class="row" style="gap:6px"><button id="hands" type="button" class="hbtn" aria-pressed="false">Hands-free: off</button><button id="voice" type="button" class="hbtn on" aria-pressed="true">Read aloud: on</button><button id="menu" type="button" class="hbtn">Setup</button></span></header>
 
-<section id="pair" hidden>
-  <h1>Connect this phone</h1>
-  <p>One time, on the same Wi-Fi as your laptop.</p>
+<section class="view" id="v-pair" hidden><div class="scroll" id="pair">
+  <h2>Connect this phone</h2>
+  <p>One time, on the same Wi-Fi as your laptop. Connect again any time to refresh your contacts and shop inventory.</p>
   <ol><li>On the laptop, open the Keystone folder and double-click <b style="color:var(--ink)">Connect phone</b>.</li><li>It shows an address and a 6-digit code. Type both here.</li></ol>
-  <label>Address on the laptop screen<input id="p-addr" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="192.168.1.23:4320"></label>
-  <label>6-digit code<input id="p-code" inputmode="numeric" autocomplete="off" maxlength="7" placeholder="123456"></label>
+  <label>Address on the laptop screen<input type="text" id="p-addr" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="192.168.1.23:4320"></label>
+  <label>6-digit code<input type="text" id="p-code" inputmode="numeric" autocomplete="off" maxlength="7" placeholder="123456"></label>
   <button class="btn yes" id="p-go" type="button" style="flex:none">Connect</button>
   <p id="p-msg" role="status"></p>
-  <button class="btn" id="p-cancel" type="button" style="flex:none" hidden>Cancel</button>
+  <button class="btn" id="p-cancel" type="button" style="flex:none" hidden>Back</button>
+  <p class="small" id="p-about"></p>
+</div></section>
+
+<section class="view" id="v-today" hidden><div class="scroll" id="today"></div></section>
+
+<section class="view" id="v-talk" hidden>
+  <div class="scroll" id="talk" aria-live="polite"></div>
+  <div class="chips" id="chips">
+    <button class="chip" type="button" data-say="What do I have today?">My day</button>
+    <button class="chip" type="button" data-fill="Where does the  job stand?" data-at="15">Job status</button>
+    <button class="chip" type="button" data-fill="What's the phone number for ">Find a contact</button>
+    <button class="chip" type="button" data-fill="Add a note to the  job: " data-at="18">Add a note</button>
+    <button class="chip" type="button" data-fill="Set up a scope walk with ">Schedule a walk</button>
+    <button class="chip" type="button" data-fill="What do we have in the shop for ">Shop stock</button>
+  </div>
+  <div class="talkfoot">
+    <button id="mic" type="button" aria-label="Talk to Keystone"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 15a3.5 3.5 0 0 0 3.5-3.5v-6a3.5 3.5 0 0 0-7 0v6A3.5 3.5 0 0 0 12 15Zm6-3.5a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V22h2v-2.57a8 8 0 0 0 7-7.93Z"/></svg></button>
+    <form class="type" id="typeform"><input id="text" type="text" autocomplete="off" placeholder="or type here" aria-label="Type to Keystone"><button type="submit">Send</button></form>
+  </div>
 </section>
 
-<main id="talk" aria-live="polite"></main>
-<div class="chips" id="chips">
-  <button class="chip" type="button" data-say="What's on my calendar today and tomorrow?">My calendar</button>
-  <button class="chip" type="button" data-fill="Where does the  job stand?" data-at="15">Job status</button>
-  <button class="chip" type="button" data-fill="What's the phone number for ">Find a contact</button>
-  <button class="chip" type="button" data-fill="Add a note to the  job: " data-at="18">Add a note</button>
-  <button class="chip" type="button" data-fill="Set up a scope walk with ">Schedule a walk</button>
-</div>
-<footer id="foot">
-  <button id="mic" type="button" aria-label="Talk to Keystone"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 15a3.5 3.5 0 0 0 3.5-3.5v-6a3.5 3.5 0 0 0-7 0v6A3.5 3.5 0 0 0 12 15Zm6-3.5a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V22h2v-2.57A8 8 0 0 0 20 11.500Z"/></svg></button>
-  <form class="type" id="typeform"><input id="text" type="text" autocomplete="off" placeholder="or type here" aria-label="Type to Keystone"><button type="submit">Send</button></form>
-</footer>
+<section class="view" id="v-jobs" hidden>
+  <div class="chips" style="padding-top:12px"><input type="search" id="j-q" placeholder="Search jobs: name, street or number" aria-label="Search jobs" style="flex:1 0 100%"></div>
+  <div class="chips" id="j-filter"><button class="chip on" type="button" data-f="mine">My jobs</button><button class="chip" type="button" data-f="all">All open jobs</button></div>
+  <div class="scroll" id="jobs" style="padding-top:4px"></div>
+</section>
+<section class="view" id="v-job" hidden><div class="scroll" id="job"></div></section>
+
+<nav id="nav" hidden>
+  <button type="button" data-tab="today"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.200Z"/></svg>Today</button>
+  <button type="button" data-tab="talk"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 15a3.5 3.5 0 0 0 3.5-3.5v-6a3.5 3.5 0 0 0-7 0v6A3.5 3.5 0 0 0 12 15Zm6-3.5a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V22h2v-2.57a8 8 0 0 0 7-7.93Z"/></svg>Talk</button>
+  <button type="button" data-tab="jobs"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 4h4a2 2 0 0 1 2 2v1h4a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4V6a2 2 0 0 1 2-2Zm0 3h4V6h-4v1Z"/></svg>Jobs</button>
+</nav>
 
 <script src="app.js"></script>
 <script>
@@ -85,6 +129,23 @@ window.nativeDone = (id, result) => { const w = waiting.get(id); if (w) { waitin
 const call = (fn, ...args) => new Promise((resolve) => { const id = `c${++seq}`; waiting.set(id, resolve); Native[fn](id, ...args); });
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const usd = (n) => (n == null || n === "" ? "" : `$${Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 })}`);
+const readAloud = () => Native.get("readAloud") !== "off";
+const handsFree = () => Native.get("handsFree") === "on";
+
+// Reading aloud, with a way to know when it has finished (hands-free listens again then).
+let spokenDone = null;
+window.onSpoken = () => { const f = spokenDone; spokenDone = null; if (f) f(); };
+function say(text) {
+  return new Promise((resolve) => {
+    if (!readAloud() || !text) return resolve();
+    const timer = setTimeout(() => { if (spokenDone === finish) { spokenDone = null; resolve(); } }, 60000);
+    const finish = () => { clearTimeout(timer); resolve(); };
+    spokenDone = finish;
+    Native.speak(String(text).replace(/[*_#`]/g, ""));
+  });
+}
+const hush = () => { spokenDone = null; Native.quiet(); };
 
 const io = {
   get: (k) => Native.get(k),
@@ -94,73 +155,218 @@ const io = {
     if (res.error) throw new Error(/Unable to resolve host|timeout|Failed to connect|unreachable/i.test(res.error) ? "No connection. Check your signal and try again." : res.error);
     return res;
   },
+  // A Yes/No card before anything is written. Hands-free, it's read out and "yes" or "no" can be spoken.
   confirm: (title, lines) => new Promise((resolve) => {
+    showTab("talk");
     const el = document.createElement("div");
-    el.className = "card";
-    el.innerHTML = `<h3>${esc(title)}</h3>${lines.map((l) => `<div class="ln">${esc(l)}</div>`).join("")}<div class="row"><button class="btn" type="button" data-a="no">No</button><button class="btn yes" type="button" data-a="yes">Yes</button></div>`;
-    el.addEventListener("click", (e) => {
-      const a = e.target.closest("[data-a]")?.dataset.a; if (!a) return;
-      el.querySelector(".row").outerHTML = `<div class="note" style="align-self:flex-start">${a === "yes" ? "You said yes." : "You said no."}</div>`;
-      el.style.borderColor = "var(--line)";
-      resolve(a === "yes");
-    });
+    el.className = "card ask";
+    el.innerHTML = `<b>${esc(title)}</b>${lines.map((l) => `<div class="ln">${esc(l)}</div>`).join("")}<div class="row"><button class="btn" type="button" data-a="no">No</button><button class="btn yes" type="button" data-a="yes">Yes</button></div>`;
+    let settled = false;
+    const settle = (yes) => {
+      if (settled) return; settled = true; hush();
+      el.querySelector(".row").outerHTML = `<div class="note" style="align-self:flex-start">${yes ? "You said yes." : "You said no."}</div>`;
+      el.classList.remove("ask"); resolve(yes);
+    };
+    el.addEventListener("click", (e) => { const a = e.target.closest("[data-a]")?.dataset.a; if (a) settle(a === "yes"); });
     $("#talk").appendChild(el); scrollDown();
-    if (readAloud()) Native.speak(`${title} Yes or no?`);
+    (async () => {
+      await say(handsFree() ? `${title} ${lines.join(". ").slice(0, 400)}. Say yes or no.` : `${title} Yes or no?`);
+      if (!handsFree() || settled) return;
+      const r = await call("listen");
+      const t = (r.text || "").trim().toLowerCase();
+      if (/^(yes|yeah|yep|yup|do it|go ahead|confirm|correct|sure|ok|okay)\b/.test(t)) settle(true);
+      else if (/^(no|nope|cancel|don't|do not|stop|wait)\b/.test(t)) settle(false);
+      // anything else: the card stays for a tap
+    })();
   }),
 };
 const K = KeystonePhone.create(io);
 
-// ---- screen
+// ============================================================ Tabs
+const TABS = ["today", "talk", "jobs", "job", "pair"];
+let tab = "talk";
+function showTab(t) {
+  tab = t;
+  for (const v of TABS) $("#v-" + v).hidden = v !== t;
+  document.querySelectorAll("#nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === (t === "job" ? "jobs" : t)));
+  $("#nav").hidden = t === "pair";
+  if (t === "today") loadToday(false);
+  if (t === "jobs") loadJobs(false);
+}
+$("#nav").onclick = (e) => { const b = e.target.closest("[data-tab]"); if (b) showTab(b.dataset.tab); };
+
+// ============================================================ Talk
 const scrollDown = () => { const t = $("#talk"); t.scrollTop = t.scrollHeight; };
 // Phone numbers and emails in an answer become tappable.
 const linkify = (s) => esc(s).replace(/\(\d{3}\) \d{3}-\d{4}|\b\d{3}-\d{3}-\d{4}\b/g, (m) => `<a href="tel:${m.replace(/\D/g, "")}">${m}</a>`).replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, (m) => `<a href="mailto:${m}">${m}</a>`);
 function add(kind, text, html) { const el = document.createElement("div"); el.className = kind === "note" ? "note" : `msg ${kind}`; if (html) el.innerHTML = html; else el.textContent = text; $("#talk").appendChild(el); scrollDown(); return el; }
-const readAloud = () => Native.get("readAloud") !== "off";
-function showVoice() { const on = readAloud(); $("#voice").textContent = `Read aloud: ${on ? "on" : "off"}`; $("#voice").classList.toggle("on", on); $("#voice").setAttribute("aria-pressed", String(on)); }
-$("#voice").onclick = () => { Native.set("readAloud", readAloud() ? "off" : "on"); if (!readAloud()) Native.quiet(); showVoice(); };
+function showToggles() {
+  const v = readAloud(), h = handsFree();
+  $("#voice").textContent = `Read aloud: ${v ? "on" : "off"}`; $("#voice").classList.toggle("on", v); $("#voice").setAttribute("aria-pressed", String(v));
+  $("#hands").textContent = `Hands-free: ${h ? "on" : "off"}`; $("#hands").classList.toggle("on", h); $("#hands").setAttribute("aria-pressed", String(h));
+}
+$("#voice").onclick = () => { Native.set("readAloud", readAloud() ? "off" : "on"); if (!readAloud()) hush(); showToggles(); };
+$("#hands").onclick = () => {
+  Native.set("handsFree", handsFree() ? "off" : "on"); showToggles();
+  if (handsFree()) { showTab("talk"); add("note", "Hands-free is on: after each answer I'll listen again. Say \"stop\" or stay quiet to end."); listen(); } else hush();
+};
 
-const STEP = { find_jobs: "Looking up the job", get_job: "Reading the job", find_contact: "Looking them up", add_note: "Writing the note", log_call: "Logging the call", calendar_list: "Checking your calendar", calendar_create: "Setting up the event", gmail_draft: "Writing the draft" };
+const STEP = { find_jobs: "Looking up the job", get_job: "Reading the job", find_contact: "Looking them up", add_note: "Writing the note", log_call: "Logging the call", calendar_list: "Checking your calendar", calendar_create: "Setting up the event", gmail_draft: "Writing the draft", set_stage: "Changing the stage", my_day: "Putting your day together", my_jobs: "Reading your jobs", shop_stock: "Checking the shop" };
 let history = [], busy = false;
 async function send(text) {
   text = String(text || "").trim();
   if (!text || busy) return;
-  busy = true; $("#mic").disabled = true; Native.quiet();
+  showTab("talk");
+  busy = true; $("#mic").disabled = true; hush();
   add("me", text);
   const status = add("note", "", `<span class="busy"></span>Thinking…`);
+  let answer = "";
   try {
     const r = await K.ask(text, history, (name) => { status.innerHTML = `<span class="busy"></span>${esc(STEP[name] || "Working")}…`; scrollDown(); });
-    history = r.history;
+    history = r.history; answer = r.text;
     status.remove();
     add("ai", "", linkify(r.text));
-    if (readAloud()) Native.speak(r.text.replace(/[*_#`]/g, ""));
   } catch (e) {
     status.remove();
     add("err", e.message || "Something went wrong.");
+    answer = e.message || "";
   }
   busy = false; $("#mic").disabled = false;
+  await say(answer);
+  // Hands-free: listen for the next thing once the answer has been read.
+  if (handsFree() && tab === "talk" && !busy) listen();
 }
-$("#mic").onclick = async () => {
+async function listen() {
   if (busy) return;
+  hush();
   const r = await call("listen");
-  if (r.error) return add("err", r.error);
-  if (r.text) send(r.text);
-};
+  if (r.error) { add("err", r.error); return; }
+  const t = (r.text || "").trim();
+  if (!t || /^(stop|stop listening|that's all|that is all|never ?mind|cancel|done|goodbye)\.?$/i.test(t)) {
+    if (handsFree()) add("note", "Okay, I've stopped listening. Tap the microphone when you need me.");
+    return;
+  }
+  send(t);
+}
+$("#mic").onclick = listen;
 $("#typeform").onsubmit = (e) => { e.preventDefault(); const t = $("#text").value; $("#text").value = ""; send(t); };
+function fill(text, at) { showTab("talk"); const box = $("#text"); box.value = text; box.focus(); const i = at ?? text.length; box.setSelectionRange(i, i); }
 $("#chips").onclick = (e) => {
   const c = e.target.closest(".chip"); if (!c) return;
   if (c.dataset.say) return send(c.dataset.say);
-  const box = $("#text"); box.value = c.dataset.fill; box.focus();
-  const at = c.dataset.at ? Number(c.dataset.at) : box.value.length; box.setSelectionRange(at, at);
+  fill(c.dataset.fill, c.dataset.at ? Number(c.dataset.at) : undefined);
 };
 
-// ---- connecting to Keystone on the laptop
-function showPair(first) {
-  $("#pair").hidden = false; $("#talk").hidden = true; $("#chips").hidden = true; $("#foot").hidden = true;
-  $("#p-cancel").hidden = first; $("#p-msg").textContent = ""; $("#p-addr").value = Native.get("lastAddress") || "";
+// ============================================================ Today
+const when = (iso) => (/T/.test(iso || "") ? new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "All day");
+const dayName = (e, todayStr) => (e.day === todayStr ? "" : "Tomorrow ");
+let todayData = null, todayBusy = false;
+async function loadToday(force) {
+  const el = $("#today");
+  if (todayBusy) return;
+  if (todayData && !force && Date.now() - Date.parse(todayData.at) < 5 * 60000) return drawToday();
+  todayBusy = true;
+  if (!todayData) el.innerHTML = `<p class="note"><span class="busy"></span>Putting your day together… the first time takes a little longer.</p>`;
+  try { todayData = await K.today(force); } catch (e) { el.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; todayBusy = false; return; }
+  todayBusy = false; drawToday();
 }
-function showTalk() {
-  $("#pair").hidden = true; $("#talk").hidden = false; $("#chips").hidden = false; $("#foot").hidden = false;
+function drawToday() {
+  const d = todayData, el = $("#today");
+  const sec = (title, part, rows, empty) => `<div class="card"><h3>${title}${part.items.length ? ` · ${part.items.length}` : ""}</h3>${part.problem ? `<p class="small" style="margin:0;color:var(--warn)">Couldn't read this: ${esc(part.problem)}</p>` : rows.join("") || `<p class="muted small" style="margin:0">${empty}</p>`}</div>`;
+  const jobBtn = (j) => `<button type="button" class="tag" data-open="${j.jobNumber}" style="background:none;font:inherit;font-size:13px;min-height:32px">#${j.jobNumber} ${esc(j.name)}</button>`;
+  el.innerHTML = `<div class="row" style="justify-content:space-between"><h2>${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</h2><button class="btn sm" type="button" id="t-refresh">Refresh</button></div>
+    ${sec("Waiting on your reply", d.email, d.email.items.map((m) => `<div class="item"><div class="b"><b>${esc(m.from)}</b> ${m.job ? `<span class="tag">${esc(m.job)}</span>` : ""}<div>${esc(m.subject)}</div><div class="small muted">${esc(m.snippet)}</div><div class="acts" style="margin-top:6px"><a href="https://mail.google.com/mail/u/0/#inbox/${esc(m.threadId)}">Open in Gmail</a><button type="button" data-fillsay="Draft a reply to ${esc(m.from)} about &quot;${esc(m.subject)}&quot;: ">Draft a reply</button></div></div></div>`), "No email from job people is waiting on you.")}
+    ${sec("Calendar", d.calendar, d.calendar.items.map((e) => `<div class="item"><span class="time">${dayName(e, d.today)}${when(e.start)}</span><div class="b"><b>${esc(e.title)}</b>${e.location ? `<div class="small"><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.location)}">${esc(e.location)}</a></div>` : ""}</div></div>`), "Nothing on your calendar today or tomorrow.")}
+    ${sec("Tasks", d.tasks, d.tasks.items.map((t) => `<label class="item" data-task="${esc(t.id)}" data-list="${esc(t.list)}"><input type="checkbox"><div class="b">${esc(t.title)}${t.due ? ` <span class="tag ${t.due < d.today ? "w" : ""}">${t.due < d.today ? "overdue" : t.due === d.today ? "today" : "tomorrow"}</span>` : ""}${t.notes ? `<div class="small muted">${esc(t.notes)}</div>` : ""}</div></label>`), "No tasks due.")}
+    ${sec("Leads: set up the scope walk", d.leads, d.leads.items.map((j) => `<div class="item"><div class="b">${jobBtn(j)} <span class="small muted">${j.days != null ? `${j.days} day${j.days === 1 ? "" : "s"} in ${esc(j.stage)}` : esc(j.stage)}</span>${j.walk ? `<div class="small" style="color:var(--ok)">Appointment on the job in Homebase</div>` : ""}<div class="acts" style="margin-top:6px">${j.customerPhone ? `<a href="tel:${j.customerPhone.replace(/\D/g, "")}">Call ${esc(j.customerPhone)}</a>` : ""}<button type="button" data-fillsay="Set up a scope walk for job ${j.jobNumber} on ">Schedule</button></div></div></div>`), "No leads waiting on a walk.")}
+    ${sec("Proposals out", d.proposals, d.proposals.items.map((j) => `<div class="item"><div class="b">${jobBtn(j)} <span class="small muted">${j.days != null ? `out ${j.days} day${j.days === 1 ? "" : "s"}` : ""}${j.proposalAmount ? ` · ${usd(j.proposalAmount)}` : ""}</span></div></div>`), "No proposals out.")}
+    <p class="small muted" style="margin:0">Built on your phone from Gmail, your calendar, Google Tasks and Homebase. It doesn't see your texts; the laptop's brief does.</p>`;
+}
+$("#today").addEventListener("click", (e) => {
+  if (e.target.closest("#t-refresh")) { todayData = null; return loadToday(true); }
+  const o = e.target.closest("[data-open]"); if (o) return openJob(Number(o.dataset.open));
+  const f = e.target.closest("[data-fillsay]"); if (f) return fill(f.dataset.fillsay);
+});
+$("#today").addEventListener("change", async (e) => {
+  const row = e.target.closest("[data-task]"); if (!row) return;
+  const done = e.target.checked;
+  row.classList.toggle("done", done);
+  try { await K.setTaskDone(row.dataset.list, row.dataset.task, done); if (todayData) todayData.at = new Date(0).toISOString(); }
+  catch (err) { e.target.checked = !done; row.classList.toggle("done", !done); alert(`Couldn't update that task: ${err.message}`); }
+});
+
+// ============================================================ Jobs
+let jobsAll = null, jobFilter = "mine", jobsBusy = false;
+async function loadJobs(force) {
+  const el = $("#jobs");
+  if (jobsAll && !force) return drawJobs();
+  if (jobsBusy) return;
+  jobsBusy = true;
+  el.innerHTML = `<p class="note"><span class="busy"></span>Reading your jobs from Homebase…</p>`;
+  try { jobsAll = await K.myJobs(force); } catch (e) { el.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; jobsBusy = false; return; }
+  jobsBusy = false; drawJobs();
+}
+function drawJobs() {
+  const q = $("#j-q").value.trim().toLowerCase();
+  const list = (jobsAll || []).filter((j) => (q ? `#${j.jobNumber} ${j.name} ${j.address} ${j.stage}`.toLowerCase().includes(q) : jobFilter === "all" || j.mine));
+  $("#jobs").innerHTML = list.map((j) => `<button type="button" class="job" data-open="${j.jobNumber}"><b>#${j.jobNumber} ${esc(j.name)}</b><div class="small muted">${esc(j.stage)}${j.address ? ` · ${esc(j.address.split(",")[0])}` : ""}</div></button>`).join("") || `<p class="note">${q ? "No open job matches that." : "None of the open jobs have you on them. Tap All open jobs."}</p>`;
+  if (!q) $("#jobs").insertAdjacentHTML("beforeend", `<button class="btn sm" type="button" id="j-refresh" style="align-self:center">Refresh from Homebase</button>`);
+}
+$("#j-q").oninput = drawJobs;
+$("#j-filter").onclick = (e) => { const b = e.target.closest("[data-f]"); if (!b) return; jobFilter = b.dataset.f; document.querySelectorAll("#j-filter .chip").forEach((c) => c.classList.toggle("on", c === b)); drawJobs(); };
+$("#jobs").onclick = (e) => { if (e.target.closest("#j-refresh")) return loadJobs(true); const b = e.target.closest("[data-open]"); if (b) openJob(Number(b.dataset.open)); };
+
+let jobOpen = null;
+async function openJob(n) {
+  showTab("job");
+  const el = $("#job");
+  el.innerHTML = `<button class="btn sm" type="button" data-back="1" style="align-self:flex-start">‹ Jobs</button><p class="note"><span class="busy"></span>Reading #${n}…</p>`;
+  let j;
+  try { j = await K.getJob(n); } catch (e) { el.innerHTML = `<button class="btn sm" type="button" data-back="1" style="align-self:flex-start">‹ Jobs</button><div class="msg err">${esc(e.message)}</div>`; return; }
+  jobOpen = j;
+  const tel = (p) => p.replace(/\D/g, "");
+  const person = (c) => `<div class="item"><div class="b"><b>${esc(c.name)}</b>${c.roles ? ` <span class="tag">${esc(c.roles)}</span>` : ""}${c.company ? `<div class="small muted">${esc(c.company)}</div>` : ""}<div class="acts" style="margin-top:6px">${c.phone ? `<a href="tel:${tel(c.phone)}">Call</a><a href="sms:${tel(c.phone)}">Text</a>` : ""}${c.email ? `<a href="mailto:${esc(c.email)}">Email</a>` : ""}</div><div class="small muted" style="margin-top:4px">${[c.phone, c.email].filter(Boolean).map(esc).join(" · ")}</div></div></div>`;
+  const days = j.stageSince ? Math.max(0, Math.floor((Date.now() - Date.parse(j.stageSince)) / 864e5)) : null;
+  el.innerHTML = `<button class="btn sm" type="button" data-back="1" style="align-self:flex-start">‹ Jobs</button>
+    <div><h2>#${j.jobNumber} ${esc(j.name)}</h2>${j.address ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(j.address)}">${esc(j.address)}</a>` : ""}</div>
+    <div class="card"><div class="row" style="justify-content:space-between"><div><h3>Stage</h3><b style="font-size:19px">${esc(j.stage)}</b>${days != null ? ` <span class="small muted">· ${days} day${days === 1 ? "" : "s"}</span>` : ""}</div><button class="btn sm" type="button" data-stage="1">Change</button></div></div>
+    <div class="acts"><button type="button" data-fillsay="Add a note to job ${j.jobNumber}: ">Add a note</button><button type="button" data-fillsay="Log a call on job ${j.jobNumber} with ">Log a call</button><button type="button" data-fillsay="Set up a scope walk for job ${j.jobNumber} on ">Schedule</button><button type="button" data-ask="Give me a quick rundown of job ${j.jobNumber}: where it stands and what's next.">Rundown</button></div>
+    <div class="card"><h3>People</h3>${j.contacts.map(person).join("") || `<p class="muted small" style="margin:0">Nobody on this job in Homebase.</p>`}</div>
+    <div class="card"><h3>Details</h3><dl>${[["Carrier", j.carrier], ["Claim", j.claimNumber], ["Proposal", usd(j.proposalAmount)], ["Contract", usd(j.contractAmount)], ["Estimator", j.people?.estimator], ["Project manager", j.people?.projectManager], ["Homebase email", j.intakeEmail]].filter(([, v]) => v).map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl></div>
+    <div class="card"><h3>Latest notes</h3>${j.recentNotes.map((x) => `<div class="item"><div class="b"><span class="small muted">${esc(x.author)} · ${x.at ? new Date(x.at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}</span><div>${esc(x.body)}</div></div></div>`).join("") || `<p class="muted small" style="margin:0">No team notes yet.</p>`}</div>`;
+}
+$("#job").addEventListener("click", async (e) => {
+  if (e.target.closest("[data-back]")) return showTab("jobs");
+  const f = e.target.closest("[data-fillsay]"); if (f) return fill(f.dataset.fillsay);
+  const a = e.target.closest("[data-ask]"); if (a) return send(a.dataset.ask);
+  if (e.target.closest("[data-stage]") && jobOpen) pickStage(jobOpen);
+});
+async function pickStage(j) {
+  let stages;
+  try { stages = await K.stages(); } catch (e) { return alert(e.message); }
+  const sheet = document.createElement("div"); sheet.className = "sheet";
+  sheet.innerHTML = `<div><b>Move #${j.jobNumber} ${esc(j.name)} to…</b>${stages.filter((s) => s !== "Closed Lost").map((s) => `<button type="button" class="opt ${s === j.stage ? "cur" : ""}" data-s="${esc(s)}">${esc(s)}${s === j.stage ? " (now)" : ""}</button>`).join("")}<p class="small muted" style="margin:4px 0 0">Closed Lost needs a reason: do that one on the laptop.</p><button type="button" class="btn" data-x="1" style="flex:none">Cancel</button></div>`;
+  document.body.appendChild(sheet);
+  sheet.onclick = async (e) => {
+    const s = e.target.closest("[data-s]")?.dataset.s;
+    if (e.target === sheet || e.target.closest("[data-x]") || s === j.stage) return sheet.remove();
+    if (!s) return;
+    sheet.remove();
+    if (!confirm(`Move #${j.jobNumber} ${j.name} from ${j.stage} to ${s} in Homebase?`)) return;
+    try { await K.setStage(j.jobNumber, s); jobsAll = null; todayData = null; openJob(j.jobNumber); } catch (err) { alert(err.message); }
+  };
+}
+
+// ============================================================ Connecting to Keystone on the laptop
+function showPair(first) {
+  showTab("pair");
+  $("#p-cancel").hidden = first; $("#p-msg").textContent = ""; $("#p-addr").value = Native.get("lastAddress") || "";
+  const s = K.setup();
+  $("#p-about").textContent = `Keystone for Android ${Native.version ? Native.version() : ""}${s?.madeAt ? ` · connected ${new Date(s.madeAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · ${s.contacts?.length || 0} contacts, ${s.stock?.length || 0} shop items` : ""}`;
+}
+function start() {
   if (!$("#talk").children.length) { const s = K.setup(); add("note", `Connected as ${s?.me?.name || "you"}. Tap the microphone and talk, or type.`); }
+  showTab("today");
 }
 $("#p-go").onclick = async () => {
   const addr = $("#p-addr").value.trim(), code = $("#p-code").value.trim();
@@ -169,15 +375,21 @@ $("#p-go").onclick = async () => {
   const r = await call("pair", addr, code);
   $("#p-go").disabled = false;
   if (r.error) { $("#p-msg").textContent = r.error; return; }
-  Native.set("lastAddress", addr); $("#p-code").value = ""; history = []; $("#talk").innerHTML = "";
-  showTalk();
+  Native.set("lastAddress", addr); Native.set("myJobs", ""); $("#p-code").value = ""; history = []; $("#talk").innerHTML = ""; todayData = null; jobsAll = null;
+  start();
 };
-$("#p-cancel").onclick = showTalk;
+$("#p-cancel").onclick = () => showTab("today");
 $("#menu").onclick = () => showPair(!K.paired());
-window.onNativeBack = () => { if (!$("#pair").hidden && K.paired()) { showTalk(); return true; } return false; };
+window.onNativeBack = () => {
+  const sheet = document.querySelector(".sheet"); if (sheet) { sheet.remove(); return true; }
+  if (tab === "job") { showTab("jobs"); return true; }
+  if (tab === "pair" && K.paired()) { showTab("today"); return true; }
+  if (tab !== "today" && K.paired()) { showTab("today"); return true; }
+  return false;
+};
 
-showVoice();
-if (K.paired()) showTalk(); else showPair(true);
+showToggles();
+if (K.paired()) start(); else showPair(true);
 </script>
 </body>
 </html>

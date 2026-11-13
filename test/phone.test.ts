@@ -95,4 +95,64 @@ describe("the phone app's logic", () => {
     await no.k.ask("set up a walk", []);
     expect(no.sent.some((x) => x.url.includes("calendar/v3"))).toBe(false);
   });
+
+  it("changes a job's stage only after a yes, with Homebase's own stage name; Closed Lost stays on the laptop", async () => {
+    const stageCalls: string[] = [];
+    const mk = (answers: any[], yes: boolean) => {
+      const p = phone(answers, yes);
+      const http = (p.k as any);
+      return { ...p, http };
+    };
+    const sent: any[] = [];
+    const store: Record<string, string> = { setup: JSON.stringify(setup) };
+    let yes = true;
+    const io = {
+      get: (k: string) => store[k] ?? "", set: (k: string, v: string) => void (store[k] = v), confirm: async (t: string) => { stageCalls.push(t); return yes; },
+      http: async (r: any) => {
+        sent.push(r);
+        const ok = (o: unknown) => ({ status: 200, body: JSON.stringify(o) });
+        if (r.url.endsWith("/vocabulary")) return ok({ stages: ["Lead", "Scope Walk Scheduled", "Estimating", "Closed Lost"] });
+        if (r.url.includes("/projects?")) return ok({ projects: [{ id: "p1", jobNumber: "6001", name: "Forbes", stage: "Lead", address: { street: "412 Maple St", city: "Denver", state: "CO", zip: "80211" } }] });
+        if (r.url.endsWith("/projects/p1")) return ok({ project: { id: "p1", jobNumber: "6001", name: "Forbes", stage: "Lead", people: { estimator: "Hunter Patterson" }, dates: { stageChanged: new Date(Date.now() - 5 * 864e5).toISOString() } } });
+        return ok({ ok: true });
+      },
+    };
+    void mk;
+    const k = K.create(io);
+    const tool = k.tools.find((t: any) => t.decl.name === "set_stage");
+    expect(await tool.run({ jobNumber: 6001, stage: "scope walk scheduled" })).toMatchObject({ done: true, from: "Lead", to: "Scope Walk Scheduled" });
+    expect(stageCalls).toEqual(["Move #6001 to Scope Walk Scheduled in Homebase?"]);
+    expect(JSON.parse(sent.find((x) => x.method === "PATCH").body)).toEqual({ stage: "Scope Walk Scheduled", fromStage: "Lead" });
+    yes = false;
+    const before = sent.filter((x) => x.method === "PATCH").length;
+    expect(await tool.run({ jobNumber: 6001, stage: "Estimating" })).toMatchObject({ done: false });
+    expect((await tool.run({ jobNumber: 6001, stage: "Sold" })).error).toMatch(/isn't a Homebase stage/);
+    await expect(k.setStage(6001, "Closed Lost")).rejects.toThrow(/laptop/);
+    expect(sent.filter((x) => x.method === "PATCH").length).toBe(before);
+    // The job list knows which jobs are his, shows the address as text, and is kept on the phone for the day.
+    const jobs = await k.myJobs(true);
+    expect(jobs).toEqual([expect.objectContaining({ jobNumber: 6001, mine: true, address: "412 Maple St, Denver, CO 80211", stage: "Lead" })]);
+    expect(JSON.parse(store.myJobs).jobs).toHaveLength(1);
+  });
+
+  it("today's list keeps going when one part can't be read, and shop stock comes from the copy on the phone", async () => {
+    const store: Record<string, string> = { setup: JSON.stringify({ ...setup, google: null, stock: [{ type: "LVP / LVT", product: "Sample plank", color: "Oak", amount: "20 boxes", location: "Shop", status: "", notes: "" }, { type: "Tile", product: "Sample tile", color: "Sand", amount: "", location: "Shop", status: "", notes: "" }] }) };
+    const io = {
+      get: (k: string) => store[k] ?? "", set: (k: string, v: string) => void (store[k] = v), confirm: async () => true,
+      http: async (r: any) => {
+        const ok = (o: unknown) => ({ status: 200, body: JSON.stringify(o) });
+        if (r.url.includes("/projects?")) return ok({ projects: [{ id: "p1", jobNumber: "6001", name: "Forbes", stage: "Proposal Submitted" }, { id: "p2", jobNumber: "6002", name: "Tollas", stage: "Lead" }] });
+        if (/\/projects\/p\d$/.test(r.url)) return ok({ project: { id: r.url.slice(-2), jobNumber: r.url.endsWith("p1") ? "6001" : "6002", name: r.url.endsWith("p1") ? "Forbes" : "Tollas", stage: r.url.endsWith("p1") ? "Proposal Submitted" : "Lead", people: { estimator: "Hunter Patterson" }, dates: { stageChanged: new Date(Date.now() - 3 * 864e5).toISOString() }, money: { proposalAmount: 18450 } } });
+        return ok({});
+      },
+    };
+    const k = K.create(io);
+    const d = await k.today(true);
+    expect(d.calendar.problem).toMatch(/Google isn't connected/);
+    expect(d.tasks.problem).toMatch(/Google isn't connected/);
+    expect(d.leads.items.map((j: any) => [j.jobNumber, j.days])).toEqual([[6002, 3]]);
+    expect(d.proposals.items.map((j: any) => [j.jobNumber, j.proposalAmount])).toEqual([[6001, 18450]]);
+    expect(k.findStock("lvp oak").map((x: any) => x.product)).toEqual(["Sample plank"]);
+    expect(k.findStock("")).toHaveLength(2);
+  });
 });
