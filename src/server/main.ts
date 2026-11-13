@@ -894,7 +894,7 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/sync-all" && req.method === "POST") return send(res, 202, runSyncAll());
     if (p === "/api/sync-all" && req.method === "GET") return send(res, 200, { running: syncRunning, last: lastSync });
     // ---- Estimator tab: a chat with Claude per job, using the forefront-estimate skill
-    const st = p.match(/^\/api\/studio\/(\d+)(?:\/(send|stop|reset|upload))?$/);
+    const st = p.match(/^\/api\/studio\/(\d+)(?:\/(send|stop|reset|upload|check))?$/);
     if (st) {
       const n = Number(st[1]);
       if (!hub.jobs.exists(n)) await pullJob(hub, n, { quiet: true });
@@ -907,15 +907,20 @@ const server = http.createServer(async (req, res) => {
         const r = await addFile(hub, n, name, await saveUpload(req), { toHomebase: false });
         return send(res, 200, { path: path.relative(hub.jobs.folder(n), r.file).split(path.sep).join("/"), sub: r.sub });
       }
+      if (st[2] === "check") {
+        // Keystone's free check of the estimate, on request.
+        const text = await studio.check(n);
+        return text ? send(res, 200, { ok: true }) : send(res, 400, { error: "There's no estimate on this job to check yet." });
+      }
       if (st[2] === "stop") return send(res, 200, (await studio.stop(n), { ok: true }));
       if (st[2] === "reset") return send(res, 200, (studio.reset(n), { ok: true }));
       const b = await body(req);
       const text = String(b.text ?? "").trim();
       if (!text) return send(res, 400, { error: "Say what you want Claude to do." });
       // Claude (paid, the proven one) or Gemini (free, a trial): Hunter picks in the Estimator tab.
-      const ai = b.ai === "gemini" ? "gemini" : "claude";
+      const ai = b.ai === "gemini" ? "gemini" : b.ai === "claude-lite" ? "claude-lite" : "claude";
       if (ai === "gemini" && !(hub.gemini && cfg.ai.geminiKey)) return send(res, 400, { error: "Gemini isn't connected. Double-click Connect Gemini in the Keystone folder." });
-      if (ai === "claude" && !claudeOnlyReady(hub)) return send(res, 400, { error: "Writing with Claude needs a Claude API key: ANTHROPIC_API_KEY=sk-ant-... in Keystone's .env, then restart. Or switch the Estimator to Gemini (free)." });
+      if (ai !== "gemini" && !claudeOnlyReady(hub)) return send(res, 400, { error: "Writing with Claude needs a Claude API key: ANTHROPIC_API_KEY=sk-ant-... in Keystone's .env, then restart. Or switch the Estimator to Gemini (free)." });
       if (studio.running(n)) return send(res, 409, { error: "The estimator is still working on this job." });
       studio.send(n, text, ai).then(() => bus.emit({ type: "changed", job: n, what: "job" })).catch((e) => console.error(e));
       return send(res, 202, { ok: true });

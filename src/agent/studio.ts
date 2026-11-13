@@ -14,7 +14,11 @@ import { jobWalks } from "../workflows/walks.js";
  * messages resume the same Claude session, so "make the hallway LVP instead" works like it does in chat.
  * All estimating rules come from the skill; this file only carries the conversation and lists what it made.
  */
-export type StudioRole = "user" | "assistant" | "tool" | "error";
+export type StudioRole = "user" | "assistant" | "tool" | "error" | "check" | "cost";
+/** Who writes: Claude's main model, Claude's cheaper model, or Gemini (free). */
+export type Writer = "claude" | "claude-lite" | "gemini";
+/** The cheaper Claude model offered in the Estimator next to the main one. */
+export const LITE_MODEL = "claude-sonnet-5-5";
 export interface StudioTurn {
   role: StudioRole;
   text: string;
@@ -23,7 +27,7 @@ export interface StudioTurn {
 export type StudioEvent =
   | { kind: "turn"; job: number; turn: StudioTurn }
   | { kind: "delta"; job: number; text: string }
-  | { kind: "state"; job: number; running: boolean; writer?: "claude" | "gemini" };
+  | { kind: "state"; job: number; running: boolean; writer?: Writer };
 
 interface Saved {
   sessionId?: string;
@@ -31,7 +35,9 @@ interface Saved {
   /** The conversation as Gemini needs it back (its own format), when Gemini is writing this job's estimate. */
   gemini?: Turn[];
   /** Which AI wrote last in this conversation. */
-  writer?: "claude" | "gemini";
+  writer?: Writer;
+  /** What Claude has cost on this job's conversation so far, in dollars (as the API reports it). */
+  cost?: number;
 }
 
 /** The documents this tab tracks, by the file names the skill writes. */
@@ -54,6 +60,13 @@ Before you scope, price or revise ANY estimate, go through everything on the job
 - "Selections sign-off": render the Material Selection Approval sheet with render.py --only selections.
 - "Photo report": pick the photos and captions and use mcp__${SERVER}__photo_report.
 - Revisions: edit estimate.json and re-render (Keystone snapshots the old version first).
+Claude costs Hunter money for every step and everything you read, so work economically without cutting corners on accuracy:
+- Call mcp__${SERVER}__job_review once per conversation; don't re-read a file, thread or photo sheet you've already read unless it changed.
+- Look at photos as contact sheets (photo_sheets.py), not one full-size photo at a time; open a full-size photo only when a sheet shows something you must see closer.
+- Look prices up in batches: several items in one price_lookup.py run where you can, and never look the same item up twice.
+- Don't narrate between steps or repeat the estimate back in full; say what changed and the totals.
+- Don't re-render until the estimate.json is complete; one render per change.
+- After you render, Keystone checks the estimate for free (prices against the price book, quantities against the rooms, and the scope against Hunter's notes) and shows him the result. Don't spend steps re-checking arithmetic yourself; get the scope, quantities and wording right the first time.
 When the skill has questions for Hunter, ask them here in a short numbered list and wait for his answers; don't guess. Files he drops into this chat are saved in the job folder and named in his message. After rendering, say which files you wrote and the totals in two or three lines. Don't draft or send email from this tab unless he asks.`;
 
 export class Studio {
@@ -87,7 +100,7 @@ export class Studio {
   /** The conversation, whether Claude is working on it, and the job's documents and inputs. */
   view(job: number) {
     const s = this.load(job);
-    return { turns: s.turns, running: this.running(job), hasSession: !!s.sessionId || !!s.gemini?.length, writer: s.writer ?? null, ...this.files(job) };
+    return { turns: s.turns, running: this.running(job), hasSession: !!s.sessionId || !!s.gemini?.length, writer: s.writer ?? null, cost: s.cost ?? 0, liteModel: LITE_MODEL, mainModel: this.hub.cfg.model, ...this.files(job) };
   }
 
   files(job: number) {
@@ -128,7 +141,7 @@ export class Studio {
   }
 
   /** Which AI last wrote in this job's conversation (so the tab can keep using it). */
-  writer(job: number): "claude" | "gemini" {
+  writer(job: number): Writer {
     return this.load(job).writer ?? "claude";
   }
 
@@ -137,8 +150,35 @@ export class Studio {
   }
 
   /** Sends one message from Hunter; resolves when Claude's turn is over. */
-  async send(job: number, text: string, ai: "claude" | "gemini" = "claude"): Promise<void> {
-    if (ai === "gemini") return this.sendGemini(job, text);
+  async send(job: number, text: string, ai: Writer = "claude"): Promise<void> {
+    const before = this.estimateStamp(job);
+    try {
+      await (ai === "gemini" ? this.sendGemini(job, text) : this.sendClaude(job, text, ai));
+    } finally {
+      // A new or changed estimate gets Keystone's free check, shown in the conversation.
+      if (this.estimateStamp(job) !== before) await this.check(job).catch(() => {});
+    }
+  }
+
+  private estimateStamp(job: number): number {
+    const f = this.hub.jobs.path(job, "estimate", "estimate.json");
+    return existsSync(f) ? statSync(f).mtimeMs : 0;
+  }
+
+  /** Keystone's free check of the job's estimate, added to the conversation. Returns the text, or null without an estimate. */
+  async check(job: number): Promise<string | null> {
+    const { checkEstimate, checkText } = await import("../workflows/estimateCheck.js");
+    const c = await checkEstimate(this.hub, job);
+    if (!c) return null;
+    const s = this.load(job);
+    const turn = { role: "check" as const, text: checkText(c), at: new Date().toISOString() };
+    s.turns.push(turn);
+    this.save(job, s);
+    this.emit({ kind: "turn", job, turn });
+    return turn.text;
+  }
+
+  private async sendClaude(job: number, text: string, ai: Writer): Promise<void> {
     if (!this.hub.cfg.anthropicApiKey) throw new Error("Claude is off on this machine (no Anthropic API key). Set ANTHROPIC_API_KEY in .env, or save it in the Estimator app.");
     if (this.running(job)) throw new Error("Claude is still working on this job. Wait, or press Stop.");
     const s = this.load(job);
@@ -148,8 +188,9 @@ export class Studio {
       this.save(job, s);
       this.emit({ kind: "turn", job, turn });
     };
-    s.writer = "claude";
+    s.writer = ai;
     add("user", text);
+    const model = ai === "claude-lite" ? LITE_MODEL : this.hub.cfg.model;
 
     const q = query({
       prompt: text,
@@ -158,13 +199,15 @@ export class Studio {
         {
           ...(s.sessionId ? { resume: s.sessionId } : {}),
           includePartialMessages: true,
+          model,
+          maxTurns: 120, // a ceiling so a stuck run can't keep spending
           systemPrompt: { type: "preset", preset: "claude_code", append: systemPrompt(this.hub, job) + STUDIO_PROMPT },
         },
         job,
       ),
     });
     this.live.set(job, q);
-    this.emit({ kind: "state", job, running: true, writer: "claude" });
+    this.emit({ kind: "state", job, running: true, writer: ai });
     try {
       const { withDraftSource } = await import("../workflows/generated.js");
       await withDraftSource("Estimator", async () => {
@@ -223,8 +266,14 @@ export class Studio {
         if (b.type === "text" && b.text.trim()) add("assistant", b.text.trim());
         if (b.type === "tool_use") add("tool", describeTool(b.name, b.input as Record<string, unknown>));
       }
-    } else if (m.type === "result" && m.subtype !== "success") {
-      add("error", m.subtype === "error_max_turns" ? "Claude hit its step limit. Say \"keep going\" to continue." : `Claude stopped (${m.subtype}).`);
+    } else if (m.type === "result") {
+      // What this message cost, as the API reports it, and the job's running total.
+      const spent = Number((m as { total_cost_usd?: number }).total_cost_usd);
+      if (Number.isFinite(spent) && spent > 0) {
+        s.cost = Math.round(((s.cost ?? 0) + spent) * 10000) / 10000;
+        add("cost", `That used about $${spent.toFixed(2)} of Claude. This job's conversation so far: $${s.cost.toFixed(2)}.`);
+      }
+      if (m.subtype !== "success") add("error", m.subtype === "error_max_turns" ? "Claude hit its step limit. Say \"keep going\" to continue." : `Claude stopped (${m.subtype}).`);
     }
   }
 }

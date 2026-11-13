@@ -986,7 +986,7 @@
             <div class="bar">
               <button class="btn" type="button" id="est-attach" title="Add files to the job folder for the estimator">＋ Files</button>
               <input type="file" id="est-pick" multiple hidden>
-              <label class="small muted" style="display:inline-flex;align-items:center;gap:6px">Written by <select id="est-ai" title="Claude is the proven one and uses your paid Claude key. Gemini is free and on trial: check its quantities and prices."><option value="claude">Claude (paid)</option><option value="gemini">Gemini (free, trial)</option></select></label>
+              <label class="small muted" style="display:inline-flex;align-items:center;gap:6px">Written by <select id="est-ai" title="Claude's best model is the proven one and costs the most. The lighter Claude model costs a good deal less. Gemini is free and on trial. Keystone checks every estimate for free whichever you pick."><option value="claude">Claude, best (costs most)</option><option value="claude-lite">Claude, lighter (costs less)</option><option value="gemini">Gemini (free, trial)</option></select></label>
               <span class="small muted" id="est-state" style="flex:1"></span>
               <button class="btn" type="button" id="est-stop" hidden>Stop</button>
               <button class="btn primary" type="button" id="est-send">Send</button>
@@ -2997,7 +2997,7 @@ function renderEstSide() {
   const j = d.job;
   $("#est-jobinfo").innerHTML = `<b>#${j.jobNumber} ${esc(j.name)}</b>${esc(j.address || "")}<br><span class="muted">${esc(j.stage || "")}${j.insurance === "oop" ? " · Out of pocket" : j.carrier ? ` · ${esc(j.carrier)}` : ""}${j.claimNumber ? ` · ${esc(j.claimNumber)}` : ""}</span>${j.estimate?.total ? `<br>Estimate total: <b style="display:inline">$${Number(j.estimate.total).toLocaleString("en-US", { minimumFractionDigits: 2 })}</b>` : ""}`;
   const cur = $("#est-frame").dataset.path;
-  $("#est-docs").innerHTML = d.docs.map((x) => `<button type="button" class="est-doc ${x.file ? "have" : ""} ${x.file && x.file.path === cur && !$("#est").classList.contains("noprev") ? "on" : ""}" data-est-doc="${x.key}" title="${x.key === "subs" ? "The work order for subs: what to do in each room and which walls get painted, no prices. Written by Gemini (free)." : x.file ? `Preview ${esc(x.file.name)}` : `Ask for the ${esc(x.label)}`}"><i></i><span>${esc(x.label)}<br><small>${x.file ? `Updated ${new Date(x.file.modified).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Not made yet"}</small></span><span class="mk">${x.key === "subs" && x.file ? "Remake" : x.file ? "View" : "Make"}</span></button>`).join("") + (d.revisions ? `<div class="small muted" style="padding:2px 8px">${d.revisions} earlier version${d.revisions === 1 ? "" : "s"} kept in estimate/revisions</div>` : "");
+  $("#est-docs").innerHTML = d.docs.map((x) => `<button type="button" class="est-doc ${x.file ? "have" : ""} ${x.file && x.file.path === cur && !$("#est").classList.contains("noprev") ? "on" : ""}" data-est-doc="${x.key}" title="${x.key === "subs" ? "The work order for subs: what to do in each room and which walls get painted, no prices. Written by Gemini (free)." : x.file ? `Preview ${esc(x.file.name)}` : `Ask for the ${esc(x.label)}`}"><i></i><span>${esc(x.label)}<br><small>${x.file ? `Updated ${new Date(x.file.modified).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Not made yet"}</small></span><span class="mk">${x.key === "subs" && x.file ? "Remake" : x.file ? "View" : "Make"}</span></button>`).join("") + (d.revisions ? `<div class="small muted" style="padding:2px 8px">${d.revisions} earlier version${d.revisions === 1 ? "" : "s"} kept in estimate/revisions</div>` : "") + (d.estimateJson ? `<button class="btn small" type="button" id="est-check" style="margin:6px 8px 0" title="Checks every price against the price list and price book, quantities against the room sizes, and the scope against your walk notes, emails and texts. Uses no Claude.">Check the estimate (free)</button>` : "");
   $("#est-other").innerHTML = d.otherPdfs.length ? `<h5>Other PDFs</h5><div class="est-docs">${d.otherPdfs.map((f) => `<button type="button" class="est-doc have ${f.path === cur ? "on" : ""}" data-est-path="${esc(f.path)}"><i style="background:var(--muted)"></i><span>${esc(f.name)}</span><span class="mk">View</span></button>`).join("")}</div>` : "";
   const i = d.inputs;
   $("#est-inputs").innerHTML = [i.sketches.length ? `✓ Sketch: ${i.sketches.map((s) => esc(s.name)).join(", ")}${i.sketchOther ? ` + ${i.sketchOther} other DocuSketch file${i.sketchOther === 1 ? "" : "s"}` : ""}` : i.sketchOther ? `✓ DocuSketch: ${i.sketchOther} file${i.sketchOther === 1 ? "" : "s"} (no ESX, which is fine)` : `– No DocuSketch files yet (drop them in the chat, or ask it to look for the DocuSketch email)`, i.photos ? `✓ ${i.photos} photos in the job folder` : `– No photos downloaded (Claude can pull them from CompanyCam)`, i.walks ? `✓ ${i.walks} walk recording${i.walks === 1 ? "" : "s"} (your site notes and the conversation)` : "", d.estimateJson ? `✓ estimate.json` : ""].filter(Boolean).map((x) => `<div>${x}</div>`).join("");
@@ -3019,6 +3019,8 @@ function estTurnHtml(t) {
   if (t.role === "user") return `<div class="msg user"><div>${esc(t.text)}</div></div>`;
   if (t.role === "tool") return `<div class="msg tool">${esc(t.text)}</div>`;
   if (t.role === "error") return `<div class="msg error"><div>${esc(t.text)}</div></div>`;
+  if (t.role === "cost") return `<div class="msg tool" style="opacity:.85">${esc(t.text)}</div>`;
+  if (t.role === "check") return `<div class="msg assistant" style="border-left:3px solid ${/Looks wrong/.test(t.text) ? "var(--bad)" : /Worth a look/.test(t.text) ? "var(--warn, #ffb38a)" : "var(--good, #9be0b4)"}">${md(t.text)}${/Looks wrong|Worth a look/.test(t.text) ? `<div style="margin-top:8px"><button class="btn small" type="button" data-est-fix="1" title="Sends this list to whoever is selected under the message box. With Claude this costs money; with Gemini it's free.">Have it fix these</button></div>` : ""}</div>`;
   return `<div class="msg assistant">${md(t.text)}</div>`;
 }
 function renderEstState() {
@@ -3026,6 +3028,7 @@ function renderEstState() {
   $("#est-send").hidden = run; $("#est-stop").hidden = !run;
   $("#est-state").textContent = run ? `${estWho()} is working… approvals pop up when it needs your OK.` : "";
   $("#est-usehead").textContent = `What ${estWho()} can use`;
+  if (!run && estData?.cost) $("#est-state").textContent = `Claude so far on this job: $${Number(estData.cost).toFixed(2)}`;
   $("#est-files").innerHTML = estFiles.map((f) => `<span>📎 ${esc(f)}</span>`).join("");
 }
 function previewEst(f) {
@@ -3053,12 +3056,14 @@ function onSubReport(e) {
 // was started with one keeps it selected when you come back.
 /** The name to show for who is doing the work: whoever is actually running, else the one picked under the box. */
 function estWho() { const w = estData?.running && estData.writer ? estData.writer : estData ? estAi() : "claude"; return w === "gemini" ? "Gemini" : "Claude"; }
-function estAi() { const v = $("#est-ai").value; return v === "gemini" && estData?.gemini ? "gemini" : v === "claude" && estData?.claude ? "claude" : estData?.claude ? "claude" : "gemini"; }
+function estAi() { const v = $("#est-ai").value; return v === "gemini" && estData?.gemini ? "gemini" : v !== "gemini" && estData?.claude ? v : estData?.claude ? "claude" : "gemini"; }
 function showEstAi(d) {
   const sel = $("#est-ai");
   sel.querySelector('[value="claude"]').disabled = !d.claude; sel.querySelector('[value="gemini"]').disabled = !d.gemini;
+  // The lighter Claude is offered only when it's a different model from the main one.
+  const lite = sel.querySelector('[value="claude-lite"]'); lite.disabled = !d.claude; lite.hidden = d.liteModel === d.mainModel;
   const want = d.turns.length && d.writer ? d.writer : store.get("estAi", "claude");
-  sel.value = want === "gemini" ? (d.gemini ? "gemini" : "claude") : d.claude ? "claude" : "gemini";
+  sel.value = want === "gemini" ? (d.gemini ? "gemini" : "claude") : d.claude ? (want === "claude-lite" && !lite.hidden ? "claude-lite" : "claude") : "gemini";
   $("#est-input").placeholder = `Message ${sel.value === "gemini" ? "Gemini" : "Claude"} about this job… (drop DocuSketch files, an Xactimate PDF or photos here)`;
 }
 $("#est-ai").addEventListener("change", (e) => { store.set("estAi", e.target.value); renderEstState(); if (estData && !estData.turns.length) renderEstLog(); $("#est-input").placeholder = `Message ${e.target.value === "gemini" ? "Gemini" : "Claude"} about this job… (drop DocuSketch files, an Xactimate PDF or photos here)`; if (estData?.turns.length && estData.writer && estData.writer !== e.target.value) snack(`This conversation was written by ${estData.writer === "gemini" ? "Gemini" : "Claude"}. ${e.target.value === "gemini" ? "Gemini" : "Claude"} won't remember it: press New conversation for a clean start.`); });
@@ -3087,7 +3092,7 @@ function onStudio(e) {
     const live = $("#est-live"); if (live) { live.innerHTML = md(estStream); const l = $("#est-log"); if (l.scrollHeight - l.scrollTop - l.clientHeight < 200) l.scrollTop = l.scrollHeight; }
     return;
   }
-  if (e.kind === "turn") { if (e.turn.role === "assistant") estStream = ""; estData.turns.push(e.turn); if (e.turn.role === "tool" && /Writing|Running|photo report/i.test(e.turn.text)) setTimeout(refreshEstFiles, 1500); }
+  if (e.kind === "turn") { if (e.turn.role === "assistant") estStream = ""; estData.turns.push(e.turn); if (e.turn.role === "cost") { const m = e.turn.text.match(/so far: \$([\d.]+)/); if (m) estData.cost = Number(m[1]); } if (e.turn.role === "tool" && /Writing|Running|photo report/i.test(e.turn.text)) setTimeout(refreshEstFiles, 1500); }
   if (e.kind === "state") { estData.running = e.running; if (e.writer) estData.writer = e.writer; if (!e.running) { estStream = ""; refreshEstFiles(); } }
   renderEstLog(); renderEstState();
 }
@@ -3101,6 +3106,13 @@ $("#est-pick").addEventListener("change", () => { const f = [...$("#est-pick").f
 $("#est-new").addEventListener("click", async () => { if (!estJob || !confirm("Start a fresh conversation for this job? The old one is kept in the job's notes folder.")) return; try { await api(`/api/studio/${estJob}/reset`, { method: "POST", body: {} }); openEst(estJob); } catch (e) { log(e.message, "t-err"); } });
 $("#est-pclose").addEventListener("click", () => { $("#est").classList.add("noprev"); renderEstSide(); });
 $("#v-est").addEventListener("click", (e) => {
+  const fix = e.target.closest("[data-est-fix]");
+  if (fix && estData && !estData.running) {
+    const list = [...estData.turns].reverse().find((t) => t.role === "check")?.text.split("\n").filter((l) => l.startsWith("- ")).join("\n") || "";
+    if (list) estSend(`Keystone's check of the estimate found these. Fix the ones that are really wrong in estimate.json and render again. For any you leave as they are, tell me why in one line each.\n\n${list}`);
+    return;
+  }
+  if (e.target.closest("#est-check")) { const b = e.target.closest("#est-check"); b.disabled = true; b.textContent = "Checking…"; api(`/api/studio/${estJob}/check`, { method: "POST", body: {} }).catch((err) => log(err.message, "t-err")).finally(() => { b.disabled = false; b.textContent = "Check the estimate (free)"; }); return; }
   const q = e.target.closest("[data-est-quick]");
   if (q) { const it = EST_QUICK[Number(q.dataset.estQuick)]; if (it.fill) { $("#est-input").value = it.fill; $("#est-input").focus(); } else estSend(it.text); return; }
   const d = e.target.closest("[data-est-doc]");
