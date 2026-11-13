@@ -272,6 +272,36 @@
       return { at: new Date().toISOString(), today: dayOf(start), calendar: cal, tasks: tk, email: mail, leads: { items: leads, problem: jobs.problem }, proposals: { items: proposals, problem: jobs.problem } };
     }
 
+    /**
+     * The day as one short list, most pressing first: who's waiting on a reply, today's appointments, tasks due,
+     * leads with no walk booked, proposals that have sat a few days; then tomorrow and undated tasks. Lines he
+     * ticked off today stay off (a task is completed in Google Tasks; the rest are just cleared for the day).
+     */
+    function doneToday(day) {
+      try { const d = JSON.parse(io.get("dayDone") || "null"); return d && d.day === day ? d.ids : []; } catch { return []; }
+    }
+    function markDone(id, done) {
+      const day = dayOf(new Date());
+      const ids = doneToday(day).filter((x) => x !== id);
+      if (done) ids.push(id);
+      io.set("dayDone", JSON.stringify({ day, ids }));
+    }
+    async function dayList(force) {
+      const d = await today(force);
+      const time = (iso) => (/T/.test(iso || "") ? new Date(iso).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" }).replace(":00", "").replace(" ", "").toLowerCase() : "All day");
+      const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+      const now = [], later = [];
+      for (const m of d.email.items) now.push({ id: `e:${m.threadId}`, kind: "email", warn: true, title: `Reply to ${m.from}`, sub: `Waiting on you · ${m.subject}`, threadId: m.threadId, from: m.from, subject: m.subject, snippet: m.snippet });
+      for (const e of d.calendar.items) (e.day === d.today ? now : later).push({ id: `c:${e.start}:${e.title}`, kind: "cal", title: `${e.day === d.today ? "" : "Tomorrow "}${time(e.start)} ${e.title}`, sub: e.location || "", location: e.location || "" });
+      for (const t of d.tasks.items) (t.due && t.due <= d.today ? now : later).push({ id: `t:${t.id}`, kind: "task", task: t.id, list: t.list, title: t.title, sub: !t.due ? "Task" : t.due < d.today ? "Task · overdue" : t.due === d.today ? "Task · due today" : "Task · due tomorrow" });
+      for (const j of d.leads.items) if (!j.walk) now.push({ id: `l:${j.jobNumber}`, kind: "job", jobNumber: j.jobNumber, title: `Book a walk with ${j.name}`, sub: `${j.stage}${j.days != null ? ` · ${plural(j.days, "day")}` : ""}` });
+      for (const j of d.proposals.items) (j.days != null && j.days >= 3 ? now : later).push({ id: `p:${j.jobNumber}`, kind: "job", jobNumber: j.jobNumber, title: `Follow up with ${j.name}`, sub: `Proposal out${j.days != null ? ` ${plural(j.days, "day")}` : ""}` });
+      const gone = new Set(doneToday(d.today));
+      const items = [...now, ...later].filter((x) => !gone.has(x.id));
+      const problems = [...new Set([d.email, d.calendar, d.tasks, d.leads].map((x) => x.problem).filter(Boolean))];
+      return { at: d.at, today: d.today, items, waiting: items.filter((x) => x.warn).length, problems };
+    }
+
     // ------------------------------------------------------------------ Shop stock (a copy from the laptop)
     function findStock(query) {
       const words = String(query || "").toLowerCase().split(/\s+/).filter(Boolean);
@@ -393,7 +423,7 @@ How to answer:
       return { text: "That took more steps than I could finish. Try asking for one thing at a time.", history: trim(contents) };
     }
 
-    return { paired, setup, ask, findJobs, getJob, findContact, addNote, logCall, calendarList, calendarCreate, gmailDraft, tools, fmtPhone, stages, setStage, myJobs, tasks, setTaskDone, emailWaiting, today, findStock };
+    return { paired, setup, ask, findJobs, getJob, findContact, addNote, logCall, calendarList, calendarCreate, gmailDraft, tools, fmtPhone, stages, setStage, myJobs, tasks, setTaskDone, emailWaiting, today, dayList, markDone, findStock };
   }
 
   const api = { create, fmtPhone };

@@ -155,4 +155,27 @@ describe("the phone app's logic", () => {
     expect(k.findStock("lvp oak").map((x: any) => x.product)).toEqual(["Sample plank"]);
     expect(k.findStock("")).toHaveLength(2);
   });
+
+  it("my day is one short list, most pressing first, and a line ticked off stays off for the day", async () => {
+    const store: Record<string, string> = { setup: JSON.stringify({ ...setup, google: null }) };
+    const io = {
+      get: (k: string) => store[k] ?? "", set: (k: string, v: string) => void (store[k] = v), confirm: async () => true,
+      http: async (r: any) => {
+        const ok = (o: unknown) => ({ status: 200, body: JSON.stringify(o) });
+        const P: Record<string, any> = { p1: ["6001", "Forbes", "Proposal Submitted", 6], p2: ["6002", "Tollas", "Lead", 3], p3: ["6003", "Greene", "Proposal Submitted", 1] };
+        if (r.url.includes("/projects?")) return ok({ projects: Object.entries(P).map(([id, v]) => ({ id, jobNumber: v[0], name: v[1], stage: v[2] })) });
+        const m = r.url.match(/\/projects\/(p\d)$/);
+        if (m) { const v = P[m[1]]; return ok({ project: { id: m[1], jobNumber: v[0], name: v[1], stage: v[2], people: { estimator: "Hunter Patterson" }, dates: { stageChanged: new Date(Date.now() - v[3] * 864e5).toISOString() } } }); }
+        return ok({});
+      },
+    };
+    const k = K.create(io);
+    const d = await k.dayList(true);
+    expect(d.items.map((x: any) => [x.title, x.sub])).toEqual([["Book a walk with Tollas", "Lead · 3 days"], ["Follow up with Forbes", "Proposal out 6 days"], ["Follow up with Greene", "Proposal out 1 day"]]);
+    expect(d.problems[0]).toMatch(/Google isn't connected/);
+    k.markDone(d.items[0].id, true);
+    expect((await k.dayList(false)).items.map((x: any) => x.jobNumber)).toEqual([6001, 6003]);
+    k.markDone(d.items[0].id, false);
+    expect((await k.dayList(false)).items).toHaveLength(3);
+  });
 });
