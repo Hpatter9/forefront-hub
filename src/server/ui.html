@@ -982,7 +982,7 @@
         <div class="est-comp" id="est-comp">
           <div class="est-box">
             <div class="est-files" id="est-files"></div>
-            <textarea id="est-input" rows="2" placeholder="Message Claude about this job… (drop an ESX, Xactimate PDF or photos here)"></textarea>
+            <textarea id="est-input" rows="2" placeholder="Message Claude about this job… (drop DocuSketch files, an Xactimate PDF or photos here)"></textarea>
             <div class="bar">
               <button class="btn" type="button" id="est-attach" title="Add files to the job folder for the estimator">＋ Files</button>
               <input type="file" id="est-pick" multiple hidden>
@@ -1215,7 +1215,7 @@ const ACTIONS = {
   reply: (r) => `${r.threadId ? `<button class="btn small primary" data-do="thread" data-thread="${esc(r.threadId)}">Reply</button>` : ""}<button class="btn small" data-do="claude" data-p="Read the latest email on job #${r.jobNumber} and draft my reply in Gmail (draft only).">Draft reply with ${AI()}</button><button class="btn small" data-do="handled" data-n="${r.jobNumber}" title="You dealt with it (called, texted, talked in person). Takes it off your list.">Handled</button><button class="btn small" data-do="notmine" data-n="${r.jobNumber}" title="It isn't yours to answer. Takes it off your list.">Not for me</button>`,
   log: (r) => `<button class="btn small primary" data-do="logsent" data-n="${r.jobNumber}">Log in Homebase</button>`,
   walk: (r) => `<button class="btn small" data-do="open" data-n="${r.jobNumber}">Open job to schedule the walk</button>`,
-  estimate: (r) => `<button class="btn small" data-do="claude" data-p="Start the estimate for job #${r.jobNumber}: check what's in the job folder (ESX, photos, notes) and tell me what's missing before you price it.">Start estimate with Claude</button>`,
+  estimate: (r) => `<button class="btn small" data-do="claude" data-p="Start the estimate for job #${r.jobNumber}: check what's in the job folder (DocuSketch files, photos, walk notes, emails and texts) and tell me what's missing before you price it.">Start estimate with Claude</button>`,
   adjuster: (r) => `<button class="btn small primary" data-do="claude" data-p="Draft a short check-in email to the adjuster on job #${r.jobNumber}, in my voice, asking where they are on their review of our estimate and whether they need anything else from us (photos, measurements, a call). Reply in the existing thread with them if there is one. Gmail draft only.">Draft check-in with ${AI()}</button>`,
   followup: (r) => `<button class="btn small" data-do="claude" data-p="Draft a short follow-up email for job #${r.jobNumber}'s proposal in my voice (Gmail draft only), to whoever is waiting on it.">Draft follow-up</button>`,
   draft: () => `<a class="btn small" href="https://mail.google.com/mail/u/0/#drafts" target="_blank" rel="noopener">Open Gmail drafts</a>`,
@@ -2939,7 +2939,7 @@ $("#approve").addEventListener("cancel", (e) => { e.preventDefault(); answer(fal
 // ============================================================= Estimator tab: Claude + the forefront-estimate skill, per job
 let estJob = store.get("estjob", null), estData = null, estFiles = [], estStream = "";
 const EST_QUICK = [
-  { label: "New estimate from ESX + photos", text: "Write a new estimate for this job from the ESX in the sketch folder and the CompanyCam photos. Ask me anything you need before you price it." },
+  { label: "New estimate", text: "Write a new estimate for this job. Use everything on the job: all the CompanyCam photos, every DocuSketch file (floor plan or measurement PDF, room images, an .ESX if there is one; there may be no .ESX, and that's fine), the job walk transcript, and the emails and texts with the customer, adjuster and anyone else on the job. Tell me what you went through and what was missing, then ask me anything you need before you price it." },
   { label: "Convert an Xactimate PDF", text: "Convert the Xactimate estimate PDF in this job's folder into our Reconstruction Estimate, Agreement and Xactimate documents." },
   { label: "Agreement + selections", text: "Build the Reconstruction Agreement with material selections. Ask me what the homeowner picked, and set allowances for anything they still need to choose." },
   { label: "Selections sign-off", text: "Make the Material Selection Approval sheet for the homeowner to sign." },
@@ -3000,7 +3000,7 @@ function renderEstSide() {
   $("#est-docs").innerHTML = d.docs.map((x) => `<button type="button" class="est-doc ${x.file ? "have" : ""} ${x.file && x.file.path === cur && !$("#est").classList.contains("noprev") ? "on" : ""}" data-est-doc="${x.key}" title="${x.file ? `Preview ${esc(x.file.name)}` : `Ask Claude to make the ${esc(x.label)}`}"><i></i><span>${esc(x.label)}<br><small>${x.file ? `Updated ${new Date(x.file.modified).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Not made yet"}</small></span><span class="mk">${x.file ? "View" : "Make"}</span></button>`).join("") + (d.revisions ? `<div class="small muted" style="padding:2px 8px">${d.revisions} earlier version${d.revisions === 1 ? "" : "s"} kept in estimate/revisions</div>` : "");
   $("#est-other").innerHTML = d.otherPdfs.length ? `<h5>Other PDFs</h5><div class="est-docs">${d.otherPdfs.map((f) => `<button type="button" class="est-doc have ${f.path === cur ? "on" : ""}" data-est-path="${esc(f.path)}"><i style="background:var(--muted)"></i><span>${esc(f.name)}</span><span class="mk">View</span></button>`).join("")}</div>` : "";
   const i = d.inputs;
-  $("#est-inputs").innerHTML = [i.sketches.length ? `✓ Sketch: ${i.sketches.map((s) => esc(s.name)).join(", ")}` : `– No ESX yet (drop it in the chat, or ask it to look for the DocuSketch email)`, i.photos ? `✓ ${i.photos} photos in the job folder` : `– No photos downloaded (Claude can pull them from CompanyCam)`, i.walks ? `✓ ${i.walks} walk recording${i.walks === 1 ? "" : "s"} (your site notes and the conversation)` : "", d.estimateJson ? `✓ estimate.json` : ""].filter(Boolean).map((x) => `<div>${x}</div>`).join("");
+  $("#est-inputs").innerHTML = [i.sketches.length ? `✓ Sketch: ${i.sketches.map((s) => esc(s.name)).join(", ")}${i.sketchOther ? ` + ${i.sketchOther} other DocuSketch file${i.sketchOther === 1 ? "" : "s"}` : ""}` : i.sketchOther ? `✓ DocuSketch: ${i.sketchOther} file${i.sketchOther === 1 ? "" : "s"} (no ESX, which is fine)` : `– No DocuSketch files yet (drop them in the chat, or ask it to look for the DocuSketch email)`, i.photos ? `✓ ${i.photos} photos in the job folder` : `– No photos downloaded (Claude can pull them from CompanyCam)`, i.walks ? `✓ ${i.walks} walk recording${i.walks === 1 ? "" : "s"} (your site notes and the conversation)` : "", d.estimateJson ? `✓ estimate.json` : ""].filter(Boolean).map((x) => `<div>${x}</div>`).join("");
 }
 function renderEstLog() {
   const d = estData, log = $("#est-log");
@@ -3045,9 +3045,9 @@ function showEstAi(d) {
   sel.querySelector('[value="claude"]').disabled = !d.claude; sel.querySelector('[value="gemini"]').disabled = !d.gemini;
   const want = d.turns.length && d.writer ? d.writer : store.get("estAi", "claude");
   sel.value = want === "gemini" ? (d.gemini ? "gemini" : "claude") : d.claude ? "claude" : "gemini";
-  $("#est-input").placeholder = `Message ${sel.value === "gemini" ? "Gemini" : "Claude"} about this job… (drop an ESX, Xactimate PDF or photos here)`;
+  $("#est-input").placeholder = `Message ${sel.value === "gemini" ? "Gemini" : "Claude"} about this job… (drop DocuSketch files, an Xactimate PDF or photos here)`;
 }
-$("#est-ai").addEventListener("change", (e) => { store.set("estAi", e.target.value); renderEstState(); if (estData && !estData.turns.length) renderEstLog(); $("#est-input").placeholder = `Message ${e.target.value === "gemini" ? "Gemini" : "Claude"} about this job… (drop an ESX, Xactimate PDF or photos here)`; if (estData?.turns.length && estData.writer && estData.writer !== e.target.value) snack(`This conversation was written by ${estData.writer === "gemini" ? "Gemini" : "Claude"}. ${e.target.value === "gemini" ? "Gemini" : "Claude"} won't remember it: press New conversation for a clean start.`); });
+$("#est-ai").addEventListener("change", (e) => { store.set("estAi", e.target.value); renderEstState(); if (estData && !estData.turns.length) renderEstLog(); $("#est-input").placeholder = `Message ${e.target.value === "gemini" ? "Gemini" : "Claude"} about this job… (drop DocuSketch files, an Xactimate PDF or photos here)`; if (estData?.turns.length && estData.writer && estData.writer !== e.target.value) snack(`This conversation was written by ${estData.writer === "gemini" ? "Gemini" : "Claude"}. ${e.target.value === "gemini" ? "Gemini" : "Claude"} won't remember it: press New conversation for a clean start.`); });
 async function estSend(text) {
   text = (text ?? $("#est-input").value).trim();
   if (!estJob) return log("Pick a job first.", "t-err");

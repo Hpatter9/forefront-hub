@@ -26,7 +26,9 @@ describe("everything on a job, for the estimator to go through first", () => {
     expect(d.emails.length).toBeGreaterThan(0);
     expect(d.emails.every((e) => e.body.length <= 1800)).toBe(true);
     expect(d.texts).toEqual([expect.objectContaining({ who: "Alex Adjuster", text: "Approved the hall bath tile" })]);
-    expect(d.missing).toContain("No DocuSketch .ESX in the sketch folder.");
+    // No .ESX, but DocuSketch's images are there: that's noted as normal, not as a blocker.
+    expect(d.docusketch).toEqual(["photos/all_images/kitchen 1.jpg"]);
+    expect(d.missing.join(" ")).toMatch(/No DocuSketch \.ESX \(that's normal for some jobs\)/);
   });
 
   it("says so when CompanyCam and texts couldn't be checked, instead of skipping them quietly", async () => {
@@ -37,5 +39,6 @@ describe("everything on a job, for the estimator to go through first", () => {
     expect(d.missing.join(" ")).toMatch(/No CompanyCam project found/);
     expect(d.missing.join(" ")).toMatch(/texts aren't connected/);
     expect(d.missing.join(" ")).toMatch(/No photos at all/);
+    expect(d.missing.join(" ")).toMatch(/No DocuSketch files found/);
   });
 });

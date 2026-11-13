@@ -19,6 +19,8 @@ export interface JobDossier {
   folder: string;
   /** Every file under the job folder, by subfolder (path relative to the job folder, size in KB). */
   files: Record<string, { path: string; kb: number }[]>;
+  /** The DocuSketch files wherever they are (an .ESX, its PDFs, room images). There may be no .ESX. */
+  docusketch: string[];
   photos: { inFolder: number; companycam: { linked: boolean; project?: string; total?: number; previews?: string; problem?: string }; howTo: string };
   notes: { jobNotes: string; teamNotes: { at: string; author: string; body: string }[]; walks: { file: string; at: string; summary: string }[] };
   emails: { at: string; who: string; subject: string; body: string; attachments: string[]; threadId?: string }[];
@@ -30,6 +32,20 @@ export interface JobDossier {
 }
 
 const IMAGE = /\.(jpe?g|png|heic|webp|gif)$/i;
+
+/**
+ * A job's DocuSketch files, as paths relative to the job folder: anything in sketch/, plus files elsewhere that
+ * DocuSketch names in its own way (its PDFs and "all images" zips and what was unpacked from them).
+ */
+export function sketchFiles(hub: Hub, n: number): string[] {
+  const named = /docusketch|floor ?plan|measurement|sketch|all_images|_3d_|dollhouse/i;
+  return [
+    ...tree(hub.jobs.path(n, "sketch")).map((f) => `sketch/${f.path}`),
+    ...tree(hub.jobs.path(n, "files")).filter((f) => named.test(f.path)).map((f) => `files/${f.path}`),
+    ...tree(hub.jobs.path(n, "photos")).filter((f) => named.test(f.path) && !f.path.startsWith("previews/")).map((f) => `photos/${f.path}`),
+    ...tree(hub.jobs.path(n, "email")).filter((f) => named.test(f.path)).map((f) => `email/${f.path}`),
+  ];
+}
 function tree(dir: string, base = "", out: { path: string; kb: number }[] = []): { path: string; kb: number }[] {
   if (!existsSync(dir) || out.length >= 600) return out;
   for (const f of readdirSync(dir).sort()) {
@@ -68,7 +84,9 @@ export async function jobDossier(hub: Hub, n: number): Promise<JobDossier> {
 
   const files = Object.fromEntries((["sketch", "photos", "estimate", "files", "notes", "email"] as const).map((s) => [s, tree(hub.jobs.path(n, s))]));
   const inFolder = files.photos.filter((f) => IMAGE.test(f.path) && !f.path.startsWith("previews/")).length;
-  if (!files.sketch.some((f) => /\.esx$/i.test(f.path))) missing.push("No DocuSketch .ESX in the sketch folder.");
+  const sketch = sketchFiles(hub, n);
+  if (!sketch.length) missing.push("No DocuSketch files found: no .ESX, floor plan or measurement PDF, or room images.");
+  else if (!sketch.some((f) => /\.esx$/i.test(f))) missing.push(`No DocuSketch .ESX (that's normal for some jobs): measurements come from the other DocuSketch files (${sketch.length}) and the walk transcript.`);
   if (!inFolder && !cc.total) missing.push("No photos at all: none in the job's photos folder and none from CompanyCam.");
 
   // Emails, texts, calls and walks with the job's people.
@@ -94,6 +112,7 @@ export async function jobDossier(hub: Hub, n: number): Promise<JobDossier> {
     job: { jobNumber: n, name: j.name, address: j.address, stage: j.stage, market: j.market, customer: j.customer, occupant: j.occupant, adjuster: j.adjuster, carrier: j.carrier, claimNumber: j.claimNumber, insurance: j.insurance, estimate: j.estimate },
     folder: hub.jobs.folder(n),
     files,
+    docusketch: sketch.slice(0, 200),
     photos: { inFolder, companycam: cc, howTo: "Look at every photo before scoping: run the skill's photo_sheets.py on photos/ (and photos/previews for CompanyCam) and read the contact sheets. Photos in subfolders of photos/ came from zips Hunter added." },
     notes: {
       jobNotes: read(hub.jobs.path(n, "notes", "notes.txt")).slice(0, 12_000),
