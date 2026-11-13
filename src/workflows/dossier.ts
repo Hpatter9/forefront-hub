@@ -4,6 +4,7 @@ import { pickProject } from "../connectors/companycam/index.js";
 import type { Hub } from "../hub.js";
 import { jobConversation } from "./conversation.js";
 import { stockForJob, stockLine } from "./inventory.js";
+import { conversationDigest, photoNotes, type ConversationDigest, type PhotoNotes } from "./jobDigest.js";
 import { downloadPhotos, savedNotes } from "./pull.js";
 import { jobWalks } from "./walks.js";
 
@@ -21,9 +22,12 @@ export interface JobDossier {
   files: Record<string, { path: string; kb: number }[]>;
   /** The DocuSketch files wherever they are (an .ESX, its PDFs, room images). There may be no .ESX. */
   docusketch: string[];
-  photos: { inFolder: number; companycam: { linked: boolean; project?: string; total?: number; previews?: string; problem?: string }; howTo: string };
+  photos: { inFolder: number; companycam: { linked: boolean; project?: string; total?: number; previews?: string; problem?: string }; howTo: string; /** Numbered contact sheets already made, and a line about each photo (by the free AI). */ sheets?: string[]; notes?: PhotoNotes["photos"] };
   notes: { jobNotes: string; teamNotes: { at: string; author: string; body: string }[]; walks: { file: string; at: string; summary: string }[] };
-  emails: { at: string; who: string; subject: string; body: string; attachments: string[]; threadId?: string }[];
+  /** Each email. `body` is left out when `conversation` (the digest) is there: read a whole thread with gmail_read_thread when a point matters. */
+  emails: { at: string; who: string; subject: string; body?: string; attachments: string[]; threadId?: string }[];
+  /** The emails, texts and calls boiled down ahead of time by the free AI: read this first. Absent when it wasn't made. */
+  conversation?: ConversationDigest & { note: string };
   texts: { at: string; who: string; text: string }[];
   calls: { at: string; who: string; body: string }[];
   shopStock: string[];
@@ -105,6 +109,12 @@ export async function jobDossier(hub: Hub, n: number): Promise<JobDossier> {
   if (!tx.connected) missing.push("iPhone texts aren't connected, so texts weren't checked.");
   else if (!texts.length) missing.push("No texts with this job's contacts (as of the last iPhone backup).");
 
+  // Reading done ahead by the free AI, so the paid one reads a digest instead of every message and photo.
+  const [digest, pnotes] = await Promise.all([
+    conversationDigest(hub, n, [...emails.slice(-50).map((e) => ({ kind: "email" as const, at: e.at, who: e.who, subject: e.subject, body: e.body, threadId: e.threadId })), ...texts.slice(-150).map((t) => ({ kind: "text" as const, at: t.at, who: t.who, body: t.text })), ...calls.slice(-30).map((c) => ({ kind: "call" as const, at: c.at, who: c.who, body: c.body }))].sort((a, b) => a.at.localeCompare(b.at))),
+    photoNotes(hub, n),
+  ]);
+
   const read = (f: string) => { try { return existsSync(f) ? readFileSync(f, "utf8") : ""; } catch { return ""; } };
   const walks = jobWalks(hub, n);
   const stock = stockForJob(hub, n);
@@ -113,14 +123,15 @@ export async function jobDossier(hub: Hub, n: number): Promise<JobDossier> {
     folder: hub.jobs.folder(n),
     files,
     docusketch: sketch.slice(0, 200),
-    photos: { inFolder, companycam: cc, howTo: "Look at every photo before scoping: run the skill's photo_sheets.py on photos/ (and photos/previews for CompanyCam) and read the contact sheets. Photos in subfolders of photos/ came from zips Hunter added." },
+    photos: pnotes ? { inFolder, companycam: cc, sheets: pnotes.sheets, notes: pnotes.photos, howTo: "The photos are already on numbered contact sheets (`sheets`), with a line about each in `notes` written by a free assistant from those sheets. Use the notes to find the rooms in the scope, then look at the sheets that cover those rooms yourself before you scope them; you can skip sheets that only show rooms outside the scope. Open a full-size photo only when a sheet isn't clear enough. Don't run photo_sheets.py again." } : { inFolder, companycam: cc, howTo: "Look at every photo before scoping: run the skill's photo_sheets.py on photos/ (and photos/previews for CompanyCam) and read the contact sheets. Photos in subfolders of photos/ came from zips Hunter added." },
     notes: {
       jobNotes: read(hub.jobs.path(n, "notes", "notes.txt")).slice(0, 12_000),
       teamNotes: savedNotes(hub, n).flatMap((x) => [x, ...x.replies]).map((x) => ({ at: x.postedAt, author: x.author, body: x.body.slice(0, 1200) })).slice(0, 60),
       walks: walks.map((w) => ({ file: path.relative(hub.jobs.folder(n), w.file).split(path.sep).join("/"), at: w.at, summary: w.summary })),
     },
-    emails: emails.slice(-50),
-    texts: texts.slice(-150),
+    ...(digest ? { conversation: { ...digest, note: "Made ahead of time by a free assistant from every email, text and call on the job. Work from these points; where a point decides scope, quantity or price, read the original (gmail_read_thread with the thread id in `source`) before relying on it." } } : {}),
+    emails: digest ? emails.slice(-50).map(({ body: _body, ...e }) => e) : emails.slice(-50),
+    texts: digest ? texts.slice(-30) : texts.slice(-150),
     calls: calls.slice(-30),
     shopStock: [...stock.named.map((x) => `Noted for this job: ${stockLine(x)}. ${x.notes}`), ...stock.kinds.flatMap((k) => k.items.map(stockLine))].slice(0, 40),
     missing,

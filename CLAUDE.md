@@ -27,3 +27,8 @@
 - The sub work order (`src/workflows/subReport.ts`, laid out by `scripts/sub_report.py`) is written by the everyday
   AI (Gemini) from the estimate with prices stripped, the walk transcripts, notes and photos. It never shows a price,
   and anything the sources don't settle (which walls, color) is printed as NOT SETTLED and returned as a question.
+- Keeping Claude cheap and estimates right: `job_review` (`src/workflows/dossier.ts`) hands the estimator a digest made
+  by Gemini (`src/workflows/jobDigest.ts`: emails/texts boiled down, a line per photo plus saved contact sheets) instead
+  of every original, falling back to originals if Gemini fails. After any estimate change, `src/workflows/estimateCheck.ts`
+  checks it without Claude (prices vs the skill's price files, quantities vs room sizes, Gemini read-through vs sources).
+  New everyday features go to Gemini; only writing the estimate itself may use Claude.
