@@ -276,6 +276,15 @@ export function hubToolDefs(hub: Hub) {
         return inv.problem ? { problem: inv.problem } : { asOf: inv.updatedAt, items: findStock(hub, query).slice(0, 60) };
       }),
     ),
+    tool(
+      "sub_work_order",
+      "Make the work order PDF for subcontractors on a job: room by room, what to do and how much, exactly which walls, ceilings and trim get painted, and photos of the areas, with no prices. Built from the estimate, the walk transcripts, notes and photos. Pass `trade` (Painter, Drywall, Flooring...) for a copy with only that trade's work. Returns the file and any questions that must be settled first.",
+      { jobNumber, trade: z.string().default("").describe("one trade, or empty for all trades") },
+      wrap(async ({ jobNumber: n, trade }) => {
+        const r = await (await import("../workflows/subReport.js")).makeSubReport(hub, n, { trade });
+        return { file: r.file, rooms: r.rooms, photos: r.photos, questionsToSettleFirst: r.questions };
+      }),
+    ),
     tool("huddle_list", "Hunter's huddle list: what he wants to bring up at the team huddle, and what's already been brought up.", {}, wrap(async () => (await import("../workflows/huddle.js")).huddleList(hub))),
     tool(
       "calendar_free_time",

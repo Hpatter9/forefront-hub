@@ -58,7 +58,7 @@ describe("Estimator tab", () => {
     writeFileSync(hub.jobs.path(3226, "sketch", "Augustine.ESX"), "x");
     const f = new Studio(hub, () => {}).files(3226);
     const have = Object.fromEntries(f.docs.map((d) => [d.key, d.file?.path ?? null]));
-    expect(have).toEqual({ estimate: "estimate/Augustine - Reconstruction Estimate.pdf", agreement: null, xactimate: null, selections: "estimate/Augustine - Material Selection Approval.pdf", photos: null });
+    expect(have).toEqual({ estimate: "estimate/Augustine - Reconstruction Estimate.pdf", agreement: null, xactimate: null, selections: "estimate/Augustine - Material Selection Approval.pdf", photos: null, subs: null });
     expect(f.otherPdfs.map((x) => x.path)).toEqual(["files/Carrier estimate.pdf"]);
     expect(f.inputs.sketches[0].name).toBe("Augustine.ESX");
   });

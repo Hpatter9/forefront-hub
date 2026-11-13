@@ -24,3 +24,6 @@
 - The Estimator can be written by Claude (Agent SDK + the skill) or, as a trial, by Gemini (`src/agent/geminiEstimator.ts`):
   Gemini gets SKILL.md word for word plus narrow tools (read/list/view/write in the job folder, run the skill's own
   scripts). No estimating rules live in Keystone either way; the same overwrite guard applies to both.
+- The sub work order (`src/workflows/subReport.ts`, laid out by `scripts/sub_report.py`) is written by the everyday
+  AI (Gemini) from the estimate with prices stripped, the walk transcripts, notes and photos. It never shows a price,
+  and anything the sources don't settle (which walls, color) is printed as NOT SETTLED and returned as a question.

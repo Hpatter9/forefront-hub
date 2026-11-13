@@ -2997,7 +2997,7 @@ function renderEstSide() {
   const j = d.job;
   $("#est-jobinfo").innerHTML = `<b>#${j.jobNumber} ${esc(j.name)}</b>${esc(j.address || "")}<br><span class="muted">${esc(j.stage || "")}${j.insurance === "oop" ? " · Out of pocket" : j.carrier ? ` · ${esc(j.carrier)}` : ""}${j.claimNumber ? ` · ${esc(j.claimNumber)}` : ""}</span>${j.estimate?.total ? `<br>Estimate total: <b style="display:inline">$${Number(j.estimate.total).toLocaleString("en-US", { minimumFractionDigits: 2 })}</b>` : ""}`;
   const cur = $("#est-frame").dataset.path;
-  $("#est-docs").innerHTML = d.docs.map((x) => `<button type="button" class="est-doc ${x.file ? "have" : ""} ${x.file && x.file.path === cur && !$("#est").classList.contains("noprev") ? "on" : ""}" data-est-doc="${x.key}" title="${x.file ? `Preview ${esc(x.file.name)}` : `Ask Claude to make the ${esc(x.label)}`}"><i></i><span>${esc(x.label)}<br><small>${x.file ? `Updated ${new Date(x.file.modified).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Not made yet"}</small></span><span class="mk">${x.file ? "View" : "Make"}</span></button>`).join("") + (d.revisions ? `<div class="small muted" style="padding:2px 8px">${d.revisions} earlier version${d.revisions === 1 ? "" : "s"} kept in estimate/revisions</div>` : "");
+  $("#est-docs").innerHTML = d.docs.map((x) => `<button type="button" class="est-doc ${x.file ? "have" : ""} ${x.file && x.file.path === cur && !$("#est").classList.contains("noprev") ? "on" : ""}" data-est-doc="${x.key}" title="${x.key === "subs" ? "The work order for subs: what to do in each room and which walls get painted, no prices. Written by Gemini (free)." : x.file ? `Preview ${esc(x.file.name)}` : `Ask for the ${esc(x.label)}`}"><i></i><span>${esc(x.label)}<br><small>${x.file ? `Updated ${new Date(x.file.modified).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Not made yet"}</small></span><span class="mk">${x.key === "subs" && x.file ? "Remake" : x.file ? "View" : "Make"}</span></button>`).join("") + (d.revisions ? `<div class="small muted" style="padding:2px 8px">${d.revisions} earlier version${d.revisions === 1 ? "" : "s"} kept in estimate/revisions</div>` : "");
   $("#est-other").innerHTML = d.otherPdfs.length ? `<h5>Other PDFs</h5><div class="est-docs">${d.otherPdfs.map((f) => `<button type="button" class="est-doc have ${f.path === cur ? "on" : ""}" data-est-path="${esc(f.path)}"><i style="background:var(--muted)"></i><span>${esc(f.name)}</span><span class="mk">View</span></button>`).join("")}</div>` : "";
   const i = d.inputs;
   $("#est-inputs").innerHTML = [i.sketches.length ? `✓ Sketch: ${i.sketches.map((s) => esc(s.name)).join(", ")}${i.sketchOther ? ` + ${i.sketchOther} other DocuSketch file${i.sketchOther === 1 ? "" : "s"}` : ""}` : i.sketchOther ? `✓ DocuSketch: ${i.sketchOther} file${i.sketchOther === 1 ? "" : "s"} (no ESX, which is fine)` : `– No DocuSketch files yet (drop them in the chat, or ask it to look for the DocuSketch email)`, i.photos ? `✓ ${i.photos} photos in the job folder` : `– No photos downloaded (Claude can pull them from CompanyCam)`, i.walks ? `✓ ${i.walks} walk recording${i.walks === 1 ? "" : "s"} (your site notes and the conversation)` : "", d.estimateJson ? `✓ estimate.json` : ""].filter(Boolean).map((x) => `<div>${x}</div>`).join("");
@@ -3034,6 +3034,20 @@ function previewEst(f) {
   fr.src = `/api/jobs/${estJob}/file/${encodeURIComponent(f.path)}?v=${encodeURIComponent(f.modified)}`;
   $("#est-ptitle").textContent = f.name; $("#est-popen").href = fr.src;
   $("#est").classList.remove("noprev"); renderEstSide();
+}
+// The work order for subs. Always the free AI (Gemini); the Written-by choice above doesn't apply.
+async function subReport() {
+  if (!estJob) return;
+  const trade = prompt("Who is this copy for?\n\nLeave it empty for one sheet with all trades, or type one trade (Painter, Drywall, Flooring…) for a copy with only their work.", "");
+  if (trade === null) return;
+  try { await api(`/api/jobs/${estJob}/sub-report`, { method: "POST", body: { trade: trade.trim() } }); snack("Writing the sub work order… about a minute. It opens here when it's ready."); }
+  catch (e) { log(e.message, "t-err"); }
+}
+function onSubReport(e) {
+  if (e.job !== estJob) return;
+  refreshEstFiles().then(() => previewEst({ path: e.file, name: e.file.split("/").pop(), modified: new Date().toISOString() }));
+  if (e.questions.length) alert(`The work order is ready, but ${e.questions.length === 1 ? "one thing isn't" : `${e.questions.length} things aren't`} settled. They're printed on the sheet as NOT SETTLED:\n\n${e.questions.map((q) => `• ${q}`).join("\n")}\n\nAdd the answers to the job's notes (or tell the walk recording next time) and press Remake.`);
+  else snack(`Sub work order ready: ${e.rooms} room${e.rooms === 1 ? "" : "s"}, ${e.photos} photo${e.photos === 1 ? "" : "s"}. Written by ${e.ai || "Gemini"}.`);
 }
 // Who writes the estimate: Claude (paid, proven) or Gemini (free, a trial). The choice is remembered; a job that
 // was started with one keeps it selected when you come back.
@@ -3090,7 +3104,7 @@ $("#v-est").addEventListener("click", (e) => {
   const q = e.target.closest("[data-est-quick]");
   if (q) { const it = EST_QUICK[Number(q.dataset.estQuick)]; if (it.fill) { $("#est-input").value = it.fill; $("#est-input").focus(); } else estSend(it.text); return; }
   const d = e.target.closest("[data-est-doc]");
-  if (d && estData) { const doc = estData.docs.find((x) => x.key === d.dataset.estDoc); if (doc.file) previewEst(doc.file); else if (!estData.running) { const it = { estimate: 0, agreement: 2, xactimate: 0, selections: 3, photos: 4 }[doc.key]; $("#est-input").value = EST_QUICK[it].text; $("#est-input").focus(); } return; }
+  if (d && estData) { const doc = estData.docs.find((x) => x.key === d.dataset.estDoc); if (doc.key === "subs") { if (doc.file && !e.target.closest(".mk")) previewEst(doc.file); else subReport(); } else if (doc.file) previewEst(doc.file); else if (!estData.running) { const it = { estimate: 0, agreement: 2, xactimate: 0, selections: 3, photos: 4 }[doc.key]; $("#est-input").value = EST_QUICK[it].text; $("#est-input").focus(); } return; }
   const o = e.target.closest("[data-est-path]");
   if (o && estData) previewEst(estData.otherPdfs.find((f) => f.path === o.dataset.estPath));
 });
@@ -3603,6 +3617,7 @@ es.onmessage = (m) => {
   const e = JSON.parse(m.data);
   if (e.type === "log") log(e.text);
   if (e.type === "studio") onStudio(e);
+  if (e.type === "subreport") onSubReport(e);
   if (e.type === "answer") onAnswer(e);
   if (e.type === "approval") { if (!approvals.some((a) => a.id === e.id)) approvals.push(e); showApproval(); }
   if (e.type === "approval-done") { const i = approvals.findIndex((a) => a.id === e.id); if (i >= 0) { approvals.splice(i, 1); showApproval(); } }

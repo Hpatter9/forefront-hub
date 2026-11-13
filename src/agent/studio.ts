@@ -41,6 +41,7 @@ export const DOCS = [
   { key: "xactimate", label: "Xactimate Estimate", suffix: " - Xactimate Estimate.pdf" },
   { key: "selections", label: "Selections sign-off", suffix: " - Material Selection Approval.pdf" },
   { key: "photos", label: "Photo report", suffix: " - Photo Report.pdf" },
+  { key: "subs", label: "Sub work order", suffix: " - Sub Work Order.pdf" },
 ] as const;
 
 const STUDIO_PROMPT = `

@@ -149,7 +149,7 @@ export function estimatorTools(hub: Hub, job: number): EstimatorTools {
   };
 }
 
-function runPython(hub: Hub, script: string, args: string[], cwd: string): Promise<string> {
+export function runPython(hub: Hub, script: string, args: string[], cwd: string): Promise<string> {
   return new Promise((resolve) => {
     const [cmd, ...pre] = hub.cfg.python.split(" ");
     const child = spawn(cmd, [...pre, script, ...args], { cwd, env: { ...process.env, PYTHONIOENCODING: "utf-8" } });

@@ -579,6 +579,17 @@ const server = http.createServer(async (req, res) => {
             const r = await syncFiles(hub, n);
             hub.say(`#${n}: ${r.docs.length} file${r.docs.length === 1 ? "" : "s"} in Homebase${r.downloaded.length ? `, downloaded ${r.downloaded.join(", ")}` : ", all already in the folder"}${r.toUpload.length ? `; not in Homebase yet: ${r.toUpload.map((f) => f.name).join(", ")}` : ""}.`);
           }, "job"));
+        case "sub-report": {
+          // The work order for subs: written by the everyday AI (Gemini), never the paid estimator.
+          if (!aiReady(hub)) return send(res, 400, { error: aiOffReason(hub) });
+          const trade = String(b.trade ?? "").trim().slice(0, 40);
+          return send(res, 202, task(`Sub work order for #${n}${trade ? ` (${trade})` : ""}`, n, async () => {
+            const { makeSubReport } = await import("../workflows/subReport.js");
+            const r = await makeSubReport(hub, n, { trade });
+            if (r.questions.length) hub.say(`Before you hand it out, settle these (they're printed on the sheet as not settled):\n${r.questions.map((q) => `  - ${q}`).join("\n")}`);
+            bus.emit({ type: "subreport", job: n, file: path.relative(hub.jobs.folder(n), r.file).split(path.sep).join("/"), questions: r.questions, rooms: r.rooms, photos: r.photos, ai: r.model ?? "" } as never);
+          }, "job"));
+        }
         case "files-upload":
           return send(res, 202, task(`Upload files to Homebase #${n}`, n, () => uploadToHomebase(hub, n, b.names), "job"));
         case "mock-send": {
