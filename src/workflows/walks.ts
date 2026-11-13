@@ -369,8 +369,31 @@ export function jobWalks(hub: Hub, n: number): { file: string; at: string; summa
  * After a recording is filed: offers a short note for the job's Homebase feed (editable), and Google Tasks for what
  * Hunter said he'd do. Both ask first; nothing is written without a yes.
  */
+/** Stages a job is in before its first scope walk. A walk recorded from one of these was the initial walk. */
+export const BEFORE_WALK = new Set(["Qualify", "Lead", "Scope Walk"]);
+
+/**
+ * The initial scope walk is done once its recording is filed, so the job moves on to Estimating in Homebase
+ * (after a Yes, like every Homebase change). A job already past that point is left where it is.
+ */
+export async function offerEstimatingStage(hub: Hub, w: Walk): Promise<boolean> {
+  if (w.status !== "filed" || !w.jobNumber) return false;
+  const n = w.jobNumber;
+  const from = (await hub.homebase.getJob(n).then((j) => j.stage).catch(() => "")) || hub.jobs.get(n).stage;
+  if (!BEFORE_WALK.has(from)) return false;
+  const name = hub.jobs.get(n).name;
+  if (!(await hub.approver.confirm(`Move #${n} ${name} from ${from} to Estimating in Homebase?`, ["The scope walk is done: its recording was just filed to the job."]))) return false;
+  await hub.homebase.setStage(n, "Estimating", from);
+  hub.jobs.upsert(n, { stage: "Estimating", stageSince: new Date().toISOString() });
+  hub.jobs.log(n, `Homebase: stage ${from} -> Estimating (scope walk recorded)`);
+  hub.say(`Moved #${n} ${name} to Estimating in Homebase.`);
+  return true;
+}
+
 export async function offerWalkFollowups(hub: Hub, w: Walk): Promise<void> {
-  if (w.status !== "filed" || !w.jobNumber || !w.summary) return;
+  if (w.status !== "filed" || !w.jobNumber) return;
+  await offerEstimatingStage(hub, w).catch((e) => hub.say(`Couldn't move #${w.jobNumber} to Estimating: ${(e as Error).message}`));
+  if (!w.summary) return;
   const n = w.jobNumber;
   const day = new Date(w.recordedAt).toLocaleDateString("en-US", { timeZone: "America/Denver", weekday: "short", month: "short", day: "numeric" });
   const note = await confirmText(hub.approver, `Add this scope walk summary to Homebase #${n}?`, ["From your walk recording. Edit it if you like."], `Scope walk ${day}: ${w.summary}`);

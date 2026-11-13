@@ -973,7 +973,7 @@
         <div class="est-job" id="est-jobinfo"></div>
         <div><h5>Documents</h5><div class="est-docs" id="est-docs"></div></div>
         <div id="est-other"></div>
-        <div><h5>What Claude can use</h5><div class="est-in" id="est-inputs"></div></div>
+        <div><h5 id="est-usehead">What the estimator can use</h5><div class="est-in" id="est-inputs"></div></div>
         <div class="row" style="margin-top:auto;gap:6px;flex-wrap:wrap"><button class="btn" type="button" id="est-new" title="Start over with a fresh conversation (the old one is kept in the job's notes folder)">New conversation</button></div>
       </aside>
       <div class="est-chat" id="est-chat">
@@ -984,7 +984,7 @@
             <div class="est-files" id="est-files"></div>
             <textarea id="est-input" rows="2" placeholder="Message Claude about this job… (drop an ESX, Xactimate PDF or photos here)"></textarea>
             <div class="bar">
-              <button class="btn" type="button" id="est-attach" title="Add files to the job folder for Claude">＋ Files</button>
+              <button class="btn" type="button" id="est-attach" title="Add files to the job folder for the estimator">＋ Files</button>
               <input type="file" id="est-pick" multiple hidden>
               <label class="small muted" style="display:inline-flex;align-items:center;gap:6px">Written by <select id="est-ai" title="Claude is the proven one and uses your paid Claude key. Gemini is free and on trial: check its quantities and prices."><option value="claude">Claude (paid)</option><option value="gemini">Gemini (free, trial)</option></select></label>
               <span class="small muted" id="est-state" style="flex:1"></span>
@@ -993,7 +993,7 @@
             </div>
           </div>
         </div>
-        <div class="est-drop" id="est-drop" hidden>Drop to add to the job folder for Claude</div>
+        <div class="est-drop" id="est-drop" hidden>Drop to add to the job folder</div>
       </div>
       <div class="est-prev">
         <div class="hd"><b id="est-ptitle"></b><a class="btn" id="est-popen" target="_blank" rel="noopener">Open</a><button class="btn" type="button" id="est-pclose">Close</button></div>
@@ -2843,7 +2843,7 @@ async function askClaude(prompt, job) {
     showTab("est");
     if (!n) { $("#est-input").value = prompt; snack("Pick the job on the left, then press Send."); return; }
     if (estJob !== n || !estData) { $("#est-job").value = String(n); await openEst(n); }
-    if (estData?.running) { $("#est-input").value = prompt; snack("Claude is still working on this job. Your message is ready to send."); return; }
+    if (estData?.running) { $("#est-input").value = prompt; snack(`${estWho()} is still working on this job. Your message is ready to send.`); return; }
     await estSend(prompt);
     return;
   }
@@ -2985,24 +2985,24 @@ async function refreshEstFiles() {
 function renderEst() { renderEstSide(); renderEstLog(); renderEstState(); }
 function renderEstSide() {
   const d = estData;
-  if (!d) { $("#est-jobinfo").innerHTML = `<span class="muted small">Pick a job to start. Claude works in that job's folder with the estimating skill, like a chat.</span>`; $("#est-docs").innerHTML = ""; $("#est-inputs").innerHTML = ""; $("#est-other").innerHTML = ""; return; }
+  if (!d) { $("#est-jobinfo").innerHTML = `<span class="muted small">Pick a job to start. The estimator works in that job's folder with the estimating skill, like a chat.</span>`; $("#est-docs").innerHTML = ""; $("#est-inputs").innerHTML = ""; $("#est-other").innerHTML = ""; return; }
   const j = d.job;
   $("#est-jobinfo").innerHTML = `<b>#${j.jobNumber} ${esc(j.name)}</b>${esc(j.address || "")}<br><span class="muted">${esc(j.stage || "")}${j.insurance === "oop" ? " · Out of pocket" : j.carrier ? ` · ${esc(j.carrier)}` : ""}${j.claimNumber ? ` · ${esc(j.claimNumber)}` : ""}</span>${j.estimate?.total ? `<br>Estimate total: <b style="display:inline">$${Number(j.estimate.total).toLocaleString("en-US", { minimumFractionDigits: 2 })}</b>` : ""}`;
   const cur = $("#est-frame").dataset.path;
   $("#est-docs").innerHTML = d.docs.map((x) => `<button type="button" class="est-doc ${x.file ? "have" : ""} ${x.file && x.file.path === cur && !$("#est").classList.contains("noprev") ? "on" : ""}" data-est-doc="${x.key}" title="${x.file ? `Preview ${esc(x.file.name)}` : `Ask Claude to make the ${esc(x.label)}`}"><i></i><span>${esc(x.label)}<br><small>${x.file ? `Updated ${new Date(x.file.modified).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Not made yet"}</small></span><span class="mk">${x.file ? "View" : "Make"}</span></button>`).join("") + (d.revisions ? `<div class="small muted" style="padding:2px 8px">${d.revisions} earlier version${d.revisions === 1 ? "" : "s"} kept in estimate/revisions</div>` : "");
   $("#est-other").innerHTML = d.otherPdfs.length ? `<h5>Other PDFs</h5><div class="est-docs">${d.otherPdfs.map((f) => `<button type="button" class="est-doc have ${f.path === cur ? "on" : ""}" data-est-path="${esc(f.path)}"><i style="background:var(--muted)"></i><span>${esc(f.name)}</span><span class="mk">View</span></button>`).join("")}</div>` : "";
   const i = d.inputs;
-  $("#est-inputs").innerHTML = [i.sketches.length ? `✓ Sketch: ${i.sketches.map((s) => esc(s.name)).join(", ")}` : `– No ESX yet (drop it in the chat, or Claude can look for the DocuSketch email)`, i.photos ? `✓ ${i.photos} photos in the job folder` : `– No photos downloaded (Claude can pull them from CompanyCam)`, i.walks ? `✓ ${i.walks} walk recording${i.walks === 1 ? "" : "s"} (your site notes and the conversation)` : "", d.estimateJson ? `✓ estimate.json` : ""].filter(Boolean).map((x) => `<div>${x}</div>`).join("");
+  $("#est-inputs").innerHTML = [i.sketches.length ? `✓ Sketch: ${i.sketches.map((s) => esc(s.name)).join(", ")}` : `– No ESX yet (drop it in the chat, or ask it to look for the DocuSketch email)`, i.photos ? `✓ ${i.photos} photos in the job folder` : `– No photos downloaded (Claude can pull them from CompanyCam)`, i.walks ? `✓ ${i.walks} walk recording${i.walks === 1 ? "" : "s"} (your site notes and the conversation)` : "", d.estimateJson ? `✓ estimate.json` : ""].filter(Boolean).map((x) => `<div>${x}</div>`).join("");
 }
 function renderEstLog() {
   const d = estData, log = $("#est-log");
-  if (!d) { log.innerHTML = `<div class="hello"><h3>Estimator</h3>Pick a job on the left, then ask Claude for an estimate, agreement, selections sign-off or photo report, the same way you would in chat.</div>`; $("#est-quick").innerHTML = ""; return; }
+  if (!d) { log.innerHTML = `<div class="hello"><h3>Estimator</h3>Pick a job on the left, then ask for an estimate, agreement, selections sign-off or photo report, the same way you would in chat.</div>`; $("#est-quick").innerHTML = ""; return; }
   $("#est-comp").hidden = !(d.claude || d.gemini);
   if (!d.claude && !d.gemini) { renderHandoff(d); $("#est-quick").innerHTML = ""; return; }
   showEstAi(d);
-  if (!d.turns.length) log.innerHTML = `<div class="hello"><h3>#${d.job.jobNumber} ${esc(d.job.name)}</h3>What do you need for this job? Pick one below or just type. Claude uses the Forefront estimating skill and saves everything in the job's estimate folder.</div>`;
+  if (!d.turns.length) log.innerHTML = `<div class="hello"><h3>#${d.job.jobNumber} ${esc(d.job.name)}</h3>What do you need for this job? Pick one below or just type. ${estWho()} uses the Forefront estimating skill and saves everything in the job's estimate folder.</div>`;
   else log.innerHTML = d.turns.map(estTurnHtml).join("");
-  if (d.running) log.insertAdjacentHTML("beforeend", `<div class="msg assistant" id="est-live">${estStream ? md(estStream) : ""}</div><div class="msg typing" id="est-typing">${d.writer === "gemini" ? "Gemini" : "Claude"} is working</div>`);
+  if (d.running) log.insertAdjacentHTML("beforeend", `<div class="msg assistant" id="est-live">${estStream ? md(estStream) : ""}</div><div class="msg typing" id="est-typing">${estWho()} is working</div>`);
   const have = new Set(d.docs.filter((x) => x.file).map((x) => x.key));
   $("#est-quick").innerHTML = (d.claude || d.gemini ? EST_QUICK : []).filter((q) => !(q.label.startsWith("Revise") && !have.has("estimate"))).map((q, k) => `<button type="button" data-est-quick="${EST_QUICK.indexOf(q)}">${esc(q.label)}</button>`).join("");
   log.scrollTop = log.scrollHeight;
@@ -3016,7 +3016,8 @@ function estTurnHtml(t) {
 function renderEstState() {
   const run = !!estData?.running;
   $("#est-send").hidden = run; $("#est-stop").hidden = !run;
-  $("#est-state").textContent = run ? "Claude is working… approvals pop up when it needs your OK." : "";
+  $("#est-state").textContent = run ? `${estWho()} is working… approvals pop up when it needs your OK.` : "";
+  $("#est-usehead").textContent = `What ${estWho()} can use`;
   $("#est-files").innerHTML = estFiles.map((f) => `<span>📎 ${esc(f)}</span>`).join("");
 }
 function previewEst(f) {
@@ -3028,6 +3029,8 @@ function previewEst(f) {
 }
 // Who writes the estimate: Claude (paid, proven) or Gemini (free, a trial). The choice is remembered; a job that
 // was started with one keeps it selected when you come back.
+/** The name to show for who is doing the work: whoever is actually running, else the one picked under the box. */
+function estWho() { const w = estData?.running && estData.writer ? estData.writer : estData ? estAi() : "claude"; return w === "gemini" ? "Gemini" : "Claude"; }
 function estAi() { const v = $("#est-ai").value; return v === "gemini" && estData?.gemini ? "gemini" : v === "claude" && estData?.claude ? "claude" : estData?.claude ? "claude" : "gemini"; }
 function showEstAi(d) {
   const sel = $("#est-ai");
@@ -3036,14 +3039,14 @@ function showEstAi(d) {
   sel.value = want === "gemini" ? (d.gemini ? "gemini" : "claude") : d.claude ? "claude" : "gemini";
   $("#est-input").placeholder = `Message ${sel.value === "gemini" ? "Gemini" : "Claude"} about this job… (drop an ESX, Xactimate PDF or photos here)`;
 }
-$("#est-ai").addEventListener("change", (e) => { store.set("estAi", e.target.value); $("#est-input").placeholder = `Message ${e.target.value === "gemini" ? "Gemini" : "Claude"} about this job… (drop an ESX, Xactimate PDF or photos here)`; if (estData?.turns.length && estData.writer && estData.writer !== e.target.value) snack(`This conversation was written by ${estData.writer === "gemini" ? "Gemini" : "Claude"}. ${e.target.value === "gemini" ? "Gemini" : "Claude"} won't remember it: press New conversation for a clean start.`); });
+$("#est-ai").addEventListener("change", (e) => { store.set("estAi", e.target.value); renderEstState(); if (estData && !estData.turns.length) renderEstLog(); $("#est-input").placeholder = `Message ${e.target.value === "gemini" ? "Gemini" : "Claude"} about this job… (drop an ESX, Xactimate PDF or photos here)`; if (estData?.turns.length && estData.writer && estData.writer !== e.target.value) snack(`This conversation was written by ${estData.writer === "gemini" ? "Gemini" : "Claude"}. ${e.target.value === "gemini" ? "Gemini" : "Claude"} won't remember it: press New conversation for a clean start.`); });
 async function estSend(text) {
   text = (text ?? $("#est-input").value).trim();
   if (!estJob) return log("Pick a job first.", "t-err");
   if (!text && !estFiles.length) return;
   const full = (estFiles.length ? `Files I added to the job folder: ${estFiles.join(", ")}\n\n` : "") + (text || "Take a look at the files I just added.");
   $("#est-input").value = ""; estFiles = [];
-  try { await api(`/api/studio/${estJob}/send`, { method: "POST", body: { text: full, ai: estAi() } }); }
+  try { await api(`/api/studio/${estJob}/send`, { method: "POST", body: { text: full, ai: (estData.writer = estAi()) } }); }
   catch (e) { log(e.message, "t-err"); $("#est-input").value = text; }
 }
 async function estUpload(files) {
@@ -3063,7 +3066,7 @@ function onStudio(e) {
     return;
   }
   if (e.kind === "turn") { if (e.turn.role === "assistant") estStream = ""; estData.turns.push(e.turn); if (e.turn.role === "tool" && /Writing|Running|photo report/i.test(e.turn.text)) setTimeout(refreshEstFiles, 1500); }
-  if (e.kind === "state") { estData.running = e.running; if (!e.running) { estStream = ""; refreshEstFiles(); } }
+  if (e.kind === "state") { estData.running = e.running; if (e.writer) estData.writer = e.writer; if (!e.running) { estStream = ""; refreshEstFiles(); } }
   renderEstLog(); renderEstState();
 }
 $("#est-job").addEventListener("change", () => { const n = Number($("#est-job").value); if (n) { $("#est").classList.add("noprev"); $("#est-frame").removeAttribute("src"); delete $("#est-frame").dataset.path; openEst(n); } });

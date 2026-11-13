@@ -139,3 +139,41 @@ describe("only the walk is kept", () => {
     expect(walks(t.hub).filter((w) => w.id === first.id)).toHaveLength(1);
   });
 });
+
+describe("after the initial scope walk", () => {
+  it("offers to move a job from Lead or Scope Walk to Estimating, and leaves later stages alone", async () => {
+    const { offerEstimatingStage } = await import("../src/workflows/walks.js");
+    const t = setup();
+    const at = new Date(); at.setHours(9, 20, 0, 0);
+    t.rec("Voice 030.m4a", at);
+    const [w] = await scanWalks(t.hub, { now: new Date(at.getTime() + 3600e3), transcriber: async () => notes() });
+    const n = w.jobNumber!;
+    const stage = async (s: string) => { (t.homebase as any).writes.length = 0; await t.hub.homebase.setStage(n, s); (t.homebase as any).writes.length = 0; };
+    const moved = () => (t.homebase.writes as any[]).filter((x) => x.op === "setStage").map((x) => x.args?.stage ?? x.data?.stage ?? x.stage);
+    await stage("Lead");
+    expect(await offerEstimatingStage(t.hub, w)).toBe(true);
+    expect(JSON.stringify(t.homebase.writes)).toContain("Estimating");
+    expect(t.hub.jobs.get(n).stage).toBe("Estimating");
+    expect((await t.hub.homebase.getJob(n)).stage).toBe("Estimating");
+    await stage("Scope Walk");
+    expect(await offerEstimatingStage(t.hub, w)).toBe(true);
+    for (const later of ["Estimating", "Proposal Submitted", "Work In Progress"]) {
+      await stage(later);
+      expect(await offerEstimatingStage(t.hub, w)).toBe(false);
+      expect(moved()).toEqual([]);
+    }
+  });
+
+  it("changes nothing when the answer is no", async () => {
+    const { offerEstimatingStage } = await import("../src/workflows/walks.js");
+    const { FixedApprover } = await import("../src/core/approval.js");
+    const t = setup();
+    t.hub.approver = new FixedApprover(false);
+    const at = new Date(); at.setHours(9, 20, 0, 0);
+    t.rec("Voice 031.m4a", at);
+    const [w] = await scanWalks(t.hub, { now: new Date(at.getTime() + 3600e3), transcriber: async () => notes() });
+    await t.hub.homebase.setStage(w.jobNumber!, "Lead");
+    expect(await offerEstimatingStage(t.hub, w)).toBe(false);
+    expect((await t.hub.homebase.getJob(w.jobNumber!)).stage).toBe("Lead");
+  });
+});

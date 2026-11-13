@@ -22,7 +22,7 @@ export interface StudioTurn {
 export type StudioEvent =
   | { kind: "turn"; job: number; turn: StudioTurn }
   | { kind: "delta"; job: number; text: string }
-  | { kind: "state"; job: number; running: boolean };
+  | { kind: "state"; job: number; running: boolean; writer?: "claude" | "gemini" };
 
 interface Saved {
   sessionId?: string;
@@ -160,7 +160,7 @@ export class Studio {
       ),
     });
     this.live.set(job, q);
-    this.emit({ kind: "state", job, running: true });
+    this.emit({ kind: "state", job, running: true, writer: "claude" });
     try {
       const { withDraftSource } = await import("../workflows/generated.js");
       await withDraftSource("Estimator", async () => {
@@ -189,7 +189,7 @@ export class Studio {
     add("user", text);
     let stop = false;
     this.live.set(job, { interrupt: async () => void (stop = true) });
-    this.emit({ kind: "state", job, running: true });
+    this.emit({ kind: "state", job, running: true, writer: "gemini" });
     try {
       const { forSaving, geminiEstimate } = await import("./geminiEstimator.js");
       const { withDraftSource } = await import("../workflows/generated.js");
