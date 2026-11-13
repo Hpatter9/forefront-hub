@@ -2965,12 +2965,20 @@ function md(src) {
 async function loadEst() {
   if (!jobs.length) await loadJobs();
   if (!estJob && view) estJob = view.homebase.jobNumber;
-  $("#est-job").innerHTML = `<option value="">Pick a job…</option>` + jobs.map((j) => `<option value="${j.jobNumber}" ${j.jobNumber === estJob ? "selected" : ""}>#${j.jobNumber} ${esc(j.name)}${j.stage ? ` · ${esc(j.stage)}` : ""}</option>`).join("");
-  if (estJob && !jobs.some((j) => j.jobNumber === estJob)) $("#est-job").insertAdjacentHTML("beforeend", `<option value="${estJob}" selected>#${estJob}</option>`);
+  fillEstJobs();
   if (estJob) openEst(estJob); else renderEst();
+}
+// The Estimator's job list, most recently opened first (so swapping between the jobs you're working on is quick),
+// then everything else in the usual order.
+function fillEstJobs() {
+  const recent = store.get("estRecent", []).map((n) => jobs.find((j) => j.jobNumber === n)).filter(Boolean);
+  const list = [...recent, ...jobs.filter((j) => !recent.includes(j))];
+  $("#est-job").innerHTML = `<option value="">Pick a job…</option>` + list.map((j) => `<option value="${j.jobNumber}" ${j.jobNumber === estJob ? "selected" : ""}>#${j.jobNumber} ${esc(j.name)}${j.stage ? ` · ${esc(j.stage)}` : ""}</option>`).join("");
+  if (estJob && !jobs.some((j) => j.jobNumber === estJob)) $("#est-job").insertAdjacentHTML("beforeend", `<option value="${estJob}" selected>#${estJob}</option>`);
 }
 async function openEst(n) {
   estJob = n; store.set("estjob", n); estFiles = []; estStream = "";
+  store.set("estRecent", [n, ...store.get("estRecent", []).filter((x) => x !== n)].slice(0, 30)); fillEstJobs();
   setCrumbs(`Estimator / <b>#${n}</b>`);
   $("#est-log").innerHTML = `<div class="hello">Loading #${n}…</div>`;
   try { estData = await api(`/api/studio/${n}`); } catch (e) { estData = null; $("#est-log").innerHTML = `<div class="hello">Couldn't open #${n}: ${esc(e.message)}</div>`; return; }
