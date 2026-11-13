@@ -1,6 +1,7 @@
 import { query, type Query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import type { Turn } from "../connectors/gemini/index.js";
 import type { Hub } from "../hub.js";
 import { agentOptions, systemPrompt } from "./run.js";
 import { SERVER } from "./tools.js";
@@ -26,6 +27,10 @@ export type StudioEvent =
 interface Saved {
   sessionId?: string;
   turns: StudioTurn[];
+  /** The conversation as Gemini needs it back (its own format), when Gemini is writing this job's estimate. */
+  gemini?: Turn[];
+  /** Which AI wrote last in this conversation. */
+  writer?: "claude" | "gemini";
 }
 
 /** The documents this tab tracks, by the file names the skill writes. */
@@ -50,7 +55,7 @@ Before you scope, price or revise ANY estimate, go through everything on the job
 When the skill has questions for Hunter, ask them here in a short numbered list and wait for his answers; don't guess. Files he drops into this chat are saved in the job folder and named in his message. After rendering, say which files you wrote and the totals in two or three lines. Don't draft or send email from this tab unless he asks.`;
 
 export class Studio {
-  private live = new Map<number, Query>();
+  private live = new Map<number, { interrupt(): Promise<unknown> }>();
 
   constructor(private hub: Hub, private emit: (e: StudioEvent) => void) {}
 
@@ -80,7 +85,7 @@ export class Studio {
   /** The conversation, whether Claude is working on it, and the job's documents and inputs. */
   view(job: number) {
     const s = this.load(job);
-    return { turns: s.turns, running: this.running(job), hasSession: !!s.sessionId, ...this.files(job) };
+    return { turns: s.turns, running: this.running(job), hasSession: !!s.sessionId || !!s.gemini?.length, writer: s.writer ?? null, ...this.files(job) };
   }
 
   files(job: number) {
@@ -118,12 +123,18 @@ export class Studio {
     this.save(job, { turns: [] });
   }
 
+  /** Which AI last wrote in this job's conversation (so the tab can keep using it). */
+  writer(job: number): "claude" | "gemini" {
+    return this.load(job).writer ?? "claude";
+  }
+
   async stop(job: number) {
     await this.live.get(job)?.interrupt().catch(() => {});
   }
 
   /** Sends one message from Hunter; resolves when Claude's turn is over. */
-  async send(job: number, text: string): Promise<void> {
+  async send(job: number, text: string, ai: "claude" | "gemini" = "claude"): Promise<void> {
+    if (ai === "gemini") return this.sendGemini(job, text);
     if (!this.hub.cfg.anthropicApiKey) throw new Error("Claude is off on this machine (no Anthropic API key). Set ANTHROPIC_API_KEY in .env, or save it in the Estimator app.");
     if (this.running(job)) throw new Error("Claude is still working on this job. Wait, or press Stop.");
     const s = this.load(job);
@@ -133,6 +144,7 @@ export class Studio {
       this.save(job, s);
       this.emit({ kind: "turn", job, turn });
     };
+    s.writer = "claude";
     add("user", text);
 
     const q = query({
@@ -153,6 +165,38 @@ export class Studio {
       const { withDraftSource } = await import("../workflows/generated.js");
       await withDraftSource("Estimator", async () => {
         for await (const m of q) this.handle(job, s, m, add);
+      });
+    } catch (e) {
+      add("error", (e as Error).message);
+    } finally {
+      this.live.delete(job);
+      this.save(job, s);
+      this.emit({ kind: "state", job, running: false });
+    }
+  }
+
+  /** The same conversation, written by Gemini (free) with the skill's instructions and scripts. A trial next to Claude. */
+  private async sendGemini(job: number, text: string): Promise<void> {
+    if (this.running(job)) throw new Error("The estimator is still working on this job. Wait, or press Stop.");
+    const s = this.load(job);
+    const add = (role: StudioRole, t: string) => {
+      const turn = { role, text: t, at: new Date().toISOString() };
+      s.turns.push(turn);
+      this.save(job, s);
+      this.emit({ kind: "turn", job, turn });
+    };
+    s.writer = "gemini";
+    add("user", text);
+    let stop = false;
+    this.live.set(job, { interrupt: async () => void (stop = true) });
+    this.emit({ kind: "state", job, running: true });
+    try {
+      const { forSaving, geminiEstimate } = await import("./geminiEstimator.js");
+      const { withDraftSource } = await import("../workflows/generated.js");
+      await withDraftSource("Estimator", async () => {
+        const r = await geminiEstimate(this.hub, job, text, { history: s.gemini, stopped: () => stop, onStep: (line) => add("tool", line), onText: (t) => add("assistant", t) });
+        s.gemini = forSaving(r.contents).slice(-400);
+        add(r.stopped ? "error" : "assistant", r.stopped ? "Stopped." : `${r.text}\n\n(Written by Gemini: ${r.models.join(", ") || this.hub.cfg.ai.geminiModel}${r.models.some((m) => m !== this.hub.cfg.ai.geminiModel) ? `. The main model, ${this.hub.cfg.ai.geminiModel}, was busy or at its free limit for part of this, so a lighter one filled in` : ""}. This is a trial: check quantities and prices before you send anything.)`);
       });
     } catch (e) {
       add("error", (e as Error).message);

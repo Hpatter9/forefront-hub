@@ -986,6 +986,7 @@
             <div class="bar">
               <button class="btn" type="button" id="est-attach" title="Add files to the job folder for Claude">＋ Files</button>
               <input type="file" id="est-pick" multiple hidden>
+              <label class="small muted" style="display:inline-flex;align-items:center;gap:6px">Written by <select id="est-ai" title="Claude is the proven one and uses your paid Claude key. Gemini is free and on trial: check its quantities and prices."><option value="claude">Claude (paid)</option><option value="gemini">Gemini (free, trial)</option></select></label>
               <span class="small muted" id="est-state" style="flex:1"></span>
               <button class="btn" type="button" id="est-stop" hidden>Stop</button>
               <button class="btn primary" type="button" id="est-send">Send</button>
@@ -2996,13 +2997,14 @@ function renderEstSide() {
 function renderEstLog() {
   const d = estData, log = $("#est-log");
   if (!d) { log.innerHTML = `<div class="hello"><h3>Estimator</h3>Pick a job on the left, then ask Claude for an estimate, agreement, selections sign-off or photo report, the same way you would in chat.</div>`; $("#est-quick").innerHTML = ""; return; }
-  $("#est-comp").hidden = !d.claude;
-  if (!d.claude) { renderHandoff(d); $("#est-quick").innerHTML = ""; return; }
+  $("#est-comp").hidden = !(d.claude || d.gemini);
+  if (!d.claude && !d.gemini) { renderHandoff(d); $("#est-quick").innerHTML = ""; return; }
+  showEstAi(d);
   if (!d.turns.length) log.innerHTML = `<div class="hello"><h3>#${d.job.jobNumber} ${esc(d.job.name)}</h3>What do you need for this job? Pick one below or just type. Claude uses the Forefront estimating skill and saves everything in the job's estimate folder.</div>`;
   else log.innerHTML = d.turns.map(estTurnHtml).join("");
-  if (d.running) log.insertAdjacentHTML("beforeend", `<div class="msg assistant" id="est-live">${estStream ? md(estStream) : ""}</div><div class="msg typing" id="est-typing">Claude is working</div>`);
+  if (d.running) log.insertAdjacentHTML("beforeend", `<div class="msg assistant" id="est-live">${estStream ? md(estStream) : ""}</div><div class="msg typing" id="est-typing">${d.writer === "gemini" ? "Gemini" : "Claude"} is working</div>`);
   const have = new Set(d.docs.filter((x) => x.file).map((x) => x.key));
-  $("#est-quick").innerHTML = (d.claude ? EST_QUICK : []).filter((q) => !(q.label.startsWith("Revise") && !have.has("estimate"))).map((q, k) => `<button type="button" data-est-quick="${EST_QUICK.indexOf(q)}">${esc(q.label)}</button>`).join("");
+  $("#est-quick").innerHTML = (d.claude || d.gemini ? EST_QUICK : []).filter((q) => !(q.label.startsWith("Revise") && !have.has("estimate"))).map((q, k) => `<button type="button" data-est-quick="${EST_QUICK.indexOf(q)}">${esc(q.label)}</button>`).join("");
   log.scrollTop = log.scrollHeight;
 }
 function estTurnHtml(t) {
@@ -3024,13 +3026,24 @@ function previewEst(f) {
   $("#est-ptitle").textContent = f.name; $("#est-popen").href = fr.src;
   $("#est").classList.remove("noprev"); renderEstSide();
 }
+// Who writes the estimate: Claude (paid, proven) or Gemini (free, a trial). The choice is remembered; a job that
+// was started with one keeps it selected when you come back.
+function estAi() { const v = $("#est-ai").value; return v === "gemini" && estData?.gemini ? "gemini" : v === "claude" && estData?.claude ? "claude" : estData?.claude ? "claude" : "gemini"; }
+function showEstAi(d) {
+  const sel = $("#est-ai");
+  sel.querySelector('[value="claude"]').disabled = !d.claude; sel.querySelector('[value="gemini"]').disabled = !d.gemini;
+  const want = d.turns.length && d.writer ? d.writer : store.get("estAi", "claude");
+  sel.value = want === "gemini" ? (d.gemini ? "gemini" : "claude") : d.claude ? "claude" : "gemini";
+  $("#est-input").placeholder = `Message ${sel.value === "gemini" ? "Gemini" : "Claude"} about this job… (drop an ESX, Xactimate PDF or photos here)`;
+}
+$("#est-ai").addEventListener("change", (e) => { store.set("estAi", e.target.value); $("#est-input").placeholder = `Message ${e.target.value === "gemini" ? "Gemini" : "Claude"} about this job… (drop an ESX, Xactimate PDF or photos here)`; if (estData?.turns.length && estData.writer && estData.writer !== e.target.value) snack(`This conversation was written by ${estData.writer === "gemini" ? "Gemini" : "Claude"}. ${e.target.value === "gemini" ? "Gemini" : "Claude"} won't remember it: press New conversation for a clean start.`); });
 async function estSend(text) {
   text = (text ?? $("#est-input").value).trim();
   if (!estJob) return log("Pick a job first.", "t-err");
   if (!text && !estFiles.length) return;
   const full = (estFiles.length ? `Files I added to the job folder: ${estFiles.join(", ")}\n\n` : "") + (text || "Take a look at the files I just added.");
   $("#est-input").value = ""; estFiles = [];
-  try { await api(`/api/studio/${estJob}/send`, { method: "POST", body: { text: full } }); }
+  try { await api(`/api/studio/${estJob}/send`, { method: "POST", body: { text: full, ai: estAi() } }); }
   catch (e) { log(e.message, "t-err"); $("#est-input").value = text; }
 }
 async function estUpload(files) {

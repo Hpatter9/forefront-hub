@@ -269,7 +269,7 @@
       ]);
       const leads = jobs.items.filter((j) => /^(lead|qualify)$/i.test(j.stage)).map((j) => ({ ...j, days: daysSince(j.stageSince), walk: j.nextAppointment }));
       const proposals = jobs.items.filter((j) => /^proposal submitted$/i.test(j.stage)).map((j) => ({ ...j, days: daysSince(j.stageSince) })).sort((a, b) => (b.days ?? 0) - (a.days ?? 0));
-      return { at: new Date().toISOString(), today: dayOf(start), calendar: cal, tasks: tk, email: mail, leads: { items: leads, problem: jobs.problem }, proposals: { items: proposals, problem: jobs.problem } };
+      return { at: new Date().toISOString(), today: dayOf(new Date()), calendar: cal, tasks: tk, email: mail, leads: { items: leads, problem: jobs.problem }, proposals: { items: proposals, problem: jobs.problem } };
     }
 
     /**

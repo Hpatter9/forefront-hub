@@ -889,7 +889,7 @@ const server = http.createServer(async (req, res) => {
       if (!hub.jobs.exists(n)) await pullJob(hub, n, { quiet: true });
       const j = hub.jobs.get(n);
       const job = { jobNumber: n, name: j.name, address: j.address, stage: j.stage, insurance: j.insurance, customer: j.customer.name, carrier: j.carrier, claimNumber: j.claimNumber, estimate: j.estimate };
-      if (!st[2] && req.method === "GET") return send(res, 200, { job, claude: claudeOnlyReady(hub), ...studio.view(n) });
+      if (!st[2] && req.method === "GET") return send(res, 200, { job, claude: claudeOnlyReady(hub), gemini: !!(hub.gemini && cfg.ai.geminiKey), geminiModel: cfg.ai.geminiModel, ...studio.view(n) });
       if (req.method !== "POST") return send(res, 405, { error: "method" });
       if (st[2] === "upload") {
         const name = decodeURIComponent(String(req.headers["x-filename"] ?? "file"));
@@ -901,9 +901,12 @@ const server = http.createServer(async (req, res) => {
       const b = await body(req);
       const text = String(b.text ?? "").trim();
       if (!text) return send(res, 400, { error: "Say what you want Claude to do." });
-      if (!claudeOnlyReady(hub)) return send(res, 400, { error: "The Estimator uses the Claude estimating skill, so it needs a Claude API key: ANTHROPIC_API_KEY=sk-ant-... in Keystone's .env, then restart." });
-      if (studio.running(n)) return send(res, 409, { error: "Claude is still working on this job." });
-      studio.send(n, text).then(() => bus.emit({ type: "changed", job: n, what: "job" })).catch((e) => console.error(e));
+      // Claude (paid, the proven one) or Gemini (free, a trial): Hunter picks in the Estimator tab.
+      const ai = b.ai === "gemini" ? "gemini" : "claude";
+      if (ai === "gemini" && !(hub.gemini && cfg.ai.geminiKey)) return send(res, 400, { error: "Gemini isn't connected. Double-click Connect Gemini in the Keystone folder." });
+      if (ai === "claude" && !claudeOnlyReady(hub)) return send(res, 400, { error: "Writing with Claude needs a Claude API key: ANTHROPIC_API_KEY=sk-ant-... in Keystone's .env, then restart. Or switch the Estimator to Gemini (free)." });
+      if (studio.running(n)) return send(res, 409, { error: "The estimator is still working on this job." });
+      studio.send(n, text, ai).then(() => bus.emit({ type: "changed", job: n, what: "job" })).catch((e) => console.error(e));
       return send(res, 202, { ok: true });
     }
     if (p === "/api/ask" && req.method === "POST") {

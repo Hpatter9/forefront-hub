@@ -21,3 +21,6 @@
 - The shop's overstock is the newest `.xlsx` in `inventory/` on the PC (git-ignored: its notes can name customers),
   read by `src/workflows/inventory.ts`. Keystone only reminds (job page card, `shop_stock` tool, a line in the AI's
   instructions); it never puts stock on an estimate itself.
+- The Estimator can be written by Claude (Agent SDK + the skill) or, as a trial, by Gemini (`src/agent/geminiEstimator.ts`):
+  Gemini gets SKILL.md word for word plus narrow tools (read/list/view/write in the job folder, run the skill's own
+  scripts). No estimating rules live in Keystone either way; the same overwrite guard applies to both.
