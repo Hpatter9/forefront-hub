@@ -1,3 +1,4 @@
+import { MockGmail } from "../src/connectors/gmail/mock.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -16,6 +17,19 @@ function setup(answer = true) {
 }
 
 describe("the Estimator's tools for Gemini", () => {
+  it("can make Gmail drafts (all Gemini models), but has nothing that sends, schedules or writes Homebase", async () => {
+    const { hub, put } = setup();
+    put("estimate/Sample - Reconstruction Estimate.pdf", "%PDF-1.4 test");
+    const tools = estimatorTools(hub, 6500);
+    const names = tools.decls.map((d) => d.name);
+    expect(names).toEqual(expect.arrayContaining(["gmail_create_draft", "gmail_search"]));
+    expect(names.some((n) => /send|calendar|homebase_set|homebase_add|tasks_create/.test(n))).toBe(false);
+    const r = await tools.run("gmail_create_draft", { jobNumber: 6500, kind: "homeowner", to: ["dana@example.com"], subject: "Estimate", body: "Hi", attachments: ["estimate/Sample - Reconstruction Estimate.pdf"] });
+    expect(r.result).not.toMatch(/^Error/);
+    expect((hub.gmail as MockGmail).drafts().at(-1)!.input.bcc).toContain("office+6500@forefrontteam.com");
+    expect(estimatorSystem(hub, 6500)).toContain("gmail_create_draft");
+  });
+
   it("reads the job folder and the skill, and nothing else", async () => {
     const { hub, put } = setup();
     put("notes/notes.txt", "Hall bath, 5 by 8.");
@@ -81,7 +95,7 @@ describe("Gemini writing in the Estimator", () => {
     const second = (hub.gemini as MockGemini).requests[1];
     expect(second.contents.at(-1)!.parts.some((p: any) => p.inlineData?.mimeType === "image/png")).toBe(true);
     expect(second.tools!.map((t) => t.name)).toEqual(expect.arrayContaining(["run_script", "read_file", "job_review"]));
-    expect(second.tools!.some((t) => /gmail_create_draft|homebase_set_stage|calendar_create/.test(t.name))).toBe(false);
+    expect(second.tools!.some((t) => /gmail_send|homebase_set_stage|calendar_create/.test(t.name))).toBe(false);
     expect(JSON.stringify(forSaving(r.contents))).not.toContain("inlineData");
   });
 

@@ -240,6 +240,18 @@ const server = http.createServer(async (req, res) => {
       }, 400);
       return;
     }
+    if (p === "/api/budget" && req.method === "GET") {
+      const { budgetReport } = await import("../workflows/spend.js");
+      return send(res, 200, { ...(await budgetReport(cfg.stateDir, hub.claudeCost)), adminKey: !!hub.claudeCost });
+    }
+    if (p === "/api/budget" && req.method === "POST") {
+      // Hunter's own numbers: a monthly budget per provider, or the rate for a Gemini model.
+      const spend = await import("../workflows/spend.js");
+      const b = await body(req);
+      if (b.provider === "claude" || b.provider === "google") spend.setBudget(cfg.stateDir, b.provider, b.budget == null || b.budget === "" ? null : Number(b.budget));
+      if (typeof b.model === "string" && b.model) spend.setGeminiRate(cfg.stateDir, b.model, b.rate && Number.isFinite(Number(b.rate.in)) && Number.isFinite(Number(b.rate.out)) ? { in: Number(b.rate.in), out: Number(b.rate.out) } : null);
+      return send(res, 200, { ...(await spend.budgetReport(cfg.stateDir, hub.claudeCost)), adminKey: !!hub.claudeCost });
+    }
     if (p === "/api/status") {
       const ver = await import("./version.js");
       return send(res, 200, {

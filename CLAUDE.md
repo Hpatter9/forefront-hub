@@ -58,3 +58,11 @@
   `files/ITEL/` with a Gemini summary (material, rooms, matched product, unit price, installed or not), and the
   estimators are pointed at the skill's "ITEL pricing" rule (in the skill, not here). The free check validates
   `price_source: "itel"` lines against the reports.
+- API budget (`src/workflows/spend.ts`, chip + panel at the top of the page): every Claude run's `total_cost_usd`
+  and every Gemini answer's tokens (`MeteredGemini`, priced at editable per-model rates) are tallied per month in
+  `.hub/spend.json`; Hunter sets a monthly budget per provider and sees what's left. No API reports prepaid credit
+  left. With `ANTHROPIC_ADMIN_KEY` the panel also shows Anthropic's own month-to-date cost
+  (`src/connectors/anthropicCost`, cost analytics API) and uses the larger figure. Past the Claude budget, the
+  Estimator asks before a paid Claude run. Record the cost of any new Claude or Gemini call path the same way.
+- Every Estimator writer can make Gmail drafts (never send): Claude through the hub tools, Gemini (all models) via
+  `gmail_create_draft` in `HUB_TOOLS`, the Claude app via `keystone_create_draft` on the bridge.

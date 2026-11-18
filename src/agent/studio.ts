@@ -5,6 +5,7 @@ import type { Turn } from "../connectors/gemini/index.js";
 import type { Hub } from "../hub.js";
 import { agentOptions, systemPrompt } from "./run.js";
 import { SERVER } from "./tools.js";
+import { claudeOverBudget, recordClaude } from "../workflows/spend.js";
 import { sketchFiles } from "../workflows/dossier.js";
 import { jobWalks } from "../workflows/walks.js";
 
@@ -188,6 +189,11 @@ export class Studio {
   private async sendClaude(job: number, text: string, ai: Writer): Promise<void> {
     if (!this.hub.cfg.anthropicApiKey) throw new Error("Claude is off on this machine (no Anthropic API key). Set ANTHROPIC_API_KEY in .env, or save it in the Estimator app.");
     if (this.running(job)) throw new Error("Claude is still working on this job. Wait, or press Stop.");
+    // Past the month's Claude budget: ask before spending more (Gemini and the Claude app hand-off cost nothing extra).
+    const b = claudeOverBudget(this.hub.cfg.stateDir);
+    if (b.over && !(await this.hub.approver.confirm(`This month's Claude budget is used up ($${b.spent.toFixed(2)} of $${b.budget!.toFixed(2)}). Spend more on this run?`, ["Choose No to switch \"Written by\" to the Claude app (your subscription) or Gemini instead."]))) {
+      throw new Error("Not started: this month's Claude budget is used up. Switch \"Written by\" to the Claude app or Gemini, or raise the budget (API budget, top of the page).");
+    }
     const s = this.load(job);
     const add = (role: StudioRole, t: string) => {
       const turn = { role, text: t, at: new Date().toISOString() };
@@ -283,6 +289,7 @@ export class Studio {
     } else if (m.type === "result") {
       // What this message cost, as the API reports it, and the job's running total.
       const spent = Number((m as { total_cost_usd?: number }).total_cost_usd);
+      recordClaude(this.hub.cfg.stateDir, spent);
       if (Number.isFinite(spent) && spent > 0) {
         s.cost = Math.round(((s.cost ?? 0) + spent) * 10000) / 10000;
         add("cost", `That used about $${spent.toFixed(2)} of Claude. This job's conversation so far: $${s.cost.toFixed(2)}.`);

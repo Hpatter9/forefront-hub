@@ -18,8 +18,8 @@ import { hubToolDefs } from "./tools.js";
  * an existing estimate asks Hunter first and keeps the old version in estimate/revisions.
  */
 export const SCRIPTS = ["read_esx.py", "read_xactimate.py", "price_lookup.py", "render.py", "photo_sheets.py", "photo_report.py"];
-/** Keystone tools the estimator may also use (everything about the job; nothing that sends or schedules). */
-const HUB_TOOLS = ["job_review", "job_get", "job_update", "homebase_get_job", "job_timeline", "gmail_read_thread", "docusketch_find_sketch", "companycam_download_photos", "estimate_status", "photo_report", "shop_stock", "contacts_find"];
+/** Keystone tools the estimator may also use (everything about the job, and Gmail drafts; nothing that sends or schedules). */
+const HUB_TOOLS = ["job_review", "job_get", "job_update", "homebase_get_job", "job_timeline", "gmail_search", "gmail_read_thread", "gmail_create_draft", "docusketch_find_sketch", "companycam_download_photos", "estimate_status", "photo_report", "shop_stock", "contacts_find"];
 const MEDIA: Record<string, string> = { ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif", ".pdf": "application/pdf" };
 const TEXT_MAX = 40_000;
 
@@ -183,7 +183,7 @@ How to work here:
 - DocuSketch doesn't always give an .ESX: the job may only have DocuSketch's PDF (floor plan, measurements), its room images or a zip of them (unpacked under photos/). Use whatever DocuSketch files there are, reading measurements from them and from the walk transcript; never stop or ask just because there's no .ESX.
 - ITEL reports: job_review's "itel" lists every ITEL report on the job (in files/ITEL) with the material and rooms it covers. Look at each PDF with view_files before using it, follow the skill's "ITEL pricing" rule (a report applies only to the material and rooms it covers), and tell Hunter which lines you priced from which report.
 - When the skill has questions for Hunter, ask them in a short numbered list and stop; don't guess. When you've rendered documents, say which files you wrote and the totals in two or three lines.
-- Email: don't draft or send anything from here unless he asks.
+- Email: draft only when he asks (the send-off, a reply, a note to the adjuster). Write it per the skill's step 6 (subject, voice, variant) and make it with gmail_create_draft: jobNumber ${job}, kind "homeowner" or "adjuster" for an estimate send-off ("other" for anything else), attachments as paths in the job folder ("estimate/<file>.pdf"), threadId to reply in an existing thread (find it with gmail_search). It is only a draft: Hunter reviews and sends it from Gmail. The job's Homebase log address is BCC'd for you, and his signature is added, so leave both out. Skip the skill's base64 steps; the tool attaches the files itself. Then tell him who each draft is to and what's attached.
 - If a script fails, read its message, fix the input and run it again; if you can't, tell Hunter exactly what it said.
 
 Right now it's ${new Date().toLocaleString("en-US", { timeZone: "America/Denver", weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })} (Denver time).

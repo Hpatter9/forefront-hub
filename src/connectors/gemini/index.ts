@@ -1,3 +1,4 @@
+import { recordGemini } from "../../workflows/spend.js";
 import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import type { Config } from "../../core/config.js";
@@ -43,6 +44,8 @@ export interface GenerateResult {
   calls: { name: string; args: Record<string, unknown>; id?: string }[];
   /** The model that actually answered (a fallback when the first was busy). */
   model?: string;
+  /** Tokens used, as Google reports them (output includes thinking). */
+  usage?: { input: number; output: number };
 }
 
 export interface GeminiClient {
@@ -168,7 +171,9 @@ function toResult(j: any): GenerateResult {
     const why = cand?.finishReason || j?.promptFeedback?.blockReason || "no answer";
     throw new Error(`Gemini gave no answer (${why}).`);
   }
+  const u = j?.usageMetadata;
   return {
+    ...(u ? { usage: { input: Number(u.promptTokenCount) || 0, output: (Number(u.candidatesTokenCount) || 0) + (Number(u.thoughtsTokenCount) || 0) } } : {}),
     turn: { role: "model", parts },
     text: parts.filter((p) => typeof p.text === "string" && !p.thought).map((p) => p.text).join("").trim(),
     calls: parts.filter((p) => p.functionCall).map((p) => ({ name: p.functionCall!.name, args: p.functionCall!.args ?? {}, id: p.functionCall!.id })),
@@ -195,6 +200,18 @@ export class MockGemini implements GeminiClient {
   }
 }
 
+/** Counts what each answer cost (spend.ts), whichever feature asked. */
+export class MeteredGemini implements GeminiClient {
+  get kind() { return this.inner.kind; }
+  constructor(private inner: GeminiClient, private stateDir: string) {}
+  async generate(req: GenerateRequest): Promise<GenerateResult> {
+    const r = await this.inner.generate(req);
+    if (r.usage) recordGemini(this.stateDir, r.model ?? req.model, r.usage.input, r.usage.output);
+    return r;
+  }
+  uploadFile(file: string, mimeType: string) { return this.inner.uploadFile(file, mimeType); }
+}
+
 export function makeGemini(cfg: Config): GeminiClient | null {
-  return cfg.ai.geminiKey ? new LiveGemini(cfg.ai.geminiKey) : null;
+  return cfg.ai.geminiKey ? new MeteredGemini(new LiveGemini(cfg.ai.geminiKey), cfg.stateDir) : null;
 }

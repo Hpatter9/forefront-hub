@@ -1,3 +1,4 @@
+import { recordClaude } from "../workflows/spend.js";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { Job } from "../core/job.js";
 import type { Hub } from "../hub.js";
@@ -22,6 +23,7 @@ export class AgentWriter implements EmailWriter {
     for await (const m of query({ prompt, options: opts })) {
       if (m.type === "assistant") for (const b of m.message.content) if (b.type === "tool_use") this.hub.say(`  → ${b.name}`);
       if (m.type === "result") {
+        recordClaude(this.hub.cfg.stateDir, (m as { total_cost_usd?: number }).total_cost_usd);
         if (m.subtype !== "success") throw new Error(`Writer stopped: ${m.subtype}`);
         if (m.structured_output) return m.structured_output as T;
         const raw = m.result.match(/\{[\s\S]*\}/)?.[0];

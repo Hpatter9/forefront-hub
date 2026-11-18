@@ -6,6 +6,7 @@ import { addKeystoneToClaudeApp, claudeAppConfigFiles } from "../src/cli/connect
 import { createRequire } from "node:module";
 import { unzip } from "../src/core/zip.js";
 import { bridge } from "../src/server/claudeBridge.js";
+import { MockGmail } from "../src/connectors/gmail/mock.js";
 import { ESTIMATOR_DIR, testHub } from "./helpers.js";
 
 function setup() {
@@ -24,7 +25,8 @@ describe("Keystone's tools for the Claude app (estimates on the subscription)", 
     put("notes/notes.txt", "Lockbox on the side gate.");
     const names = br.list().map((t) => t.name);
     expect(names).toEqual(expect.arrayContaining(["keystone_find_job", "keystone_start_estimate", "keystone_run_script", "keystone_write_file", "keystone_view_photos", "keystone_check_estimate"]));
-    expect(names.some((n) => /send|stage|draft|calendar/.test(n))).toBe(false); // estimating only
+    expect(names.some((n) => /send|stage|calendar|homebase/.test(n))).toBe(false); // estimating, plus Gmail drafts
+    expect(names).toContain("keystone_create_draft");
     const start = textOf(await br.call("keystone_start_estimate", { jobNumber: 9001 }));
     expect(start).toContain("call keystone_run_script");
     expect(start).toContain(readFileSync(path.join(hub.cfg.skillDir, "SKILL.md"), "utf8").slice(0, 300));
@@ -112,5 +114,15 @@ describe("the extension file for the Claude app", () => {
     const files = claudeAppConfigFiles({ APPDATA: path.join(base, "Roaming"), LOCALAPPDATA: path.join(base, "Local") }, "win32");
     expect(files[0]).toBe(path.join(base, "Local", "Packages", "Claude_pzs8sxrjxfjjc", "LocalCache", "Roaming", "Claude", "claude_desktop_config.json"));
     expect(files[1]).toBe(path.join(base, "Roaming", "Claude", "claude_desktop_config.json"));
+  });
+
+  it("makes the send-off as a Gmail draft with the PDFs attached and the Homebase log BCC'd (never sent)", async () => {
+    const { br, put, hub } = setup();
+    put("estimate/Sample - Reconstruction Estimate.pdf", "%PDF-1.4 test");
+    const r = textOf(await br.call("keystone_create_draft", { jobNumber: 9001, kind: "homeowner", to: ["dana@example.com"], subject: "Sample - Reconstruction Estimate", body: "Hi Dana,\n\nAttached.", attachments: ["estimate/Sample - Reconstruction Estimate.pdf"] }));
+    expect(r).not.toMatch(/Error/);
+    const d = (hub.gmail as MockGmail).drafts().find((x) => x.input.subject === "Sample - Reconstruction Estimate")!;
+    expect(d.input.bcc).toContain("office+9001@forefrontteam.com");
+    expect(d.input.attachments[0]).toBe(path.join(hub.jobs.folder(9001), "estimate", "Sample - Reconstruction Estimate.pdf"));
   });
 });

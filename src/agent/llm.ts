@@ -1,3 +1,4 @@
+import { recordClaude } from "../workflows/spend.js";
 import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { claudeEnv } from "./env.js";
 import { z } from "zod";
@@ -78,6 +79,7 @@ export async function complete<T = string>(hub: Hub, o: { system: string; prompt
     },
   })) {
     if (m.type === "result") {
+      recordClaude(hub.cfg.stateDir, (m as { total_cost_usd?: number }).total_cost_usd);
       if (m.subtype !== "success") throw new Error(`Claude stopped (${m.subtype}).`);
       out = o.schema ? ((m as any).structured_output ?? JSON.parse(m.result.match(/\{[\s\S]*\}/)?.[0] ?? "null")) : m.result;
     }

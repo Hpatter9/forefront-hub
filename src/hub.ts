@@ -1,3 +1,4 @@
+import { makeClaudeCost, type ClaudeCost } from "./connectors/anthropicCost/index.js";
 import { makeGemini, type GeminiClient } from "./connectors/gemini/index.js";
 import { makeTravel, type TravelClient } from "./connectors/travel/index.js";
 import path from "node:path";
@@ -24,6 +25,8 @@ export interface Hub {
   travel: TravelClient;
   /** Gemini, when it's Keystone's AI (null otherwise). */
   gemini: GeminiClient | null;
+  /** Anthropic's own count of this month's spending, when an Admin key is set (null otherwise). */
+  claudeCost?: ClaudeCost | null;
   photos: PhotoClient;
   /** Text messages from the iPhone's backup (off unless turned on). */
   texts: TextsClient;
@@ -44,6 +47,7 @@ export function makeHub(cfg: Config = loadConfig(), approver: Approver = new Cli
     tasks: makeTasks(cfg),
     travel: makeTravel(cfg),
     gemini: makeGemini(cfg),
+    claudeCost: makeClaudeCost(cfg.anthropicAdminKey),
     photos: makeCompanyCam(cfg),
     texts: makeTexts(cfg),
     sketches: new DocuSketch(gmail, cfg.docusketch.downloadsDir),

@@ -1041,6 +1041,12 @@
   <p class="small muted" id="so-missing"></p>
   </div><div class="foot"><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="go">Create drafts</button></div></form></dialog>
 
+<dialog id="budgetdlg"><form method="dialog"><div class="in" style="min-width:min(520px,90vw)">
+  <h4>API budget this month</h4>
+  <div id="bd-lines"></div>
+  <details id="bd-rates" class="small" style="margin-top:10px"><summary>Gemini prices Keystone uses</summary><div id="bd-models" style="margin-top:6px"></div></details>
+  <p class="small muted" id="bd-note"></p>
+  </div><div class="foot"><button class="btn" value="cancel">Close</button><button class="btn primary" value="go" id="bd-save">Save budgets</button></div></form></dialog>
 <dialog id="logdlg"><form method="dialog"><div class="in">
   <h4>Log a call</h4>
   <div class="row"><select id="lg-dir" style="width:auto"><option>Outbound</option><option>Inbound</option></select><input type="text" id="lg-who" placeholder="With (e.g. Eileen Brandt)" style="flex:1"></div>
@@ -1185,6 +1191,60 @@ function renderRecent() {
 $("#globalq").addEventListener("keydown", (e) => { if (e.key !== "Enter") return; const q = $("#globalq").value.trim(); if (!q) return; if (/^#?\d{4}$/.test(q)) { showTab("jobs"); openJob(Number(q.replace("#", ""))); } else { showTab("jobs"); $("#q").value = q; renderList(); } $("#globalq").value = ""; });
 $("#logo").addEventListener("click", (e) => { e.preventDefault(); showTab("today"); });
 
+// ============================================================= API budget
+// What Claude and Gemini have cost this month and what's left of the budgets Hunter set. Keystone counts every run
+// itself; with an Anthropic Admin key it also shows Anthropic's own (slower) figure and uses the larger.
+let budget = null;
+const money = (n) => `$${Number(n || 0).toFixed(2)}`;
+function showBudget() {
+  let el = $("#budgetchip");
+  if (!el) { el = document.createElement("button"); el.id = "budgetchip"; el.type = "button"; el.className = "chip"; el.style.cssText = "cursor:pointer;font:inherit"; ($("#verchip") || $("#chips")).after(el); el.addEventListener("click", openBudget); }
+  if (!budget) { el.hidden = true; return; }
+  el.hidden = false;
+  const part = (l) => l.budget == null ? `${l.provider === "claude" ? "Claude" : "Google"} ${money(l.spent)}` : `${l.provider === "claude" ? "Claude" : "Google"} ${money(l.left)} left`;
+  el.textContent = `API: ${budget.lines.map(part).join(" · ")}`;
+  const worst = budget.lines.some((l) => l.level === "over") ? "var(--bad)" : budget.lines.some((l) => l.level === "low") ? "var(--warn)" : "";
+  el.style.borderColor = worst; el.style.color = worst;
+  el.title = budget.lines.map((l) => `${l.label}: ${money(l.spent)} spent this month${l.budget != null ? ` of ${money(l.budget)} (${money(l.left)} left)` : " (no budget set)"}`).join("\n") + "\n\nClick to set your monthly budgets.";
+}
+async function loadBudget() { try { budget = await api("/api/budget"); } catch { budget = null; } showBudget(); }
+setInterval(loadBudget, 5 * 60_000); // Gemini runs in the background; keep the chip current
+function renderBudget() {
+  const bar = (l) => l.budget == null ? "" : `<div style="height:8px;border-radius:4px;background:var(--pill);margin:6px 0"><div style="height:8px;border-radius:4px;width:${Math.min(100, Math.round((l.used || 0) * 100))}%;background:${l.level === "over" ? "var(--bad)" : l.level === "low" ? "var(--warn)" : "var(--ok)"}"></div></div>`;
+  $("#bd-lines").innerHTML = budget.lines.map((l) => `<div style="margin:12px 0">
+    <div class="row" style="justify-content:space-between;align-items:baseline"><b>${esc(l.label)}</b><span>${l.budget == null ? `${money(l.spent)} spent` : `<b>${money(l.left)}</b> left of ${money(l.budget)}`}</span></div>
+    ${bar(l)}
+    <div class="small muted">${l.provider === "claude"
+      ? `Keystone's runs: ${money(l.keystone)}.${l.official != null ? ` Anthropic's own count for the whole account: ${money(l.official)}${l.officialAsOf ? ` (up to ${new Date(l.officialAsOf).toLocaleString()})` : ""}.` : l.officialNote ? ` Couldn't read Anthropic's count: ${esc(l.officialNote)}` : ""}`
+      : `Estimated from the tokens Google reported, at the prices below. If your Gemini key is on Google's free tier, this costs you nothing.`}</div>
+    <label class="small" style="display:block;margin-top:6px">Monthly budget $ <input type="number" min="0" step="1" data-prov="${l.provider}" value="${l.budget ?? ""}" placeholder="none" style="width:110px"></label>
+  </div>`).join("");
+  $("#bd-models").innerHTML = budget.geminiModels.length ? budget.geminiModels.map((m) => `<div class="row" style="gap:6px;align-items:center;margin:4px 0"><span style="flex:1">${esc(m.model)} <span class="muted">${Math.round(m.in / 1000)}k in, ${Math.round(m.out / 1000)}k out</span></span>
+    $<input type="number" step="0.01" min="0" data-model="${esc(m.model)}" data-k="in" value="${m.rate.in}" style="width:70px" title="dollars per million input tokens"> in /
+    $<input type="number" step="0.01" min="0" data-model="${esc(m.model)}" data-k="out" value="${m.rate.out}" style="width:70px" title="dollars per million output tokens"> out per million</div>`).join("") : `<span class="muted">No Gemini use counted yet this month.</span>`;
+  $("#bd-note").innerHTML = `Neither Anthropic nor Google shows how much prepaid credit is left through their APIs, so set the budget to what you've put on each account (or your monthly limit there). Keystone asks before starting a paid Claude run once the Claude budget is used up.${budget.adminKey ? "" : " For Anthropic's own count, put an Admin key (made in the Claude Console under Settings, Admin keys) in Keystone's .env as ANTHROPIC_ADMIN_KEY."}${budget.lastMonth ? ` Last month: Claude ${money(budget.lastMonth.claude)}, Google ${money(budget.lastMonth.google)}.` : ""}`;
+}
+async function openBudget() {
+  await loadBudget();
+  if (!budget) return snack("Couldn't read the budget.");
+  renderBudget();
+  const d = $("#budgetdlg");
+  d.returnValue = "";
+  d.showModal();
+  d.addEventListener("close", async () => {
+    if (d.returnValue !== "go") return;
+    for (const i of d.querySelectorAll("input[data-prov]")) budget = await api("/api/budget", { method: "POST", body: { provider: i.dataset.prov, budget: i.value } });
+    const models = [...new Set([...d.querySelectorAll("input[data-model]")].map((i) => i.dataset.model))];
+    for (const m of models) {
+      const get = (k) => d.querySelector(`input[data-model="${CSS.escape(m)}"][data-k="${k}"]`).value;
+      const was = budget.geminiModels.find((x) => x.model === m)?.rate;
+      if (was && (Number(get("in")) !== was.in || Number(get("out")) !== was.out)) budget = await api("/api/budget", { method: "POST", body: { model: m, rate: { in: get("in"), out: get("out") } } });
+    }
+    showBudget();
+    snack("Budgets saved.");
+  }, { once: true });
+}
+
 // ============================================================= status
 // Which version is running, and a one-click restart when a newer one is waiting on GitHub.
 function showVersion() {
@@ -1212,6 +1272,7 @@ async function loadStatus() {
     $("#prompt").placeholder = `Ask ${AI()}, or drop files here, e.g. “who's waiting on me?”, “draft a follow-up to the Wegener homeowner”`;
   const chip = (label, on, title) => `<span class="chip ${on ? "" : "off"}" title="${esc(title)}">${on ? "●" : "○"} ${label}</span>`;
   showVersion();
+  loadBudget();
   $("#chips").innerHTML = [
     chip("Homebase", status.homebase !== "mock", `Homebase: ${status.homebase}`),
     chip("Gmail", status.gmail === "google", status.gmail === "google" ? (status.gmailFull ? "Connected" : "Connected for drafts only; reconnect to send from Keystone") : "Not connected (test inbox)"),
@@ -3127,7 +3188,7 @@ function onStudio(e) {
     const live = $("#est-live"); if (live) { live.innerHTML = md(estStream); const l = $("#est-log"); if (l.scrollHeight - l.scrollTop - l.clientHeight < 200) l.scrollTop = l.scrollHeight; }
     return;
   }
-  if (e.kind === "turn") { if (e.turn.role === "assistant") estStream = ""; estData.turns.push(e.turn); if (e.turn.role === "cost") { const m = e.turn.text.match(/so far: \$([\d.]+)/); if (m) estData.cost = Number(m[1]); } if (e.turn.role === "tool" && /Writing|Running|photo report/i.test(e.turn.text)) setTimeout(refreshEstFiles, 1500); }
+  if (e.kind === "turn") { if (e.turn.role === "assistant") estStream = ""; estData.turns.push(e.turn); if (e.turn.role === "cost") { const m = e.turn.text.match(/so far: \$([\d.]+)/); if (m) estData.cost = Number(m[1]); loadBudget(); } if (e.turn.role === "tool" && /Writing|Running|photo report/i.test(e.turn.text)) setTimeout(refreshEstFiles, 1500); }
   if (e.kind === "state") { estData.running = e.running; if (e.writer) estData.writer = e.writer; if (!e.running) { estStream = ""; refreshEstFiles(); } }
   renderEstLog(); renderEstState();
 }

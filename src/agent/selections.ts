@@ -1,3 +1,4 @@
+import { recordClaude } from "../workflows/spend.js";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { aiProvider, aiReady, claudeOnlyReady, complete } from "./llm.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -122,6 +123,7 @@ Return only the structured result.`;
   })) {
     if (m.type === "assistant") for (const b of m.message.content) if (b.type === "tool_use" && b.name === "Bash") say(`  selections #${n}: running ${String((b.input as any).command ?? "").match(/[\w-]+\.py/)?.[0] ?? "a command"}`);
     if (m.type === "result") {
+      recordClaude(hub.cfg.stateDir, (m as { total_cost_usd?: number }).total_cost_usd);
       if (m.subtype !== "success") throw new Error(`Claude stopped (${m.subtype}).`);
       out = (m as any).structured_output ?? JSON.parse(m.result.match(/\{[\s\S]*\}/)?.[0] ?? "null");
     }

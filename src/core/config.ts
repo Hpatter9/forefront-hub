@@ -15,6 +15,8 @@ export interface Config {
   jobsRoot: string;
   python: string;
   anthropicApiKey: string;
+  /** An Anthropic Admin key (sk-ant-admin...), only for reading the account's spending. */
+  anthropicAdminKey: string;
   /**
    * Which AI runs Keystone's AI features. HUB_AI=gemini | claude | off; when it isn't set: Gemini if there's a
    * GEMINI_API_KEY, else Claude if there's an Anthropic key, else off. The Estimator tab and setting up
@@ -77,6 +79,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
     jobsRoot: e("JOBS_ROOT", live ? (isWin ? "C:\\Jobs" : path.join(root, "jobs")) : path.join(stateDir, "jobs")),
     python: e("PYTHON", isWin ? "py" : "python3"),
     anthropicApiKey,
+    anthropicAdminKey: e("ANTHROPIC_ADMIN_KEY"),
     ai: (() => {
       const geminiKey = e("GEMINI_API_KEY", e("GOOGLE_API_KEY"));
       const want = e("HUB_AI").toLowerCase();

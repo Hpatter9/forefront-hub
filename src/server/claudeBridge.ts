@@ -89,7 +89,8 @@ export function bridge(hub: Hub) {
           `- ITEL reports: the job's are listed under "itel" below and saved in files/ITEL. Read each PDF with keystone_pdf_text before using it and follow the skill's "ITEL pricing" rule: a report applies only to the material and rooms it covers. Tell Hunter which lines you priced from which report.`,
           `- DocuSketch doesn't always give an .ESX: use whatever DocuSketch files are listed (its PDF, room images) and the walk transcript for measurements; don't stop for lack of an .ESX.`,
           `- Go through what's below before you scope: the "conversation" digest (open an original email only where a point decides scope, quantity or price), the walk transcripts and notes, and the photo sheets for the rooms in the scope. Tell Hunter in a few lines what you went through, what changes the scope, what conflicts and what's missing, then ask the skill's questions before pricing.`,
-          `- When the documents are rendered they are already in the job's estimate folder; Hunter sees them in Keystone. Call keystone_check_estimate and report what it found. Don't draft or send email unless he asks.`,
+          `- When the documents are rendered they are already in the job's estimate folder; Hunter sees them in Keystone. Call keystone_check_estimate and report what it found.`,
+          `- Email: when he asks for the send-off (or any email), write it per the skill's step 6 and make it with keystone_create_draft, attaching the PDFs from estimate/. It's only a Gmail draft; he sends it. Skip the skill's base64 steps and any other Gmail connector: this one BCCs the Homebase log and attaches the files from his computer.`,
           ``,
           `# The forefront-estimate skill (SKILL.md on Hunter's computer)`,
           skill || "(SKILL.md wasn't found on this computer; use your installed forefront-estimate skill.)",
@@ -153,6 +154,10 @@ export function bridge(hub: Hub) {
         const files = hub.jobs.files(n, "estimate", /\.(pdf|json)$/i).map((f) => ({ name: path.basename(f), kb: Math.max(1, Math.round(statSync(f).size / 1024)), modified: statSync(f).mtime.toISOString() }));
         return text(JSON.stringify({ folder: dir, files }));
       },
+    },
+    {
+      tool: { name: "keystone_create_draft", description: "Make a Gmail DRAFT in Hunter's mailbox (never sent: he reviews and sends it). For the estimate send-off use kind 'homeowner' or 'adjuster' (Keystone then logs the proposal in Homebase once he sends it); 'other' for anything else. Attachments are paths in the job folder, e.g. \"estimate/Smith - Reconstruction Estimate.pdf\". The job's Homebase log address is BCC'd and his signature is added automatically. threadId replies inside an existing email thread.", inputSchema: schema({ jobNumber: job, kind: z.enum(["homeowner", "adjuster", "other"]).default("other"), to: z.array(z.string()).min(1), cc: z.array(z.string()).default([]), subject: z.string(), body: z.string(), attachments: z.array(z.string()).default([]), threadId: z.string().optional() }) },
+      run: async (a) => { await ensure(a.jobNumber); return text((await tools(a.jobNumber).run("gmail_create_draft", a)).result); },
     },
   ];
 

@@ -1,3 +1,4 @@
+import { recordClaude } from "../workflows/spend.js";
 import { carrierRulesNote } from "../workflows/carriers.js";
 import { inventoryNote } from "../workflows/inventory.js";
 import { query, type Options, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
@@ -64,6 +65,7 @@ export async function ask(hub: Hub, prompt: string, opts: { jobNumber?: number; 
         if (b.type === "tool_use") hub.say(`  → ${b.name.replace(`mcp__${SERVER}__`, "")} ${summarize(b.input)}`);
       }
     } else if (m.type === "result") {
+      recordClaude(hub.cfg.stateDir, (m as { total_cost_usd?: number }).total_cost_usd);
       if (m.subtype === "success") final = m.result;
       else throw new Error(`Agent stopped: ${m.subtype}`);
     }
