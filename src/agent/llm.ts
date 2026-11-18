@@ -167,7 +167,7 @@ You're running on Gemini inside Keystone. Use the functions provided for anythin
           result = `Error: ${(e as Error).message}`;
         }
       }
-      replies.push({ functionResponse: { name: c.name, ...(c.id ? { id: c.id } : {}), response: { result: slim(result) } } });
+      replies.push({ functionResponse: { name: c.name, ...(c.id ? { id: c.id } : {}), response: { result: slim(result, limitsFor(c.name).max, limitsFor(c.name).str) } } });
     }
     contents.push({ role: "user", parts: replies });
   }
@@ -179,7 +179,15 @@ You're running on Gemini inside Keystone. Use the functions provided for anythin
  * whole conversation): tool results lose HTML copies of emails, long text is cut, JSON is sent without padding.
  */
 export const RESULT_MAX = 12_000;
-export function slim(result: string, max = RESULT_MAX): string {
+/** Tools whose results are long by nature get more room (an email thread is cut into parts by the tool itself). */
+const LIMITS: Record<string, { max: number; str: number }> = {
+  gmail_read_thread: { max: 100_000, str: 40_000 },
+  job_review: { max: 60_000, str: 10_000 },
+  job_timeline: { max: 40_000, str: 8_000 },
+  gmail_search: { max: 20_000, str: 2_500 },
+};
+export const limitsFor = (tool: string) => LIMITS[tool] ?? { max: RESULT_MAX, str: 2_500 };
+export function slim(result: string, max = RESULT_MAX, strMax = 2_500): string {
   let out = result;
   try {
     const walk = (x: any): any => {
@@ -189,7 +197,7 @@ export function slim(result: string, max = RESULT_MAX): string {
         for (const [k, v] of Object.entries(x)) if (!["html", "raw", "payload"].includes(k)) o[k] = walk(v);
         return o;
       }
-      return typeof x === "string" && x.length > 2500 ? `${x.slice(0, 2500)}…(cut)` : x;
+      return typeof x === "string" && x.length > strMax ? `${x.slice(0, strMax)}…(cut)` : x;
     };
     out = JSON.stringify(walk(JSON.parse(result)));
   } catch {
@@ -204,6 +212,8 @@ export function compactOlder(contents: Turn[], keep = 1500) {
   for (const i of rounds.slice(0, -1)) {
     for (const p of contents[i].parts) {
       const r = p.functionResponse?.response as { result?: string } | undefined;
+      // An email being answered stays whole: the reply is written from it.
+      if (p.functionResponse?.name === "gmail_read_thread") continue;
       if (r?.result && r.result.length > keep) r.result = `${r.result.slice(0, keep)}…(already read; trimmed)`;
     }
   }

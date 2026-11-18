@@ -143,7 +143,12 @@ export function hubToolDefs(hub: Hub) {
       }),
     ),
     tool("gmail_search", "Search Hunter's Forefront Gmail (Gmail search syntax).", { query: z.string(), max: z.number().int().default(10) }, wrap(async ({ query, max }) => hub.gmail.search(query, max))),
-    tool("gmail_read_thread", "Read every message in a Gmail thread.", { threadId: z.string() }, wrap(async ({ threadId }) => hub.gmail.getThread(threadId))),
+    tool(
+      "gmail_read_thread",
+      "Read every message in a Gmail thread, whole (quoted parts included: people often answer inline inside the quoted email). A long message comes back in parts: when it has `more`, call again with its messageId and offset to read the rest before you answer it.",
+      { threadId: z.string(), messageId: z.string().optional().describe("read just this message (to continue a long one)"), offset: z.number().int().min(0).default(0).describe("where to continue reading that message") },
+      wrap(async ({ threadId, messageId, offset }) => (await import("../workflows/conversation.js")).threadForAi(await hub.gmail.getThread(threadId), { messageId, offset })),
+    ),
     tool(
       "gmail_create_draft",
       "Create a Gmail DRAFT (never sent; Hunter sends it). With a jobNumber the job's Homebase log address is BCC'd automatically. kind: 'homeowner' / 'adjuster' only for an estimate send-off (it is then tracked for logging the proposal); 'other' for replies, follow-ups and everything else. To reply in a thread, pass threadId (the draft goes into that conversation). Attachments are local file paths (the PDFs in the job's estimate/ folder). Write in Hunter's voice per the forefront-estimate skill's step 6; his Gmail signature is appended, so don't add one.",

@@ -34,6 +34,44 @@ export interface ConvItem {
   full?: string;
 }
 
+/**
+ * A thread as the AI reads it: every message whole, newest first in priority, in parts when it's long. Nothing is
+ * stripped as "quoted": adjusters answer inline inside the quoted email ("responses below, highlighted"), so the
+ * quoted part can be the answer. A message too long for one read says how much is left and how to get it
+ * (call again with its messageId and offset).
+ */
+export const THREAD_BUDGET = 80_000;
+export const MESSAGE_PART = 30_000;
+export function threadForAi(th: { id: string; messages: Message[] }, o: { messageId?: string; offset?: number } = {}) {
+  const shape = (m: Message, from: number, room: number) => {
+    const text = m.body.replace(/\r/g, "");
+    const part = text.slice(from, from + room);
+    const left = text.length - from - part.length;
+    return {
+      messageId: m.id, from: m.from, to: m.to, cc: m.cc, date: m.date, subject: m.subject,
+      ...(m.labelIds?.includes("DRAFT") ? { draft: true } : {}),
+      attachments: m.attachments.map((a) => a.filename),
+      ...(from ? { startsAt: from } : {}),
+      body: part,
+      ...(left > 0 ? { more: `${left} more characters: call gmail_read_thread again with messageId "${m.id}" and offset ${from + part.length}` } : {}),
+    };
+  };
+  if (o.messageId) {
+    const m = th.messages.find((x) => x.id === o.messageId);
+    if (!m) throw new Error(`No message ${o.messageId} in thread ${th.id}.`);
+    return { threadId: th.id, message: shape(m, Math.max(0, o.offset ?? 0), MESSAGE_PART) };
+  }
+  // The newest messages get their room first; older ones share what's left (at least a start of each).
+  let budget = THREAD_BUDGET;
+  const out: ReturnType<typeof shape>[] = new Array(th.messages.length);
+  for (let i = th.messages.length - 1; i >= 0; i--) {
+    const room = Math.max(1_500, Math.min(MESSAGE_PART, budget));
+    out[i] = shape(th.messages[i], 0, room);
+    budget -= out[i].body.length;
+  }
+  return { threadId: th.id, messageCount: th.messages.length, messages: out };
+}
+
 /** The new part of an email: without the quoted earlier messages underneath. */
 export function stripQuoted(body: string): string {
   const lines = body.replace(/\r/g, "").split("\n");

@@ -4,7 +4,7 @@ import path from "node:path";
 import { z } from "zod";
 import type { FunctionDecl, Part, Turn } from "../connectors/gemini/index.js";
 import type { Hub } from "../hub.js";
-import { BUSY_RX, BUSY_WAITS, slim } from "./llm.js";
+import { BUSY_RX, BUSY_WAITS, limitsFor, slim } from "./llm.js";
 import { systemPrompt } from "./run.js";
 import { hubToolDefs } from "./tools.js";
 
@@ -131,7 +131,7 @@ export function estimatorTools(hub: Hub, job: number): EstimatorTools {
         const d = hubDefs.find((x) => x.name === name);
         if (!d) return { result: `Error: there's no function called ${name}.` };
         const out = await d.handler(z.object(d.inputSchema).parse(args ?? {}), {});
-        return { result: slim((out?.content ?? []).map((x: any) => x.text ?? "").join("\n"), name === "job_review" ? 60_000 : 12_000) };
+        return { result: slim((out?.content ?? []).map((x: any) => x.text ?? "").join("\n"), limitsFor(name).max, limitsFor(name).str) };
       } catch (e) {
         return { result: `Error: ${(e as Error).message}` };
       }
@@ -200,7 +200,7 @@ export function lighten(contents: Turn[], keepRounds = 2) {
     if (t.parts.some((p) => p.inlineData)) t.parts = [...t.parts.filter((p) => !p.inlineData), { text: "(The photos or PDFs shown here were removed to save room; view them again if you need them.)" }];
     for (const p of t.parts) {
       const r = p.functionResponse?.response as { result?: string; keep?: boolean } | undefined;
-      if (r?.result && !r.keep && r.result.length > 6000) r.result = `${r.result.slice(0, 6000)}…(already read; trimmed)`;
+      if (r?.result && !r.keep && p.functionResponse?.name !== "gmail_read_thread" && r.result.length > 6000) r.result = `${r.result.slice(0, 6000)}…(already read; trimmed)`;
     }
   }
 }
