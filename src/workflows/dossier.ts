@@ -127,7 +127,7 @@ export async function jobDossier(hub: Hub, n: number): Promise<JobDossier> {
     notes: {
       jobNotes: read(hub.jobs.path(n, "notes", "notes.txt")).slice(0, 12_000),
       teamNotes: savedNotes(hub, n).flatMap((x) => [x, ...x.replies]).map((x) => ({ at: x.postedAt, author: x.author, body: x.body.slice(0, 1200) })).slice(0, 60),
-      walks: walks.map((w) => ({ file: path.relative(hub.jobs.folder(n), w.file).split(path.sep).join("/"), at: w.at, summary: w.summary })),
+      walks: walks.map((w) => ({ file: w.file, at: w.at, summary: w.summary })), // already relative to the job folder
     },
     ...(digest ? { conversation: { ...digest, note: "Made ahead of time by a free assistant from every email, text and call on the job. Work from these points; where a point decides scope, quantity or price, read the original (gmail_read_thread with the thread id in `source`) before relying on it." } } : {}),
     emails: digest ? emails.slice(-50).map(({ body: _body, ...e }) => e) : emails.slice(-50),

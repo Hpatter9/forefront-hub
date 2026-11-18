@@ -32,3 +32,6 @@
   of every original, falling back to originals if Gemini fails. After any estimate change, `src/workflows/estimateCheck.ts`
   checks it without Claude (prices vs the skill's price files, quantities vs room sizes, Gemini read-through vs sources).
   New everyday features go to Gemini; only writing the estimate itself may use Claude.
+- Hunter's Claude subscription can't run inside Keystone (Agent SDK apps need the API). The subscription route is the
+  hand-off to the Claude app (`src/workflows/claudeHandoff.ts`): Keystone fills `<job>/for-claude/` with a job brief
+  and the files, he drags them into Claude, and drops the results back. It's the Estimator's default "Written by".

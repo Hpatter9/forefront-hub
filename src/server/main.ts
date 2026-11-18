@@ -460,7 +460,9 @@ const server = http.createServer(async (req, res) => {
       if (action === "open-folder") {
         // Opens the job's folder on this PC (to drag its files into Claude). Only runs on the PC Keystone runs on.
         if (!hub.jobs.exists(n)) await pullJob(hub, n, { quiet: true, lookups: false }).catch(() => {});
-        const dir = hub.jobs.folder(n);
+        // (sub: "for-claude" opens the folder Keystone filled for the Claude app.)
+        const sub = b.sub === "for-claude" && existsSync(path.join(hub.jobs.folder(n), "for-claude")) ? "for-claude" : "";
+        const dir = sub ? path.join(hub.jobs.folder(n), sub) : hub.jobs.folder(n);
         const { spawn } = await import("node:child_process");
         const [cmd, args] = process.platform === "win32" ? ["explorer.exe", [dir]] : process.platform === "darwin" ? ["open", [dir]] : ["xdg-open", [dir]];
         try {
@@ -589,6 +591,13 @@ const server = http.createServer(async (req, res) => {
             if (r.questions.length) hub.say(`Before you hand it out, settle these (they're printed on the sheet as not settled):\n${r.questions.map((q) => `  - ${q}`).join("\n")}`);
             bus.emit({ type: "subreport", job: n, file: path.relative(hub.jobs.folder(n), r.file).split(path.sep).join("/"), questions: r.questions, rooms: r.rooms, photos: r.photos, ai: r.model ?? "" } as never);
           }, "job"));
+        }
+        case "claude-package": {
+          // Everything for the Claude app (your subscription) in one folder. Free: Gemini does the reading.
+          if (!hub.jobs.exists(n)) await pullJob(hub, n, { quiet: true, lookups: false }).catch(() => {});
+          const { handoffPackage } = await import("../workflows/claudeHandoff.js");
+          const r = await handoffPackage(hub, n);
+          return send(res, 200, { folder: r.folder, files: r.files, skipped: r.skipped });
         }
         case "files-upload":
           return send(res, 202, task(`Upload files to Homebase #${n}`, n, () => uploadToHomebase(hub, n, b.names), "job"));
@@ -905,6 +914,8 @@ const server = http.createServer(async (req, res) => {
       if (st[2] === "upload") {
         const name = decodeURIComponent(String(req.headers["x-filename"] ?? "file"));
         const r = await addFile(hub, n, name, await saveUpload(req), { toHomebase: false });
+        // An estimate brought back from the Claude app gets Keystone's free check too.
+        if (path.basename(r.file).toLowerCase() === "estimate.json") studio.check(n).then(() => bus.emit({ type: "changed", job: n, what: "job" })).catch(() => {});
         return send(res, 200, { path: path.relative(hub.jobs.folder(n), r.file).split(path.sep).join("/"), sub: r.sub });
       }
       if (st[2] === "check") {
@@ -918,6 +929,7 @@ const server = http.createServer(async (req, res) => {
       const text = String(b.text ?? "").trim();
       if (!text) return send(res, 400, { error: "Say what you want Claude to do." });
       // Claude (paid, the proven one) or Gemini (free, a trial): Hunter picks in the Estimator tab.
+      if (b.ai === "app") return send(res, 400, { error: "Written by is set to the Claude app (your subscription), so nothing is sent from here. Use Get the files ready and Copy & open Claude." });
       const ai = b.ai === "gemini" ? "gemini" : b.ai === "claude-lite" ? "claude-lite" : "claude";
       if (ai === "gemini" && !(hub.gemini && cfg.ai.geminiKey)) return send(res, 400, { error: "Gemini isn't connected. Double-click Connect Gemini in the Keystone folder." });
       if (ai !== "gemini" && !claudeOnlyReady(hub)) return send(res, 400, { error: "Writing with Claude needs a Claude API key: ANTHROPIC_API_KEY=sk-ant-... in Keystone's .env, then restart. Or switch the Estimator to Gemini (free)." });

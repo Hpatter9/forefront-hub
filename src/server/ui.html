@@ -986,7 +986,7 @@
             <div class="bar">
               <button class="btn" type="button" id="est-attach" title="Add files to the job folder for the estimator">＋ Files</button>
               <input type="file" id="est-pick" multiple hidden>
-              <label class="small muted" style="display:inline-flex;align-items:center;gap:6px">Written by <select id="est-ai" title="Claude's best model is the proven one and costs the most. The lighter Claude model costs a good deal less. Gemini is free and on trial. Keystone checks every estimate for free whichever you pick."><option value="claude">Claude, best (costs most)</option><option value="claude-lite">Claude, lighter (costs less)</option><option value="gemini">Gemini (free, trial)</option></select></label>
+              <label class="small muted" style="display:inline-flex;align-items:center;gap:6px">Written by <select id="est-ai" title="Claude's best model is the proven one and costs the most. The lighter Claude model costs a good deal less. Gemini is free and on trial. Keystone checks every estimate for free whichever you pick."><option value="app">Claude app: your subscription (no extra cost)</option><option value="claude">Claude, best (costs most)</option><option value="claude-lite">Claude, lighter (costs less)</option><option value="gemini">Gemini (free, trial)</option></select></label>
               <span class="small muted" id="est-state" style="flex:1"></span>
               <button class="btn" type="button" id="est-stop" hidden>Stop</button>
               <button class="btn primary" type="button" id="est-send">Send</button>
@@ -3008,6 +3008,10 @@ function renderEstLog() {
   $("#est-comp").hidden = !(d.claude || d.gemini);
   if (!d.claude && !d.gemini) { renderHandoff(d); $("#est-quick").innerHTML = ""; return; }
   showEstAi(d);
+  // "Claude app": the estimate is written in the Claude app on the subscription; Keystone gets the files ready.
+  const app = $("#est-ai").value === "app" && !d.running;
+  $("#est-input").hidden = app; $("#est-send").hidden = app || d.running;
+  if (app) { renderHandoff(d); $("#est-quick").innerHTML = ""; return; }
   if (!d.turns.length) log.innerHTML = `<div class="hello"><h3>#${d.job.jobNumber} ${esc(d.job.name)}</h3>What do you need for this job? Pick one below or just type. ${estWho()} uses the Forefront estimating skill and saves everything in the job's estimate folder.</div>`;
   else log.innerHTML = d.turns.map(estTurnHtml).join("");
   if (d.running) log.insertAdjacentHTML("beforeend", `<div class="msg assistant" id="est-live">${estStream ? md(estStream) : ""}</div><div class="msg typing" id="est-typing">${estWho()} is working</div>`);
@@ -3025,7 +3029,7 @@ function estTurnHtml(t) {
 }
 function renderEstState() {
   const run = !!estData?.running;
-  $("#est-send").hidden = run; $("#est-stop").hidden = !run;
+  $("#est-send").hidden = run || $("#est-ai").value === "app"; $("#est-stop").hidden = !run;
   $("#est-state").textContent = run ? `${estWho()} is working… approvals pop up when it needs your OK.` : "";
   $("#est-usehead").textContent = `What ${estWho()} can use`;
   if (!run && estData?.cost) $("#est-state").textContent = `Claude so far on this job: $${Number(estData.cost).toFixed(2)}`;
@@ -3056,21 +3060,28 @@ function onSubReport(e) {
 // was started with one keeps it selected when you come back.
 /** The name to show for who is doing the work: whoever is actually running, else the one picked under the box. */
 function estWho() { const w = estData?.running && estData.writer ? estData.writer : estData ? estAi() : "claude"; return w === "gemini" ? "Gemini" : "Claude"; }
-function estAi() { const v = $("#est-ai").value; return v === "gemini" && estData?.gemini ? "gemini" : v !== "gemini" && estData?.claude ? v : estData?.claude ? "claude" : "gemini"; }
+function estAi() { const v = $("#est-ai").value; if (v === "app") return "app"; return v === "gemini" && estData?.gemini ? "gemini" : v !== "gemini" && estData?.claude ? v : estData?.claude ? "claude" : "gemini"; }
 function showEstAi(d) {
   const sel = $("#est-ai");
   sel.querySelector('[value="claude"]').disabled = !d.claude; sel.querySelector('[value="gemini"]').disabled = !d.gemini;
   // The lighter Claude is offered only when it's a different model from the main one.
   const lite = sel.querySelector('[value="claude-lite"]'); lite.disabled = !d.claude; lite.hidden = d.liteModel === d.mainModel;
-  const want = d.turns.length && d.writer ? d.writer : store.get("estAi", "claude");
+  // One time, after Hunter said the API cost too much: start everyone on the Claude app (the subscription). He can
+  // switch back under the message box, and that choice is then kept.
+  if (!store.get("estAiSubscriptionFirst", false)) { store.set("estAiSubscriptionFirst", true); store.set("estAi", "app"); }
+  const picked = store.get("estAi", "app");
+  if (picked === "app") { sel.value = "app"; return; }
+  const want = d.turns.length && d.writer ? d.writer : picked;
   sel.value = want === "gemini" ? (d.gemini ? "gemini" : "claude") : d.claude ? (want === "claude-lite" && !lite.hidden ? "claude-lite" : "claude") : "gemini";
   $("#est-input").placeholder = `Message ${sel.value === "gemini" ? "Gemini" : "Claude"} about this job… (drop DocuSketch files, an Xactimate PDF or photos here)`;
 }
-$("#est-ai").addEventListener("change", (e) => { store.set("estAi", e.target.value); renderEstState(); if (estData && !estData.turns.length) renderEstLog(); $("#est-input").placeholder = `Message ${e.target.value === "gemini" ? "Gemini" : "Claude"} about this job… (drop DocuSketch files, an Xactimate PDF or photos here)`; if (estData?.turns.length && estData.writer && estData.writer !== e.target.value) snack(`This conversation was written by ${estData.writer === "gemini" ? "Gemini" : "Claude"}. ${e.target.value === "gemini" ? "Gemini" : "Claude"} won't remember it: press New conversation for a clean start.`); });
+$("#est-ai").addEventListener("change", (e) => { store.set("estAi", e.target.value); renderEstState(); if (estData && (!estData.turns.length || e.target.value === "app" || $("#est-log .handoff"))) { renderEstLog(); if (e.target.value !== "app") renderEstState(); } if (e.target.value === "app") return; $("#est-input").placeholder = `Message ${e.target.value === "gemini" ? "Gemini" : "Claude"} about this job… (drop DocuSketch files, an Xactimate PDF or photos here)`; if (estData?.turns.length && estData.writer && estData.writer !== e.target.value) snack(`This conversation was written by ${estData.writer === "gemini" ? "Gemini" : "Claude"}. ${e.target.value === "gemini" ? "Gemini" : "Claude"} won't remember it: press New conversation for a clean start.`); });
 async function estSend(text) {
   text = (text ?? $("#est-input").value).trim();
   if (!estJob) return log("Pick a job first.", "t-err");
   if (!text && !estFiles.length) return;
+  // "Claude app" never spends API money: the estimate is written in the Claude app, not here.
+  if (estAi() === "app") { if (text) $("#est-input").value = text; snack("Written by is set to the Claude app (your subscription). Use the three buttons above, or switch Written by to send a message here."); return; }
   const full = (estFiles.length ? `Files I added to the job folder: ${estFiles.join(", ")}\n\n` : "") + (text || "Take a look at the files I just added.");
   $("#est-input").value = ""; estFiles = [];
   try { await api(`/api/studio/${estJob}/send`, { method: "POST", body: { text: full, ai: (estData.writer = estAi()) } }); }
@@ -3595,12 +3606,12 @@ function renderHandoff(d) {
     <p class="muted">Keystone writes the request with everything it knows about #${d.job.jobNumber} ${esc(d.job.name)}. Claude does the estimate with your forefront-estimate skill on your Claude subscription (no API cost). Then drop the PDFs back here.</p>
     <div class="hacts">${HANDOFF.map(([k, v]) => `<button type="button" class="${k === handoffAct ? "on" : ""}" data-hact="${k}">${esc(v)}</button>`).join("")}</div>
     <textarea id="ho-note" rows="2" placeholder="${handoffAct === "revise" ? "What to change (e.g. make the hallway LVP instead of carpet)" : "Anything to add for Claude (optional)"}"></textarea>
-    <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" id="ho-go">Copy &amp; open Claude</button><button class="btn" type="button" id="ho-folder">Show the job's files</button><button class="btn" type="button" id="ho-back">Add the PDFs Claude made</button></div>
+    <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" id="ho-pack">1. Get the files ready</button><button class="btn primary" type="button" id="ho-go">2. Copy &amp; open Claude</button><button class="btn" type="button" id="ho-back">3. Add what Claude made</button><button class="btn" type="button" id="ho-folder">Show the job's files</button></div>
     <ol class="hsteps">
-      <li>Press <b>Copy &amp; open Claude</b>. Claude opens in your browser with the request copied (if the box is empty, paste with Ctrl+V).</li>
-      <li id="ho-attach">Attach the job's files (<b>Show the job's files</b> opens the folder; drag them into Claude).</li>
-      <li>Answer Claude's questions; it writes the estimate with your skill.</li>
-      <li>Download the PDFs and estimate.json, then drop them here (or press <b>Add the PDFs Claude made</b>). They go in the job's estimate folder.</li>
+      <li>Press <b>Get the files ready</b>. Keystone puts everything for this job in one folder and opens it: a job brief (emails, texts and calls boiled down, a line about every photo, your notes), the DocuSketch files, your walk notes and the photo sheets. It's free and takes a minute or two the first time.</li>
+      <li id="ho-attach">Press <b>Copy &amp; open Claude</b>, then drag everything in that folder into the Claude chat and send.</li>
+      <li>Answer Claude's questions; it writes the estimate with your skill, on your subscription.</li>
+      <li>Download the PDFs and estimate.json, then drop them here (or press <b>Add what Claude made</b>). They go in the job's estimate folder and Keystone checks the estimate for free.</li>
     </ol>
     <details><summary class="small muted">See the request</summary><pre id="ho-prompt" class="small"></pre></details>
   </div>`;
@@ -3608,7 +3619,7 @@ function renderHandoff(d) {
     try {
       const r = await api(`/api/jobs/${d.job.jobNumber}/claude-prompt?${new URLSearchParams({ action: handoffAct, note: $("#ho-note")?.value || "" })}`);
       $("#ho-prompt").textContent = r.prompt;
-      $("#ho-attach").innerHTML = r.attach.length ? `Attach: <b>${r.attach.map((a) => esc(a.split("/").pop())).join(", ")}</b> (<b>Show the job's files</b> opens the folder; drag them into Claude).` : `Attach the ESX or the Xactimate PDF if you have them (<b>Show the job's files</b> opens the folder). Claude can pull the photos with your CompanyCam connector.`;
+      $("#ho-attach").innerHTML = r.attach.length ? `Press <b>Copy &amp; open Claude</b>, then drag these into the Claude chat and send: <b>${r.attach.map((a) => esc(a.split("/").pop())).join(", ")}</b>.` : `Attach the ESX or the Xactimate PDF if you have them (<b>Show the job's files</b> opens the folder). Claude can pull the photos with your CompanyCam connector.`;
       return r.prompt;
     } catch (e) { log(e.message, "t-err"); return ""; }
   };
@@ -3620,6 +3631,16 @@ function renderHandoff(d) {
     let copied = false; try { await navigator.clipboard.writeText(prompt); copied = true; } catch {}
     window.open(`https://claude.ai/new?q=${encodeURIComponent(prompt)}`, "_blank", "noopener");
     snack(copied ? "Request copied. In Claude, attach the files and send (paste with Ctrl+V if the box is empty)." : "Claude opened. Copy the request from \"See the request\" if it isn't filled in.");
+  });
+  $("#ho-pack").addEventListener("click", async (ev) => {
+    const b = ev.currentTarget; b.disabled = true; b.textContent = "Getting the files ready…";
+    try {
+      const r = await api(`/api/jobs/${d.job.jobNumber}/claude-package`, { method: "POST", body: {} });
+      await api(`/api/jobs/${d.job.jobNumber}/open-folder`, { method: "POST", body: { sub: "for-claude" } }).catch(() => {});
+      snack(`${r.files.length} files ready in the for-claude folder${r.skipped.length ? ` (left out: ${r.skipped.join(", ")})` : ""}.`);
+      await refresh();
+    } catch (e) { log(e.message, "t-err"); }
+    b.disabled = false; b.textContent = "1. Get the files ready";
   });
   $("#ho-folder").addEventListener("click", async () => { try { const r = await api(`/api/jobs/${d.job.jobNumber}/open-folder`, { method: "POST", body: {} }); snack(`Opened ${r.folder}`); } catch (e) { log(e.message, "t-err"); } });
   $("#ho-back").addEventListener("click", () => $("#est-pick").click());
