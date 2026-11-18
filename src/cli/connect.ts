@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { loadConfig } from "../core/config.js";
@@ -277,4 +277,68 @@ export async function connectPhone() {
   await new Promise((r) => setTimeout(r, 15 * 60_000));
   s.server.close();
   console.log("\nDone offering. Double-click Connect phone again if you need more time.");
+}
+
+/** Where the Claude desktop app keeps its settings on this computer (every place it might be). */
+export function claudeAppConfigFiles(env: NodeJS.ProcessEnv = process.env, platform: string = process.platform): string[] {
+  const out: string[] = [];
+  if (platform === "win32") {
+    if (env.APPDATA) out.push(path.join(env.APPDATA, "Claude", "claude_desktop_config.json"));
+    // The Microsoft Store version keeps its own copy of AppData.
+    const pk = env.LOCALAPPDATA ? path.join(env.LOCALAPPDATA, "Packages") : "";
+    if (pk && existsSync(pk)) for (const d of readdirSync(pk).filter((x) => /^(Claude|AnthropicPBC\.Claude|Anthropic\.Claude)/i.test(x))) out.push(path.join(pk, d, "LocalCache", "Roaming", "Claude", "claude_desktop_config.json"));
+  } else if (platform === "darwin") out.push(path.join(env.HOME ?? "", "Library", "Application Support", "Claude", "claude_desktop_config.json"));
+  else out.push(path.join(env.XDG_CONFIG_HOME ?? path.join(env.HOME ?? "", ".config"), "Claude", "claude_desktop_config.json"));
+  return out;
+}
+
+/** Adds (or refreshes) Keystone in one Claude app settings file, leaving everything else in it alone. */
+export function addKeystoneToClaudeApp(file: string, hubRoot: string, port: number, node = process.execPath): { added: boolean; backup?: string } {
+  let cfg: Record<string, any> = {};
+  let backup: string | undefined;
+  if (existsSync(file)) {
+    const raw = readFileSync(file, "utf8");
+    try { cfg = raw.trim() ? JSON.parse(raw) : {}; } catch { throw new Error(`${file} isn't valid JSON, so it was left alone. Fix or delete it, then run this again.`); }
+    backup = `${file}.before-keystone`;
+    if (!existsSync(backup)) writeFileSync(backup, raw);
+  }
+  const want = { command: node, args: [path.join(hubRoot, "node_modules", "tsx", "dist", "cli.mjs"), path.join(hubRoot, "src", "mcp", "stdio.ts")], env: { KEYSTONE_URL: `http://127.0.0.1:${port}` } };
+  const had = JSON.stringify(cfg.mcpServers?.keystone) === JSON.stringify(want);
+  cfg.mcpServers = { ...(cfg.mcpServers ?? {}), keystone: want };
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileSync(file, JSON.stringify(cfg, null, 2));
+  return { added: !had, backup };
+}
+
+export async function connectClaudeApp() {
+  const cfg = loadConfig();
+  const port = Number(process.env.HUB_PORT) || 4317;
+  const files = claudeAppConfigFiles();
+  const there = files.filter((f) => existsSync(path.dirname(f)));
+  console.log("Connect the Claude app to Keystone\n");
+  console.log("This lets the Claude desktop app write estimates with Keystone's job files and price book,");
+  console.log("on your Claude subscription. Nothing here uses the paid API.\n");
+  if (!there.length) {
+    console.log("I couldn't find the Claude desktop app's settings on this computer.");
+    console.log("1. Install the Claude desktop app from https://claude.ai/download (the app, not the website).");
+    console.log("2. Open it and sign in once.");
+    console.log("3. Double-click Connect Claude app again.");
+    return;
+  }
+  for (const f of there) {
+    try {
+      const r = addKeystoneToClaudeApp(f, cfg.hubRoot, port);
+      console.log(`${r.added ? "Added Keystone to" : "Keystone was already in"} ${f}`);
+    } catch (e) {
+      console.log((e as Error).message);
+    }
+  }
+  console.log("\nNow:");
+  console.log("1. Quit the Claude app completely: right-click its icon by the clock (bottom right) and choose Quit.");
+  console.log("   Closing the window isn't enough.");
+  console.log("2. Open the Claude app again.");
+  console.log("3. Start a new chat. Click the tools button under the message box: Keystone should be in the list.");
+  console.log("4. With Keystone open on this computer, say:  New estimate for job 1234   (use a real job number or name)");
+  console.log("5. The first time, Claude asks whether it may use each Keystone tool. Choose Always allow.");
+  console.log("\nKeystone must be open whenever you use it from Claude. The PDFs land in the job's estimate folder by themselves.");
 }

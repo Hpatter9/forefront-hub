@@ -61,7 +61,7 @@ function tree(dir: string, base = "", out: { path: string; kb: number }[] = []):
   return out;
 }
 
-export async function jobDossier(hub: Hub, n: number): Promise<JobDossier> {
+export async function jobDossier(hub: Hub, n: number, o: { /** Don't wait for the free AI's digest: use it only if it's already saved. */ cachedOnly?: boolean } = {}): Promise<JobDossier> {
   const missing: string[] = [];
   let j = hub.jobs.get(n);
 
@@ -111,8 +111,8 @@ export async function jobDossier(hub: Hub, n: number): Promise<JobDossier> {
 
   // Reading done ahead by the free AI, so the paid one reads a digest instead of every message and photo.
   const [digest, pnotes] = await Promise.all([
-    conversationDigest(hub, n, [...emails.slice(-50).map((e) => ({ kind: "email" as const, at: e.at, who: e.who, subject: e.subject, body: e.body, threadId: e.threadId })), ...texts.slice(-150).map((t) => ({ kind: "text" as const, at: t.at, who: t.who, body: t.text })), ...calls.slice(-30).map((c) => ({ kind: "call" as const, at: c.at, who: c.who, body: c.body }))].sort((a, b) => a.at.localeCompare(b.at))),
-    photoNotes(hub, n),
+    conversationDigest(hub, n, [...emails.slice(-50).map((e) => ({ kind: "email" as const, at: e.at, who: e.who, subject: e.subject, body: e.body, threadId: e.threadId })), ...texts.slice(-150).map((t) => ({ kind: "text" as const, at: t.at, who: t.who, body: t.text })), ...calls.slice(-30).map((c) => ({ kind: "call" as const, at: c.at, who: c.who, body: c.body }))].sort((a, b) => a.at.localeCompare(b.at)), o),
+    photoNotes(hub, n, o),
   ]);
 
   const read = (f: string) => { try { return existsSync(f) ? readFileSync(f, "utf8") : ""; } catch { return ""; } };

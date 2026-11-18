@@ -56,12 +56,13 @@ export interface Said {
 /** Worth digesting only when there's enough to read that it would cost real money to send whole. */
 export const DIGEST_MIN_CHARS = 5000;
 
-export async function conversationDigest(hub: Hub, n: number, said: Said[]): Promise<ConversationDigest | null> {
+export async function conversationDigest(hub: Hub, n: number, said: Said[], o: { cachedOnly?: boolean } = {}): Promise<ConversationDigest | null> {
   if (!hub.gemini || !hub.cfg.ai.geminiKey || said.reduce((t, x) => t + x.body.length, 0) < DIGEST_MIN_CHARS) return null;
   const file = hub.jobs.path(n, "notes", "job-digest.json");
   const key = hash(said.map((x) => [x.kind, x.at, x.who, x.body.length]));
   const hit = cached<ConversationDigest>(file, key);
   if (hit) return hit;
+  if (o.cachedOnly) return null; // the caller can't wait: it gets the originals now
   try {
     const out = await complete<ConversationDigest>(hub, {
       system: `You prepare a reconstruction estimator's reading. From the emails, texts and calls on one job, pull out every point that bears on the scope of work, the price, the schedule or access, so the estimator doesn't have to read them all. Keep the speaker's meaning exactly; quote numbers, measurements, materials, colors and dates as written. Leave out greetings, scheduling chatter that's already past, signatures and anything not about this job. Do not interpret, recommend or fill gaps. If two messages disagree, include both.`,
@@ -110,7 +111,7 @@ function photoFiles(dir: string, base = "", out: string[] = []): string[] {
 }
 
 /** Numbered contact sheets for the job's photos, with a line about each photo. Redone only when the photos change. */
-export async function photoNotes(hub: Hub, n: number): Promise<PhotoNotes | null> {
+export async function photoNotes(hub: Hub, n: number, o: { cachedOnly?: boolean } = {}): Promise<PhotoNotes | null> {
   if (!hub.gemini || !hub.cfg.ai.geminiKey) return null;
   const photosDir = hub.jobs.path(n, "photos");
   const all = photoFiles(photosDir);
@@ -121,6 +122,7 @@ export async function photoNotes(hub: Hub, n: number): Promise<PhotoNotes | null
   const key = hash(files.map((f) => [f, statSync(path.join(photosDir, f)).size]));
   const hit = cached<PhotoNotes>(file, key);
   if (hit && hit.sheets.every((s) => existsSync(path.join(hub.jobs.folder(n), s)))) return hit;
+  if (o.cachedOnly) return null;
   try {
     rmSync(sheetsDir, { recursive: true, force: true });
     mkdirSync(sheetsDir, { recursive: true });

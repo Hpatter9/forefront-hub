@@ -909,7 +909,7 @@ const server = http.createServer(async (req, res) => {
       if (!hub.jobs.exists(n)) await pullJob(hub, n, { quiet: true });
       const j = hub.jobs.get(n);
       const job = { jobNumber: n, name: j.name, address: j.address, stage: j.stage, insurance: j.insurance, customer: j.customer.name, carrier: j.carrier, claimNumber: j.claimNumber, estimate: j.estimate };
-      if (!st[2] && req.method === "GET") return send(res, 200, { job, claude: claudeOnlyReady(hub), gemini: !!(hub.gemini && cfg.ai.geminiKey), geminiModel: cfg.ai.geminiModel, ...studio.view(n) });
+      if (!st[2] && req.method === "GET") return send(res, 200, { job, claudeApp: await claudeAppConnected(), claude: claudeOnlyReady(hub), gemini: !!(hub.gemini && cfg.ai.geminiKey), geminiModel: cfg.ai.geminiModel, ...studio.view(n) });
       if (req.method !== "POST") return send(res, 405, { error: "method" });
       if (st[2] === "upload") {
         const name = decodeURIComponent(String(req.headers["x-filename"] ?? "file"));
@@ -936,6 +936,19 @@ const server = http.createServer(async (req, res) => {
       if (studio.running(n)) return send(res, 409, { error: "The estimator is still working on this job." });
       studio.send(n, text, ai).then(() => bus.emit({ type: "changed", job: n, what: "job" })).catch((e) => console.error(e));
       return send(res, 202, { ok: true });
+    }
+    // ---- the Claude desktop app's way in (src/mcp/stdio.ts passes its tool calls here): estimates on the subscription
+    if (p === "/api/claude-bridge/tools") {
+      const { bridge } = await import("./claudeBridge.js");
+      const br = bridge(hub);
+      return send(res, 200, { instructions: br.instructions, tools: br.list() });
+    }
+    if (p === "/api/claude-bridge/call" && req.method === "POST") {
+      const b = await body(req);
+      const { bridge } = await import("./claudeBridge.js");
+      const out = await bridge(hub).call(String(b.name ?? ""), b.arguments ?? {});
+      if (/write_file|run_script/.test(String(b.name))) bus.emit({ type: "changed", job: Number(b.arguments?.jobNumber) || undefined, what: "job" });
+      return send(res, 200, out);
     }
     if (p === "/api/ask" && req.method === "POST") {
       const b = await body(req);
@@ -1021,6 +1034,12 @@ function scanAndOfferWalks(only?: string, redo = false) {
     walksRunning = false;
     hub.say(`Walk recordings: ${(e as Error).message}`);
   });
+}
+
+/** Whether the Claude desktop app on this computer has been pointed at Keystone (Connect Claude app). */
+async function claudeAppConnected(): Promise<boolean> {
+  const { claudeAppConfigFiles } = await import("../cli/connect.js");
+  return claudeAppConfigFiles().some((f) => { try { return !!JSON.parse(readFileSync(f, "utf8")).mcpServers?.keystone; } catch { return false; } });
 }
 
 function runSyncAll() {

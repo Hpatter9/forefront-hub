@@ -3602,8 +3602,15 @@ const HANDOFF = [["estimate", "New estimate"], ["convert", "Convert Xactimate PD
 function renderHandoff(d) {
   const box = $("#est-log");
   box.innerHTML = `<div class="handoff">
-    <h3>Write it in Claude</h3>
-    <p class="muted">Keystone writes the request with everything it knows about #${d.job.jobNumber} ${esc(d.job.name)}. Claude does the estimate with your forefront-estimate skill on your Claude subscription (no API cost). Then drop the PDFs back here.</p>
+    <h3>Write it in the Claude app</h3>
+    <p class="muted">Claude does the estimate with your forefront-estimate skill on your Claude subscription (no API cost).</p>
+    ${d.claudeApp ? `<div class="banner" style="border-left-color:var(--accent)"><b>The Claude app is connected to Keystone.</b> Open the Claude app (not the website), start a new chat and say this. Claude reads the job, runs the prices and saves the PDFs into this job by itself: nothing to drag.
+      <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap"><code id="ho-say" style="flex:1 1 260px;padding:8px 10px;background:var(--soft);border-radius:8px">New estimate for job ${d.job.jobNumber} ${esc(d.job.name)}. Use Keystone.</code><button class="btn primary" type="button" id="ho-copysay">Copy</button></div>
+      <div class="small muted" style="margin-top:6px">Keystone has to stay open while Claude works. If Claude doesn't show Keystone's tools, quit the Claude app from the icon by the clock and open it again.</div></div>
+      <p class="small muted" style="margin:10px 0 4px">Or the manual way (works on the website too):</p>`
+    : `<div class="banner" style="border-left-color:var(--warn, #ffb38a)"><b>Skip the dragging:</b> double-click <b>Connect Claude app</b> in the Keystone folder once. After that you just tell the Claude app "New estimate for job ${d.job.jobNumber}" and it reads the job and saves the PDFs here by itself.</div>
+      <p class="small muted" style="margin:10px 0 4px">Until then, the manual way:</p>`}
+    <p class="muted" style="margin-top:0">Keystone writes the request with everything it knows about #${d.job.jobNumber} ${esc(d.job.name)}; you attach the files and drop the PDFs back here.</p>
     <div class="hacts">${HANDOFF.map(([k, v]) => `<button type="button" class="${k === handoffAct ? "on" : ""}" data-hact="${k}">${esc(v)}</button>`).join("")}</div>
     <textarea id="ho-note" rows="2" placeholder="${handoffAct === "revise" ? "What to change (e.g. make the hallway LVP instead of carpet)" : "Anything to add for Claude (optional)"}"></textarea>
     <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" id="ho-pack">1. Get the files ready</button><button class="btn primary" type="button" id="ho-go">2. Copy &amp; open Claude</button><button class="btn" type="button" id="ho-back">3. Add what Claude made</button><button class="btn" type="button" id="ho-folder">Show the job's files</button></div>
@@ -3632,6 +3639,7 @@ function renderHandoff(d) {
     window.open(`https://claude.ai/new?q=${encodeURIComponent(prompt)}`, "_blank", "noopener");
     snack(copied ? "Request copied. In Claude, attach the files and send (paste with Ctrl+V if the box is empty)." : "Claude opened. Copy the request from \"See the request\" if it isn't filled in.");
   });
+  $("#ho-copysay")?.addEventListener("click", async () => { try { await navigator.clipboard.writeText($("#ho-say").textContent); snack("Copied. Paste it into a new chat in the Claude app."); } catch { snack("Select the sentence and copy it with Ctrl+C."); } });
   $("#ho-pack").addEventListener("click", async (ev) => {
     const b = ev.currentTarget; b.disabled = true; b.textContent = "Getting the files ready…";
     try {
