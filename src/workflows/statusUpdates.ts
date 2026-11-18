@@ -34,8 +34,11 @@ export function findUpdateField(raw: Record<string, any>, override = ""): FieldP
     return { key: override.split(".").at(-1)!, current: typeof hit?.value === "string" ? hit.value : "" };
   }
   const textual = flat.filter((f) => (typeof f.value === "string" || f.value === null) && !KNOWN_NOT.has(f.key) && !/(At|On|Date|By|Id)$/.test(f.key));
-  const score = (k: string) => (/update/i.test(k) ? 4 : 0) + (/proposal|submitted/i.test(k) ? 2 : 0) + (/stage|status/i.test(k) ? 1 : 0);
-  const best = textual.filter((f) => /update/i.test(f.key)).sort((a, b) => score(b.key) - score(a.key))[0];
+  // Homebase calls it "Proposal Submitted Notes" (shown on the recon dashboard): a proposal/submitted field that holds
+  // notes, an update or a status. A plain "...update" field is the fallback.
+  const proposalish = (k: string) => /proposal|submitted/i.test(k) && /note|update|status|comment/i.test(k);
+  const score = (k: string) => (proposalish(k) ? 8 : 0) + (/submitted/i.test(k) ? 2 : 0) + (/update/i.test(k) ? 1 : 0);
+  const best = textual.filter((f) => proposalish(f.key) || /update/i.test(f.key)).sort((a, b) => score(b.key) - score(a.key))[0];
   if (best) return { key: best.key, current: typeof best.value === "string" ? best.value : "" };
   return { candidates: flat.filter((f) => /update|status|note|comment|summary/i.test(f.key)).map((f) => `${f.path} (${Array.isArray(f.value) ? "list" : f.value === null ? "empty" : typeof f.value})`).slice(0, 30) };
 }
@@ -60,12 +63,12 @@ export async function draftUpdate(hub: Hub, n: number, o: { current?: string; fo
   const r = await complete<{ update: string; nothingNew: boolean }>(hub, {
     system: "You write the one-line status update on a reconstruction job's page in Forefront's job system, for coworkers who get asked where a job stands. Plain words, no greeting, no names of tools.",
     prompt: `Job #${n} ${job?.name ?? ""}, stage ${UPDATE_STAGE}${job?.proposalAmount ? `, proposal $${job.proposalAmount}` : ""}.
-Its current update: ${o.current?.trim() ? `"${o.current.trim()}"` : "(blank)"}
+Its Proposal Submitted Notes now (this gets replaced, not added to): ${o.current?.trim() ? `"${o.current.trim()}"` : "(blank)"}
 
 Recent activity, newest first:
 ${recent}
 
-Write the new update: one or two short sentences, under 200 characters, starting with today's date "${shortDate()}: ". Say where it stands and what's next or who we're waiting on (e.g. "${shortDate()}: Adjuster agreed to the supplement except carpet; revised estimate going to Liberty Mutual this week."). Use only what the activity shows; no guesses. If nothing in the activity changes the current update, set nothingNew true.`,
+Write the job's current status, to replace the old one: one or two short sentences, under 200 characters, starting with today's date "${shortDate()}: ". Only where it stands now and what's next or who we're waiting on; no history of earlier steps (e.g. "${shortDate()}: Adjuster agreed to the supplement except carpet; revised estimate going to Liberty Mutual this week."). Use only what the activity shows; no guesses. If nothing in the activity changes the current status, set nothingNew true.`,
     schema: SCHEMA,
     fast: true,
   });
@@ -122,7 +125,7 @@ export async function updateProposalJobs(hub: Hub, o: { force?: boolean } = {}):
     }
   }
   if (!plan.length) return { written: 0, skipped };
-  const answer = await confirmOrReply(hub.approver, `Update the Proposal Submitted status on ${plan.length} Homebase job${plan.length === 1 ? "" : "s"}?`, [...plan.map((p) => `#${p.n} ${p.name}: ${p.text}`), "", "To change one, type it below and press Send my answer, e.g. \"Williams: waiting on the adjuster's carpet pricing\" (or \"skip Williams\"). The rest go in as shown."]);
+  const answer = await confirmOrReply(hub.approver, `Replace the Proposal Submitted Notes on ${plan.length} Homebase job${plan.length === 1 ? "" : "s"} with the current status?`, [...plan.map((p) => `#${p.n} ${p.name}: ${p.text}`), "", "To change one, type it below and press Send my answer, e.g. \"Williams: waiting on the adjuster's carpet pricing\" (or \"skip Williams\"). The rest go in as shown."]);
   if (answer.reply) {
     const r = applyReply(plan, answer.reply);
     if (!r.matched) { hub.say(`Your answer didn't name one of the jobs (${plan.map((p) => p.name).join(", ")}), so no updates were written. Ask again with the job's name first, e.g. "Williams: ...".`); return { written: 0, skipped: skipped + plan.length }; }
@@ -148,7 +151,7 @@ export async function setStatusUpdate(hub: Hub, n: number, text: string): Promis
   const pick = findUpdateField(await hub.homebase.rawJob(n), hub.cfg.homebase.updateField ?? "");
   if ("candidates" in pick) throw new Error(`Couldn't find the Proposal Submitted update field on #${n}. Fields that might be it: ${pick.candidates.join(", ") || "(none)"}. Set HOMEBASE_UPDATE_FIELD in .env.`);
   const line = /^\d{1,2}\/\d{1,2}:/.test(text.trim()) ? text.trim() : `${shortDate()}: ${text.trim()}`;
-  if (!(await hub.approver.confirm(`Update the status line on Homebase #${n}?`, [`Now: ${pick.current || "(blank)"}`, `New: ${line}`]))) return "Not changed.";
+  if (!(await hub.approver.confirm(`Replace the Proposal Submitted Notes on Homebase #${n}?`, [`Now: ${pick.current || "(blank)"}`, `New: ${line}`]))) return "Not changed.";
   const r = await hub.homebase.updateFields(n, { [pick.key]: line });
   if (r[pick.key]?.ok === false) throw new Error(`Homebase refused it: ${r[pick.key].message ?? r[pick.key].code ?? ""}`);
   const s = load(hub);

@@ -26,6 +26,9 @@ describe("the Proposal Submitted status line in Homebase", () => {
     expect(none).toHaveProperty("candidates");
     expect((none as { candidates: string[] }).candidates.join(" ")).toContain("brief.stageNotes (list)");
     expect(findUpdateField({ brief: { weird: "z" } }, "weird")).toEqual({ key: "weird", current: "z" });
+    // Homebase's own name for it wins over a plain "update" field, and the old text is what gets replaced.
+    expect(findUpdateField({ statusUpdate: "x", brief: { proposalSubmittedNotes: "11/10: sent to adjuster" } })).toEqual({ key: "proposalSubmittedNotes", current: "11/10: sent to adjuster" });
+    expect(findUpdateField({ proposalNotes: null })).toEqual({ key: "proposalNotes", current: "" });
   });
 
   it("writes every job's new line after one OK, and doesn't rewrite when nothing new happened", async () => {
@@ -35,7 +38,7 @@ describe("the Proposal Submitted status line in Homebase", () => {
     expect(r.written).toBe(1);
     expect((await hub.homebase.rawJob!(9002)).proposalSubmittedUpdate).toBe("11/18: Adjuster agreed to O&P and door R&R; waiting on carpet.");
     const card = (hub.approver as FixedApprover).asked.at(-1)!;
-    expect(card.action).toMatch(/Update the Proposal Submitted status on 1 Homebase job/);
+    expect(card.action).toMatch(/Replace the Proposal Submitted Notes on 1 Homebase job/);
     expect(card.details[0]).toMatch(/^#9002 Example: 11\/18/);
     const before = asked();
     expect((await updateProposalJobs(hub)).written).toBe(0); // nothing new since
