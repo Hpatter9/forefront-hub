@@ -228,6 +228,16 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       return res.end(readFileSync(path.join(HERE, "ui.html")));
     }
+    if (p === "/game.js") {
+      // Game mode: the pixel art, sounds, HUD and Quest Board (only loaded into the page; nothing on the server).
+      res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-store" });
+      return res.end(readFileSync(path.join(HERE, "game.js")));
+    }
+    if (p === "/api/game") {
+      const { gameState } = await import("../workflows/game.js");
+      const plan = readPlan();
+      return send(res, 200, gameState(hub, reminders(hub, { needsUpload: new Set((lastSync?.needsUpload ?? []).map((x) => x.jobNumber)) }), "startedAt" in plan ? plan : null, q("seen")));
+    }
     if (p === "/api/events") return bus.attach(res);
     if (p === "/api/update" && req.method === "POST") {
       // Restart into the newer version: the start file sees exit code 75, updates and starts Keystone again.

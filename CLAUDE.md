@@ -74,4 +74,12 @@
 - Question cards take a typed answer as well as Yes/No (`#ap-reply`). `confirm` treats a typed answer as no and the
   page sends it to the Ask box as an instruction; callers that can use it call `confirmOrReply` (e.g. the status
   card: "Williams: new text" or "skip Williams").
+- Game mode (switch in the corner controls; per browser, `localStorage hub:game:*`): `src/server/game.js` restyles
+  the page (pixel fonts, starfield, RPG dialogs, tabs renamed HQ/Quests/World Map/The Forge/...), adds a HUD, a Quest
+  Board on the dashboard, a World Map level path on jobs, pop-ups, level-up/boss screens and optional WebAudio sounds
+  (off by default). The pixel art is hand-drawn text grids inside game.js (no image files). Scoring is
+  `src/workflows/game.ts` via GET /api/game: XP only from what Keystone already records (job log lines matched by
+  `RULES`, estimate PDFs rendered, brief ticks), each event counted once by id into `.hub/game.json`, with daily caps;
+  quests, a boss (longest-waiting job; actions on it are hits; beaten when it leaves the waiting list), badges,
+  streak. It never changes what Keystone does. New kinds of work: add a RULES line for the job-log text they write.
 
