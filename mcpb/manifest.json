@@ -1,0 +1,28 @@
+{
+  "manifest_version": "0.3",
+  "name": "keystone",
+  "display_name": "Keystone",
+  "version": "1.0.0",
+  "description": "Lets Claude work on Forefront jobs through Keystone on this computer: read a job's files, photos and notes, run the estimating scripts and price book, and save estimates into the job folder.",
+  "long_description": "Keystone is Forefront Building + Restoration's job hub. This extension connects the Claude desktop app to the Keystone that is running on this computer, so estimates are written in Claude on your subscription. It holds no passwords or keys and only talks to Keystone at the local address below. Keystone has to be open for the tools to work.",
+  "author": { "name": "Forefront Building + Restoration" },
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.cjs",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.cjs"],
+      "env": { "KEYSTONE_URL": "${user_config.keystone_url}" }
+    }
+  },
+  "user_config": {
+    "keystone_url": {
+      "type": "string",
+      "title": "Keystone's address on this computer",
+      "description": "Leave this as it is unless Keystone was set up on a different port.",
+      "default": "http://127.0.0.1:4317",
+      "required": false
+    }
+  },
+  "compatibility": { "platforms": ["win32", "darwin"], "runtimes": { "node": ">=18.0.0" } }
+}

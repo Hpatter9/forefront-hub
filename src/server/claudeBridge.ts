@@ -10,7 +10,7 @@ import { pullJob } from "../workflows/pull.js";
 
 /**
  * Keystone's tools for the Claude desktop app, so estimates are written there on Hunter's subscription instead of
- * through the paid API. The Claude app starts a tiny helper (src/mcp/stdio.ts) that passes each tool call to the
+ * through the paid API. The Claude app starts a tiny helper (mcpb/server/index.cjs) that passes each tool call to the
  * running Keystone over 127.0.0.1; this file is what answers. Claude brings the model and Hunter's estimating
  * skill; Keystone brings the job (its files, photos, emails, texts, walk notes), the skill's scripts and price
  * book on this PC, and the free check afterwards. Results are saved straight into the job folder: nothing is

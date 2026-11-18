@@ -35,7 +35,8 @@
 - Hunter's Claude subscription can't run inside Keystone (Agent SDK apps need the API). The subscription route is the
   hand-off to the Claude app (`src/workflows/claudeHandoff.ts`): Keystone fills `<job>/for-claude/` with a job brief
   and the files, he drags them into Claude, and drops the results back. It's the Estimator's default "Written by".
-  Better still, `Connect Claude app` registers `src/mcp/stdio.ts` as a local MCP server in the Claude desktop app; it
+  Better still, `Keystone for Claude.mcpb` (packed from `mcpb/` by `scripts/build-mcpb.py`; rebuild after editing) installs
+  `mcpb/server/index.cjs` as a local MCP server in the Claude desktop app (`Connect Claude app` writes the config file too); it
   proxies tool calls to the running Keystone (`src/server/claudeBridge.ts`), so Claude reads the job, runs the skill's
   scripts and saves results itself. Bridge tools are estimating only; the Claude app's tool prompt is the approval.
 - Updates on Hunter's PC: `scripts/update.mjs` runs first in `npm run app` (so it runs however Keystone is launched),

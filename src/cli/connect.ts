@@ -286,7 +286,8 @@ export function claudeAppConfigFiles(env: NodeJS.ProcessEnv = process.env, platf
     if (env.APPDATA) out.push(path.join(env.APPDATA, "Claude", "claude_desktop_config.json"));
     // The Microsoft Store version keeps its own copy of AppData.
     const pk = env.LOCALAPPDATA ? path.join(env.LOCALAPPDATA, "Packages") : "";
-    if (pk && existsSync(pk)) for (const d of readdirSync(pk).filter((x) => /^(Claude|AnthropicPBC\.Claude|Anthropic\.Claude)/i.test(x))) out.push(path.join(pk, d, "LocalCache", "Roaming", "Claude", "claude_desktop_config.json"));
+    // (That copy is the one the Store version actually reads, so it's listed first.)
+    if (pk && existsSync(pk)) for (const d of readdirSync(pk).filter((x) => /^(Claude_|AnthropicPBC\.Claude|Anthropic\.Claude)/i.test(x))) out.unshift(path.join(pk, d, "LocalCache", "Roaming", "Claude", "claude_desktop_config.json"));
   } else if (platform === "darwin") out.push(path.join(env.HOME ?? "", "Library", "Application Support", "Claude", "claude_desktop_config.json"));
   else out.push(path.join(env.XDG_CONFIG_HOME ?? path.join(env.HOME ?? "", ".config"), "Claude", "claude_desktop_config.json"));
   return out;
@@ -302,7 +303,7 @@ export function addKeystoneToClaudeApp(file: string, hubRoot: string, port: numb
     backup = `${file}.before-keystone`;
     if (!existsSync(backup)) writeFileSync(backup, raw);
   }
-  const want = { command: node, args: [path.join(hubRoot, "node_modules", "tsx", "dist", "cli.mjs"), path.join(hubRoot, "src", "mcp", "stdio.ts")], env: { KEYSTONE_URL: `http://127.0.0.1:${port}` } };
+  const want = { command: node, args: [path.join(hubRoot, "mcpb", "server", "index.cjs")], env: { KEYSTONE_URL: `http://127.0.0.1:${port}` } };
   const had = JSON.stringify(cfg.mcpServers?.keystone) === JSON.stringify(want);
   cfg.mcpServers = { ...(cfg.mcpServers ?? {}), keystone: want };
   mkdirSync(path.dirname(file), { recursive: true });
@@ -314,7 +315,11 @@ export async function connectClaudeApp() {
   const cfg = loadConfig();
   const port = Number(process.env.HUB_PORT) || 4317;
   const files = claudeAppConfigFiles();
-  const there = files.filter((f) => existsSync(path.dirname(f)));
+  // The ordinary install has a Claude folder; the Microsoft Store one has a package folder (its Claude folder may not exist yet).
+  const there = files.filter((f) => existsSync(path.dirname(f)) || (/[\\/]Packages[\\/]/.test(f) && existsSync(path.resolve(path.dirname(f), "..", "..", ".."))));
+  console.log("The surest way is the extension file: in the Keystone folder, double-click  Keystone for Claude.mcpb  and press Install.");
+  console.log("(If double-clicking doesn't open Claude: in the Claude app, Settings > Extensions > Advanced settings > Install Extension, and pick that file.)");
+  console.log("This window also adds Keystone to the Claude app's settings file, which works on some installs:\n");
   console.log("Connect the Claude app to Keystone\n");
   console.log("This lets the Claude desktop app write estimates with Keystone's job files and price book,");
   console.log("on your Claude subscription. Nothing here uses the paid API.\n");

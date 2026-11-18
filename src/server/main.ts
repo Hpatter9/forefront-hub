@@ -952,7 +952,7 @@ const server = http.createServer(async (req, res) => {
       studio.send(n, text, ai).then(() => bus.emit({ type: "changed", job: n, what: "job" })).catch((e) => console.error(e));
       return send(res, 202, { ok: true });
     }
-    // ---- the Claude desktop app's way in (src/mcp/stdio.ts passes its tool calls here): estimates on the subscription
+    // ---- the Claude desktop app's way in (mcpb/server/index.cjs passes its tool calls here): estimates on the subscription
     if (p === "/api/claude-bridge/tools") {
       const { bridge } = await import("./claudeBridge.js");
       const br = bridge(hub);

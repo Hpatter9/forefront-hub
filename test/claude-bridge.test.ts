@@ -3,7 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { addKeystoneToClaudeApp, claudeAppConfigFiles } from "../src/cli/connect.js";
-import { handle } from "../src/mcp/stdio.js";
+import { createRequire } from "node:module";
+import { unzip } from "../src/core/zip.js";
 import { bridge } from "../src/server/claudeBridge.js";
 import { ESTIMATOR_DIR, testHub } from "./helpers.js";
 
@@ -56,7 +57,7 @@ describe("Keystone's tools for the Claude app (estimates on the subscription)", 
 describe("the helper the Claude app starts", () => {
   it("speaks the protocol and explains itself when Keystone isn't open", async () => {
     process.env.KEYSTONE_URL = "http://127.0.0.1:9"; // nothing listens here
-    const h = handle;
+    const h = createRequire(import.meta.url)("../mcpb/server/index.cjs").handle;
     const init: any = await h({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } });
     expect(init.result).toMatchObject({ protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "keystone" } });
     expect(init.result.instructions).toMatch(/Keystone isn't open/);
@@ -82,12 +83,33 @@ describe("Connect Claude app", () => {
     expect(cfg.theme).toBe("dark");
     expect(cfg.mcpServers.other).toEqual({ command: "x" });
     expect(cfg.mcpServers.keystone.command).toBe("C:\\node\\node.exe");
-    expect(cfg.mcpServers.keystone.args[1]).toMatch(/src.mcp.stdio\.ts$/);
+    expect(cfg.mcpServers.keystone.args).toHaveLength(1);
+    expect(cfg.mcpServers.keystone.args[0]).toMatch(/mcpb.server.index\.cjs$/);
     expect(cfg.mcpServers.keystone.env).toEqual({ KEYSTONE_URL: "http://127.0.0.1:4317" });
     expect(existsSync(`${file}.before-keystone`)).toBe(true);
     expect(addKeystoneToClaudeApp(file, "C:\\Games\\forefront-hub", 4317, "C:\\node\\node.exe").added).toBe(false);
     writeFileSync(file, "{ not json");
     expect(() => addKeystoneToClaudeApp(file, "x", 4317)).toThrow(/isn't valid JSON/);
     expect(claudeAppConfigFiles({ APPDATA: "C:\\Users\\h\\AppData\\Roaming" }, "win32")[0]).toMatch(/Claude.claude_desktop_config\.json$/);
+  });
+});
+
+describe("the extension file for the Claude app", () => {
+  it("is packed from the current helper and manifest, and says how to start it", () => {
+    const zip = unzip(readFileSync("Keystone for Claude.mcpb"));
+    expect([...zip.keys()].sort()).toEqual(["manifest.json", "server/index.cjs"]);
+    expect(zip.get("server/index.cjs")!.toString()).toBe(readFileSync("mcpb/server/index.cjs", "utf8")); // rebuild with scripts/build-mcpb.py after changing it
+    expect(zip.get("manifest.json")!.toString()).toBe(readFileSync("mcpb/manifest.json", "utf8"));
+    const m = JSON.parse(zip.get("manifest.json")!.toString());
+    expect(m).toMatchObject({ manifest_version: "0.3", name: "keystone", author: { name: expect.any(String) }, server: { type: "node", entry_point: "server/index.cjs", mcp_config: { command: "node", args: ["${__dirname}/server/index.cjs"] } } });
+    expect(m.version && m.description).toBeTruthy();
+  });
+
+  it("finds the Microsoft Store version's settings first, where the ordinary settings file is ignored", () => {
+    const base = mkdtempSync(path.join(os.tmpdir(), "claude-store-"));
+    mkdirSync(path.join(base, "Local", "Packages", "Claude_pzs8sxrjxfjjc"), { recursive: true });
+    const files = claudeAppConfigFiles({ APPDATA: path.join(base, "Roaming"), LOCALAPPDATA: path.join(base, "Local") }, "win32");
+    expect(files[0]).toBe(path.join(base, "Local", "Packages", "Claude_pzs8sxrjxfjjc", "LocalCache", "Roaming", "Claude", "claude_desktop_config.json"));
+    expect(files[1]).toBe(path.join(base, "Roaming", "Claude", "claude_desktop_config.json"));
   });
 });
