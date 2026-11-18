@@ -52,3 +52,7 @@
   Homebase steps as Yes/No cards; the brief lists only what's left, grouped. Task titles are "Job name - what to do"
   (`src/workflows/taskTitle.ts`, job number in the notes). A brief line that is a Google Task takes its ticked state
   from Google, so a tick anywhere shows everywhere.
+- ITEL reports (`src/workflows/itel.ts`): the job review searches the job's email for them, saves PDFs to
+  `files/ITEL/` with a Gemini summary (material, rooms, matched product, unit price, installed or not), and the
+  estimators are pointed at the skill's "ITEL pricing" rule (in the skill, not here). The free check validates
+  `price_source: "itel"` lines against the reports.

@@ -4,6 +4,7 @@ import { pickProject } from "../connectors/companycam/index.js";
 import type { Hub } from "../hub.js";
 import { jobConversation } from "./conversation.js";
 import { stockForJob, stockLine } from "./inventory.js";
+import { itelReports, fetchItelReports, type ItelReport } from "./itel.js";
 import { conversationDigest, photoNotes, type ConversationDigest, type PhotoNotes } from "./jobDigest.js";
 import { downloadPhotos, savedNotes } from "./pull.js";
 import { jobWalks } from "./walks.js";
@@ -31,6 +32,8 @@ export interface JobDossier {
   texts: { at: string; who: string; text: string }[];
   calls: { at: string; who: string; body: string }[];
   shopStock: string[];
+  /** The job's ITEL reports (saved in files/ITEL from email), each with what material and rooms it covers. */
+  itel: ItelReport[];
   /** What couldn't be checked or isn't there, in plain words. Tell Hunter about these. */
   missing: string[];
 }
@@ -115,6 +118,11 @@ export async function jobDossier(hub: Hub, n: number, o: { /** Don't wait for th
     photoNotes(hub, n, o),
   ]);
 
+  // ITEL reports: looked for in the job's email every time (new ones are saved into files/ITEL), then summarised.
+  if (!o.cachedOnly) await fetchItelReports(hub, n).catch((e) => missing.push(`The email couldn't be checked for ITEL reports: ${(e as Error).message}`));
+  const itel = await itelReports(hub, n, o).catch(() => [] as ItelReport[]);
+  if (!itel.length && (j.carrier || j.claimNumber) && j.insurance !== "oop") missing.push("No ITEL report found in the job's email or folder (normal unless the carrier ordered one).");
+
   const read = (f: string) => { try { return existsSync(f) ? readFileSync(f, "utf8") : ""; } catch { return ""; } };
   const walks = jobWalks(hub, n);
   const stock = stockForJob(hub, n);
@@ -123,6 +131,7 @@ export async function jobDossier(hub: Hub, n: number, o: { /** Don't wait for th
     folder: hub.jobs.folder(n),
     files,
     docusketch: sketch.slice(0, 200),
+    itel,
     photos: pnotes ? { inFolder, companycam: cc, sheets: pnotes.sheets, notes: pnotes.photos, howTo: "The photos are already on numbered contact sheets (`sheets`), with a line about each in `notes` written by a free assistant from those sheets. Use the notes to find the rooms in the scope, then look at the sheets that cover those rooms yourself before you scope them; you can skip sheets that only show rooms outside the scope. Open a full-size photo only when a sheet isn't clear enough. Don't run photo_sheets.py again." } : { inFolder, companycam: cc, howTo: "Look at every photo before scoping: run the skill's photo_sheets.py on photos/ (and photos/previews for CompanyCam) and read the contact sheets. Photos in subfolders of photos/ came from zips Hunter added." },
     notes: {
       jobNotes: read(hub.jobs.path(n, "notes", "notes.txt")).slice(0, 12_000),

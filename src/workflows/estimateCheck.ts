@@ -87,7 +87,7 @@ interface Item { description?: string; quantity?: number; unit?: string; unit_pr
 interface Estimate { price_list?: string; rooms?: { name?: string; floor_sf?: number; wall_sf?: number; ceiling_sf?: number; floor_perimeter_lf?: number }[]; sections?: { name?: string; option?: string; items?: Item[] }[] }
 
 /** The facts: prices against the skill's price files, quantities against the room's own measurements, plain slips. */
-export function checkFacts(hub: Hub, est: Estimate): Pick<EstimateCheck, "lines" | "pricesOk" | "findings"> {
+export function checkFacts(hub: Hub, est: Estimate, itel: { material: string; unitPrice: number | null; unit: string; file: string }[] = []): Pick<EstimateCheck, "lines" | "pricesOk" | "findings"> {
   const p = priceFiles(hub.cfg.skillDir);
   const list = p.list.get(est.price_list ?? "") ?? new Map<string, number[]>();
   const findings: Finding[] = [];
@@ -110,7 +110,15 @@ export function checkFacts(hub: Hub, est: Estimate): Pick<EstimateCheck, "lines"
       seen.set(k, (seen.get(k) ?? 0) + 1);
       // Price: the job's list when the item is on it, else the price book's median; "estimated" is Hunter's to confirm.
       const onList = list.get(k), inBook = p.book.get(k);
-      if (it.price_source === "estimated") findings.push({ level: "look", where, what: `${tag} is priced by estimate (${money(price)}), not from the price list or price book. Confirm the number.` });
+      // Kept from the carrier's Xactimate (a conversion): not Forefront's prices to check.
+      if (it.price_source === "xactimate") { pricesOk++; }
+      else if (it.price_source === "itel") {
+        const prices = itel.map((r) => r.unitPrice).filter((x): x is number => x != null);
+        if (!itel.length) findings.push({ level: "wrong", where, what: `${tag} says it's priced from an ITEL report, but there's no ITEL report on the job.` });
+        else if (prices.length && !near(price, prices)) findings.push({ level: "look", where, what: `${tag} is priced ${money(price)} "per ITEL", but the job's ITEL report${prices.length === 1 ? " says" : "s say"} ${says(prices)}. Check the unit (per SY vs per SF) and whether it includes installation.` });
+        else pricesOk++;
+      }
+      else if (it.price_source === "estimated") findings.push({ level: "look", where, what: `${tag} is priced by estimate (${money(price)}), not from the price list or price book. Confirm the number.` });
       else if (onList !== undefined) {
         if (near(price, onList)) pricesOk++;
         else if (it.price_source === "price_book" && inBook !== undefined && near(price, inBook)) findings.push({ level: "look", where, what: `${tag} uses the price book's ${money(price)}, but it's on the ${est.price_list} list at ${says(onList)}.` });
@@ -129,6 +137,13 @@ export function checkFacts(hub: Hub, est: Estimate): Pick<EstimateCheck, "lines"
         else if (U === "SF" && /wall|drywall|paint|seal|prime|texture|insulation/.test(lower)) over(walls + ceil, "walls and ceiling together");
         else if (U === "LF" && /baseboard|base shoe|quarter round|cove base/.test(lower)) over(perim, "perimeter");
       }
+    }
+    // A material an ITEL report covers, priced some other way.
+    for (const it of s.items ?? []) {
+      if (it.price_source === "itel" || it.price_source === "xactimate" || /^remove|^r&r? |detach/i.test(String(it.description ?? ""))) continue;
+      const d = String(it.description ?? "").toLowerCase();
+      const r = itel.find((x) => { const words = x.material.toLowerCase().split(/[^a-z]+/).filter((w) => w.length >= 4); return words.length > 0 && words.every((w) => d.includes(w)); });
+      if (r) findings.push({ level: "look", where, what: `${where}: ${it.description} isn't priced from the ITEL report for ${r.material} (${r.file.split("/").pop()}). If the report covers this room, the skill's ITEL rule applies.` });
     }
     for (const [k, n] of seen) if (n > 1) findings.push({ level: "look", where, what: `"${k.split("|")[0]}" is on the list ${n} times in this section.` });
     if (!(s.items ?? []).length) findings.push({ level: "look", where, what: "This section has no line items." });
@@ -188,7 +203,9 @@ export async function checkEstimate(hub: Hub, n: number, o: { review?: boolean }
   if (!existsSync(f)) return null;
   let est: Estimate;
   try { est = JSON.parse(readFileSync(f, "utf8")); } catch (e) { return { at: new Date().toISOString(), lines: 0, pricesOk: 0, findings: [{ level: "wrong", where: "Estimate", what: `estimate.json can't be read: ${(e as Error).message}` }], review: [], reviewNote: "" }; }
-  const facts = checkFacts(hub, est);
+  const { itelReports } = await import("./itel.js");
+  const itel = (await itelReports(hub, n, { cachedOnly: true }).catch(() => [])).filter((r) => r.summary).map((r) => ({ material: r.summary!.material, unitPrice: r.summary!.unitPrice, unit: r.summary!.unit, file: r.file }));
+  const facts = checkFacts(hub, est, itel);
   const r = o.review === false ? { review: [], note: "" } : await reviewAgainstSources(hub, n, est);
   return { at: new Date().toISOString(), ...facts, review: r.review, reviewNote: r.note };
 }

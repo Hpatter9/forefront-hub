@@ -77,6 +77,8 @@ export function bridge(hub: Hub) {
         await ensure(n);
         const skill = existsSync(path.join(hub.cfg.skillDir, "SKILL.md")) ? readFileSync(path.join(hub.cfg.skillDir, "SKILL.md"), "utf8") : "";
         // Don't make the Claude app wait on the free AI: use the digest if it's saved, and build it for next time.
+        // ITEL reports are looked for in the job's email first (quick; summaries are made after if new).
+        await (await import("../workflows/itel.js")).fetchItelReports(hub, n).catch(() => []);
         const review = await jobDossier(hub, n, { cachedOnly: true });
         void jobDossier(hub, n).catch(() => {});
         return text([
@@ -84,6 +86,7 @@ export function bridge(hub: Hub) {
           `- You are writing in the Claude app on Hunter's subscription. Keystone's tools reach his computer: the job folder, the estimating skill's scripts and the price book.`,
           `- Follow the skill below exactly. Where it says to run a script ("python scripts/x.py ..."), call keystone_run_script with script "x.py" and the same arguments as a list; paths are relative to the job folder ("sketch/Job.ESX", "estimate/estimate.json", "--out", "estimate"). Do not run the skill's scripts in your own sandbox: the job's files and the price book aren't there.`,
           `- Read files with keystone_read_file (the skill's references are "skill/references/..."), PDFs with keystone_pdf_text, photos and contact sheets with keystone_view_photos. Write estimate.json and any picks file with keystone_write_file. Prices come only from price_lookup.py.`,
+          `- ITEL reports: the job's are listed under "itel" below and saved in files/ITEL. Read each PDF with keystone_pdf_text before using it and follow the skill's "ITEL pricing" rule: a report applies only to the material and rooms it covers. Tell Hunter which lines you priced from which report.`,
           `- DocuSketch doesn't always give an .ESX: use whatever DocuSketch files are listed (its PDF, room images) and the walk transcript for measurements; don't stop for lack of an .ESX.`,
           `- Go through what's below before you scope: the "conversation" digest (open an original email only where a point decides scope, quantity or price), the walk transcripts and notes, and the photo sheets for the rooms in the scope. Tell Hunter in a few lines what you went through, what changes the scope, what conflicts and what's missing, then ask the skill's questions before pricing.`,
           `- When the documents are rendered they are already in the job's estimate folder; Hunter sees them in Keystone. Call keystone_check_estimate and report what it found. Don't draft or send email unless he asks.`,

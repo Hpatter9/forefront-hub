@@ -2,6 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, wri
 import path from "node:path";
 import type { Hub } from "../hub.js";
 import { jobDossier, sketchFiles, type JobDossier } from "./dossier.js";
+import { itelLine } from "./itel.js";
 import { jobWalks } from "./walks.js";
 
 /** The folder Keystone fills with everything to attach in the Claude app, so it's one drag. */
@@ -90,6 +91,7 @@ export function briefMarkdown(d: JobDossier): string {
     out.push("");
   } else out.push("## Photos", `${d.photos.inFolder} in the job folder${d.photos.companycam.total ? `, ${d.photos.companycam.total} in CompanyCam` : ""}. ${d.photos.companycam.project ? `CompanyCam project ${d.photos.companycam.project}.` : ""}`, "");
   if (d.docusketch.length) out.push("## DocuSketch files on the job", list(d.docusketch), "");
+  if (d.itel.length) out.push("## ITEL reports (attached; follow the skill's ITEL pricing rule: each applies only to the material and rooms it covers)", list(d.itel.map(itelLine)), "");
   if (d.shopStock.length) out.push("## Shop overstock that might fit (a reminder for Hunter, not part of the estimate)", list(d.shopStock), "");
   return out.join("\n").replace(/\n{3,}/g, "\n\n");
 }
@@ -120,6 +122,7 @@ export async function handoffPackage(hub: Hub, n: number): Promise<{ folder: str
   if (!d.photos.sheets?.length) for (const f of sketch.filter((x) => /\.(jpe?g|png)$/i.test(x)).slice(0, 12)) add(f);
   for (const w of d.notes.walks.slice(0, 4)) add(w.file, `Walk ${path.basename(w.file)}`);
   for (const s of d.photos.sheets ?? []) add(s, `Photos ${path.basename(s)}`);
+  for (const r of d.itel) add(r.file);
   for (const f of ["estimate/estimate.json"]) add(f);
   hub.jobs.log(n, "Got the files ready for the Claude app");
   return { folder: dir, files: readdirSync(dir).sort(), skipped };
