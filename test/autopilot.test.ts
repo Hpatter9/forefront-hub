@@ -46,7 +46,8 @@ describe("Keystone handles what it can before the brief", () => {
     let draftN = 0;
     t.hub.gemini = new MockGemini((req) => {
       const text = JSON.stringify(req.contents);
-      if (req.jsonSchema) return JSON.stringify({ tasks: [{ tag: "T1", action: "email", why: "an email" }, { tag: "T2", action: "hunter", why: "a site visit" }] });
+      // Sorting: going by what each task says, not by its place in the list.
+      if (req.jsonSchema) return JSON.stringify({ tasks: [...text.matchAll(/\[(T\d+)\] ([^\n\\]+)/g)].map(([, tag, title]) => /measure/.test(title) ? { tag, action: "hunter", why: "a site visit" } : { tag, action: "email", why: "an email" }) });
       // The drafting run: make one draft, then report.
       if (!text.includes("functionResponse")) return { calls: [{ name: "gmail_create_draft", args: { jobNumber: 9001, to: ["dana@example.com"], subject: `Draft ${++draftN}`, body: "Hi Dana,\n\nChecking in.\n\nThanks," } }] };
       return "DRAFTED: to Dana, checking in.";
@@ -66,7 +67,7 @@ describe("Keystone handles what it can before the brief", () => {
     expect(autopilotNote(r)).toMatch(/drafts waiting in Gmail .*: 2/);
     // Run again: nothing is drafted twice.
     const again = await autopilot(t.hub, [reminder({ kind: "followup" })]);
-    expect(again.handled).toEqual([]);
+    expect(again.handled, JSON.stringify(again.handled)).toEqual([]);
     expect(generatedDrafts(t.hub)).toHaveLength(2);
   });
 
