@@ -233,6 +233,13 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-store" });
       return res.end(readFileSync(path.join(HERE, "game.js")));
     }
+    if (p.startsWith("/game-art/")) {
+      // Game mode's art and music (from Hunter's Little Town game; see game-art/CREDITS.md). Plain file names only.
+      const f = p.slice("/game-art/".length);
+      if (!/^[a-z0-9_]+\.(png|ogg|json)$/.test(f) || !existsSync(path.join(HERE, "game-art", f))) return send(res, 404, { error: "Not found" });
+      res.writeHead(200, { "Content-Type": f.endsWith(".png") ? "image/png" : f.endsWith(".ogg") ? "audio/ogg" : "application/json", "Cache-Control": "max-age=86400" });
+      return createReadStream(path.join(HERE, "game-art", f)).pipe(res);
+    }
     if (p === "/api/game") {
       const { gameState } = await import("../workflows/game.js");
       const plan = readPlan();

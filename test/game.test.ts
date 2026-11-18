@@ -82,3 +82,22 @@ describe("game mode's score", () => {
     expect(s.xp).toBe(0);
   });
 });
+
+describe("game mode's art from Little Town", () => {
+  it("has every strip and building the page asks for, with credits", async () => {
+    const { existsSync, readFileSync } = await import("node:fs");
+    const dir = "src/server/game-art";
+    const art = JSON.parse(readFileSync(`${dir}/art.json`, "utf8"));
+    for (const n of ["hero_hammer", "hero_idle", ...["werewolf", "lich", "vampire", "orc"].flatMap((b) => [`boss_${b}_idle`, `boss_${b}_death`])]) {
+      expect(art.strips[n], n).toBeTruthy();
+      expect(existsSync(`${dir}/${n}.png`), n).toBe(true);
+    }
+    const page = readFileSync("src/server/game.js", "utf8");
+    for (const b of [...page.matchAll(/\["([a-z_]+)", \d+\]/g)].map((m) => m[1]).concat(["signpost", "watchtower", "workshop", "market_stall", "tavern", "stockpile", "cottage"])) {
+      expect(art.buildings[b], b).toBeTruthy();
+      expect(existsSync(`${dir}/b_${b}.png`), b).toBe(true);
+    }
+    expect(existsSync(`${dir}/town.ogg`)).toBe(true);
+    expect(readFileSync(`${dir}/CREDITS.md`, "utf8")).toMatch(/Little Town/);
+  });
+});

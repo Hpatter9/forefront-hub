@@ -77,7 +77,9 @@
 - Game mode (switch in the corner controls; per browser, `localStorage hub:game:*`): `src/server/game.js` restyles
   the page (pixel fonts, starfield, RPG dialogs, tabs renamed HQ/Quests/World Map/The Forge/...), adds a HUD, a Quest
   Board on the dashboard, a World Map level path on jobs, pop-ups, level-up/boss screens and optional WebAudio sounds
-  (off by default). The pixel art is hand-drawn text grids inside game.js (no image files). Scoring is
+  (off by default). Icons/badges are hand-drawn text grids inside game.js; the builder, bosses, town buildings and town
+  music come from Hunter's Little Town game (only its own art) via `scripts/build-game-art.py` into `src/server/game-art/`
+  (served at /game-art/, credits in its CREDITS.md). The town grows one building per level. Scoring is
   `src/workflows/game.ts` via GET /api/game: XP only from what Keystone already records (job log lines matched by
   `RULES`, estimate PDFs rendered, brief ticks), each event counted once by id into `.hub/game.json`, with daily caps;
   quests, a boss (longest-waiting job; actions on it are hits; beaten when it leaves the waiting list), badges,

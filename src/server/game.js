@@ -514,6 +514,26 @@
     rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch !== ".") { g.fillStyle = SP.palette[ch]; g.fillRect(x, y, 1, 1); } }));
     return (cache[name] = c.toDataURL());
   }
+  // Art from Hunter's Little Town game (/game-art/, see its CREDITS.md): animated townsfolk strips and buildings.
+  let ART = null;
+  const artReady = fetch("/game-art/art.json").then((r) => r.json()).then((a) => { ART = a; }).catch(() => {});
+  /** An animated figure: `name` is a strip in art.json; loops unless `once`. Falls back to a pixel sprite. */
+  function anim(name, scale, o = {}) {
+    const m = ART?.strips?.[name];
+    if (!m) return img(o.fallback || "hero", Math.round(48 * scale), o.cls || "");
+    const w = Math.round(m.w * scale), h = Math.round(m.h * scale), dur = o.dur ?? m.frames * 0.12;
+    return `<span class="ganim ${o.cls || ""}" style="width:${w}px;height:${h}px;--fw:${w}px;--n:${m.frames};background-image:url(/game-art/${name}.png);background-size:${w * m.frames}px ${h}px;animation:gstrip ${dur}s steps(${m.frames}) ${o.once ? "1 forwards" : "infinite"}"></span>`;
+  }
+  function building(name, maxW, o = {}) {
+    const m = ART?.buildings?.[name];
+    if (!m) return "";
+    const k = Math.min(1, maxW / m.w);
+    return `<img class="gbld ${o.cls || ""}" src="/game-art/b_${name}.png" width="${Math.round(m.w * k)}" height="${Math.round(m.h * k)}" alt="${e(o.alt || name)}" title="${e(o.alt || name)}">`;
+  }
+  const BOSSES = ["werewolf", "lich", "vampire", "orc"];
+  const bossKind = (jobNumber) => BOSSES[Math.abs(Number(jobNumber) || 0) % BOSSES.length];
+  /** The town grows one building per level (the last is the hall). */
+  const TOWN = [["campfire", 1], ["well", 2], ["cottage", 3], ["workshop", 4], ["stockpile", 5], ["granary", 6], ["tavern", 7], ["watchtower", 8], ["chapel", 9], ["longhouse", 10], ["castle", 11]];
   const img = (name, px, cls = "") => `<img class="gpx ${cls}" src="${sprite(name)}" width="${px}" height="${px}" alt="">`;
   const e = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const get = (k, d) => { try { return JSON.parse(localStorage.getItem("hub:game:" + k)) ?? d; } catch { return d; } };
@@ -539,6 +559,14 @@
     click: () => tone(660, 0, 0.04, "square", 0.03),
   };
   const play = (n) => { if (get("sound", false)) try { SOUNDS[n]?.(); } catch { /* no audio */ } };
+
+  // Little Town's town theme, quietly, only when asked for (and only in game mode).
+  let tune = null;
+  function music() {
+    const want = on() && get("music", false);
+    if (want) { tune ??= Object.assign(new Audio("/game-art/town.ogg"), { loop: true, volume: 0.22 }); tune.play().catch(() => {}); }
+    else tune?.pause();
+  }
 
   // ---------------------------------------------------------------- the look
   const TABS = {
@@ -627,6 +655,19 @@
   .gpath.big i { width: auto; height: auto; padding: 5px 9px; font: 9px/1 "Press Start 2P", monospace; font-style: normal; color: #c0b6f2; }
   .gpath.big i.past { color: #10301a; } .gpath.big i.here { color: #1a1426; animation: none; box-shadow: 0 0 0 2px #fff; }
   .gpath.lost { font: 9px "Press Start 2P", monospace; color: #ff5f7a; }
+  .ganim { display: inline-block; vertical-align: bottom; background-repeat: no-repeat; image-rendering: pixelated; }
+  @keyframes gstrip { to { background-position: calc(var(--fw) * var(--n) * -1) 0; } }
+  .gbld { image-rendering: pixelated; vertical-align: bottom; }
+  .gtown { grid-column: 1 / -1; position: relative; padding-bottom: 10px; overflow: hidden; }
+  .gtown .row { display: flex; align-items: flex-end; gap: 6px; min-height: 150px; overflow-x: auto; padding: 6px 4px 0;
+    background: linear-gradient(transparent 70%, #2b7a36 70%, #2b7a36 76%, #1f5a28 76%); }
+  .gtown .slot { display: grid; justify-items: center; gap: 2px; flex: none; }
+  .gtown .slot small { font: 8px "Press Start 2P", monospace; color: #c0b6f2; white-space: nowrap; }
+  .gtown .locked img { filter: brightness(0) opacity(.35); }
+  .gtown .site { position: relative; }
+  .gtown .site .ganim { position: absolute; left: -38px; bottom: 0; }
+  .gboss .ganim { margin: 4px auto 6px; display: block; }
+  .gstage { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; margin: 8px 0 4px; }
   .gtoasts { position: fixed; right: 16px; bottom: 110px; display: grid; gap: 8px; z-index: 9999; pointer-events: none; }
   .gtoast { display: flex; gap: 10px; align-items: center; background: #120b2e; color: #f4f1ff; padding: 10px 14px; box-shadow: 0 0 0 3px #f4f1ff, 0 0 0 6px #120b2e, 4px 8px 0 6px rgba(0,0,0,.4); animation: gin .25s steps(5); max-width: 380px; font-size: 14px; }
   .gtoast b { font-family: "Press Start 2P", monospace; font-size: 10px; color: #7ff09a; white-space: nowrap; }
@@ -677,8 +718,9 @@
     if (p) { p.dataset.orig ??= p.placeholder; if (game) p.placeholder = "What's your next move? Ask anything, or drop files here"; else p.placeholder = p.dataset.orig; }
     document.querySelector(".ghud")?.remove();
     document.getElementById("gboard")?.remove();
-    document.querySelectorAll(".gpath").forEach((x) => (x.parentElement?.childElementCount === 1 && x.parentElement.tagName === "DIV" && !x.parentElement.id ? x.parentElement : x).remove());
-    if (game) { hud(); board(); decorate(); refresh(); }
+    document.querySelectorAll(".gstage, .gpath").forEach((x) => x.remove());
+    music();
+    if (game) { hud(); board(); decorate(); refresh(); artReady.then(() => { if (on()) { board(); decorate(); } }); }
   }
 
   // ---------------------------------------------------------------- HUD (top bar)
@@ -690,6 +732,7 @@
       h = document.createElement("div"); h.className = "ghud";
       bar.insertBefore(h, bar.querySelector(".topright"));
       h.addEventListener("click", (ev) => {
+        if (ev.target.closest(".mus")) { put("music", !get("music", false)); music(); hud(); return; }
         if (ev.target.closest(".snd")) { put("sound", !get("sound", false)); if (get("sound", false)) { play("coin"); } hud(); return; }
         try { showTab("today"); } catch { /* page not ready */ }
       });
@@ -700,7 +743,8 @@
       <span class="gbar xp" title="${s.xp} XP. ${s.levelTo - s.xp} more to level ${s.level + 1}"><i style="width:${pct}%"></i><b>${s.xp - s.levelFrom}/${s.levelTo - s.levelFrom}</b></span>
       <span title="Workdays in a row with points">${img("flame", 18)} ${s.streak}</span>
       <span title="Points today">${img("gem", 18)} +${s.xpToday}</span>
-      <button class="snd" type="button" title="${get("sound", false) ? "Sound on (click to mute)" : "Sound off (click for game sounds)"}">${get("sound", false) ? "🔊" : "🔇"}</button>` : `${img("hero", 28)}<span class="lv">Loading…</span>`;
+      <button class="snd" type="button" title="${get("sound", false) ? "Sound on (click to mute)" : "Sound off (click for game sounds)"}">${get("sound", false) ? "🔊" : "🔇"}</button>
+      <button class="snd mus" type="button" title="${get("music", false) ? "Town music on (click to stop)" : "Town music (click to play)"}" style="opacity:${get("music", false) ? 1 : 0.45}">🎵</button>` : `${img("hero", 28)}<span class="lv">Loading…</span>`;
   }
 
   // ---------------------------------------------------------------- Quest Board (top of the dashboard)
@@ -716,7 +760,11 @@
       <span class="gbar gold"><i style="width:${q.done ? 100 : pct(q.progress, q.goal)}%"></i><b>${q.done ? "COMPLETE" : `${q.progress}/${q.goal}`}</b></span><span class="hn">${e(q.hint)}</span></div>`).join("");
     const boss = s.boss;
     const hearts = boss ? Array.from({ length: boss.hpMax }, (_, i) => img(i < boss.hp ? "heart" : "heartEmpty", 22)).join("") : "";
-    const bossHtml = boss ? `<div class="gboss">${img("boss", 112, `mon ${lastHits !== null && boss.hits > lastHits ? "hit" : ""}`)}
+    const kind = boss ? bossKind(boss.jobNumber) : "";
+    const hurt = boss && lastHits !== null && boss.hits > lastHits;
+    const bossArt = boss && ART ? (hurt ? anim(ART.strips[`boss_${kind}_hurt`] ? `boss_${kind}_hurt` : `boss_${kind}_idle`, 1.25, { once: true, cls: "mon hit" }) : anim(`boss_${kind}_idle`, 1.25, { dur: 0.9 })) : img("boss", 112, `mon ${hurt ? "hit" : ""}`);
+    if (hurt) setTimeout(() => { lastHits = boss.hits; board(); }, 900);
+    const bossHtml = boss ? `<div class="gboss">${bossArt}
         <div class="who">#${boss.jobNumber} ${e(boss.name)}</div><div class="hp">${hearts}</div>
         <div class="why">${e(boss.title)} · waiting ${boss.days} day${boss.days === 1 ? "" : "s"}</div>
         <button class="btn primary" type="button" data-gattack="${boss.jobNumber}">⚔ Attack</button>
@@ -726,11 +774,15 @@
     const badges = s.badges.map((x) => `<span class="gb ${x.earned ? "yes" : "no"}" title="${e(x.name)}: ${e(x.desc)}${x.earned ? ` (earned ${new Date(x.earned).toLocaleDateString()})` : ""}">${img(x.icon, 28)}</span>`).join("");
     const feed = s.feed.slice(0, 10).map((f) => `<div><b>+${f.xp}</b><span>${e(f.label)}</span></div>`).join("") || `<div class="muted">Your loot shows up here as you work.</div>`;
     const lpct = Math.round(((s.xp - s.levelFrom) / Math.max(1, s.levelTo - s.levelFrom)) * 100);
-    b.innerHTML = `
+    const built = TOWN.filter(([, lv]) => s.level >= lv), next = TOWN.find(([, lv]) => s.level < lv);
+    const town = ART ? `<div class="card gtown"><h3><span>${img("castle", 20)}Your town</span><span class="small muted">${built.length}/${TOWN.length} built · a new building every level</span></h3>
+      <div class="row">${built.map(([n, lv]) => `<span class="slot">${building(n, 150, { alt: `${n.replace("_", " ")} (level ${lv})` })}<small>LV ${lv}</small></span>`).join("")}
+      ${next ? `<span class="slot site locked">${anim("hero_hammer", 0.6)}${building(next[0], 150, { alt: `Next: ${next[0].replace("_", " ")} at level ${next[1]}` })}<small>LV ${next[1]} · ${s.levelTo - s.xp} XP</small></span>` : ""}</div></div>` : "";
+    b.innerHTML = `${town}
       <div class="card"><h3><span>${img("scroll", 20)}Today's quests</span><span class="small muted">${s.quests.filter((q) => q.done).length}/${s.quests.length}</span></h3>${quests}</div>
       <div class="card"><h3><span>${img("sword", 20)}Boss fight</span><span class="small muted">${s.bossesBeaten} beaten</span></h3>${bossHtml}</div>
       <div class="card"><h3><span>${img("shield", 20)}Player</span><span class="small muted">${earned}/${s.badges.length} badges</span></h3>
-        <div class="gplayer">${img("hero", 72, "hero")}<div><div class="lvl">LV ${s.level} ${e(s.title).toUpperCase()}</div>
+        <div class="gplayer">${anim("hero_hammer", 0.9, { fallback: "hero" })}<div><div class="lvl">LV ${s.level} ${e(s.title).toUpperCase()}</div>
           <span class="gbar xp" style="display:block;margin-top:6px"><i style="width:${lpct}%"></i><b>${s.xp - s.levelFrom}/${s.levelTo - s.levelFrom} XP</b></span></div></div>
         <div class="gstats"><span>${img("gem", 18)} ${s.xp} XP</span><span>${img("flame", 18)} ${s.streak}-day streak</span><span>${img("coin", 18)} +${s.xpToday} today</span></div>
         <div class="gbadges">${badges}</div>
@@ -752,6 +804,7 @@
     ["Bid", ["Proposal Submitted", "Supplement"]], ["Won", ["Job Won", "Waitlist", "WA/Contract Sent"]],
     ["Build", ["Job Prep", "Ordering Materials", "Materials Stand-by", "Scheduling", "Work In Progress", "On-Hold"]], ["Done", []],
   ];
+  const WORLD_ART = ["signpost", "watchtower", "workshop", "market_stall", "tavern", "stockpile", "cottage"];
   const worldOf = (stage) => { if (/closed lost/i.test(stage)) return -1; const i = WORLDS.findIndex(([, l]) => l.includes(stage)); return i < 0 ? WORLDS.length - 1 : i; };
   function path(stage, big) {
     const w = worldOf(stage);
@@ -768,7 +821,8 @@
     const head = document.querySelector("#job .jobhead");
     if (pill && head && !document.querySelector("#job .gpath")) {
       const stage = [...pill.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join("").trim();
-      head.insertAdjacentHTML("afterend", `<div style="margin:8px 0 4px">${path(stage, true)}</div>`);
+      const w = worldOf(stage);
+      head.insertAdjacentHTML("afterend", `<div class="gstage">${w >= 0 ? building(WORLD_ART[w], 90, { alt: `World ${w + 1}: ${WORLDS[w][0]}` }) : ""}${path(stage, true)}</div>`);
     }
   }
   const watchJobs = new MutationObserver(() => decorate());
@@ -792,9 +846,9 @@
       document.body.appendChild(s); setTimeout(() => s.remove(), 1100);
     }
   }
-  function overlay(icon, title, line) {
+  function overlay(icon, title, line, art = "") {
     const o = document.createElement("div"); o.className = "gover";
-    o.innerHTML = `<div class="box">${img(icon, 128)}<h2>${e(title)}</h2><p>${e(line)}</p><p style="font-size:9px;margin-top:18px">click to continue</p></div>`;
+    o.innerHTML = `<div class="box">${art ? `<div style="display:flex;gap:18px;justify-content:center;align-items:flex-end">${art}</div>` : img(icon, 128)}<h2>${e(title)}</h2><p>${e(line)}</p><p style="font-size:9px;margin-top:18px">click to continue</p></div>`;
     o.addEventListener("click", () => o.remove());
     document.body.appendChild(o); sparks();
     setTimeout(() => o.remove(), 4500);
@@ -818,9 +872,9 @@
       // Celebrations, biggest first. The first load after switching on stays quiet.
       if (seen) {
         const lvBefore = get("level", s.level);
-        if (s.level > lvBefore) { overlay("crown", "LEVEL UP!", `Level ${s.level}: ${s.title}`); play("level"); }
+        if (s.level > lvBefore) { const nb = TOWN.find(([, lv]) => lv === s.level); overlay("crown", "LEVEL UP!", `Level ${s.level}: ${s.title}${nb ? ` · new building: ${nb[0].replace("_", " ")}` : ""}`, ART ? `${anim("hero_hammer", 1.4)}${nb ? building(nb[0], 160) : ""}` : ""); play("level"); }
         for (const f of s.fresh) {
-          if (f.kind === "boss") { overlay("sword", "BOSS DEFEATED!", f.label.replace(/^Boss beaten: /, "")); play("boss"); }
+          if (f.kind === "boss") { overlay("sword", "BOSS DEFEATED!", f.label.replace(/^Boss beaten: /, ""), ART ? anim(`boss_${bossKind(f.job)}_death`, 1.6, { once: true, dur: 1.1 }) : ""); play("boss"); }
           else if (f.kind === "badge") { toast(s.badges.find((b) => f.label.endsWith(b.name))?.icon ?? "star", 0, f.label); play("badge"); }
           else if (f.kind === "quest") { toast("scroll", f.xp, f.label); play("quest"); }
           else { toast(f.kind === "won" ? "trophy" : f.kind === "proposal" ? "coin" : f.kind === "estimate" ? "anvil" : "gem", f.xp, f.label); play("coin"); }
