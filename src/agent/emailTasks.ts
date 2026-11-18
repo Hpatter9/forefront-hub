@@ -6,6 +6,7 @@ import type { Message } from "../connectors/gmail/types.js";
 import type { Hub } from "../hub.js";
 import { matchJob } from "../workflows/inbox.js";
 import { isAutomated } from "../workflows/reminders.js";
+import { jobTaskTitle, withJobNote } from "../workflows/taskTitle.js";
 
 /**
  * Turns incoming email into Google Tasks on its own: Claude reads each new email from a person and, when it asks
@@ -74,7 +75,7 @@ export async function proposeTasks(hub: Hub, m: Message, ctx: { jobNumber?: numb
 
 Read this email to him and list what it asks HIM to do: reply with something, send a document or photos, schedule a visit, call someone, revise an estimate, chase a signature. Rules:
 - Only real asks or commitments with a next step for Hunter. An FYI, a thank-you, a receipt, a newsletter or "sounds good" gets NO task: return an empty list.
-- One task per distinct action, at most 3. Each title is short and starts with a verb, names the person, and ends with the job tag when there is one${ctx.jobNumber ? ` (" #${ctx.jobNumber}")` : ""}: e.g. "Send Eileen the hallway flooring photos #3226".
+- One task per distinct action, at most 3. Each title is short: ${ctx.jobName ? `the job's name, a spaced dash, then what to do starting with a verb in lower case: e.g. "${ctx.jobName} - send Eileen the hallway photos", "${ctx.jobName} - check in on selections"` : `what to do, starting with a verb: e.g. "send Eileen the hallway photos"`}. No job numbers in the title.
 - due: only when the email states or clearly implies a date ("by Friday", "before the 12th", "tomorrow"); otherwise leave it out.
 - notes: one line of context if useful.
 - These tasks are already open for this conversation; don't repeat them: ${ctx.openTasks.length ? ctx.openTasks.map((t) => `"${t}"`).join(", ") : "(none)"}.
@@ -126,7 +127,9 @@ export async function tasksFromInbox(hub: Hub, o: { max?: number } = {}): Promis
       for (const p of proposed) {
         const who = m.from.replace(/<.*>/, "").trim() || m.from;
         const notes = [p.notes, `From ${who}: "${m.subject}"`, `https://mail.google.com/mail/u/0/#all/${th.id}`].filter(Boolean).join("\n");
-        const task = await hub.tasks.create({ title: p.title, due: p.due && /^\d{4}-\d{2}-\d{2}$/.test(p.due) ? p.due : nextWorkday(), notes });
+        // Hunter's format, whatever the AI wrote: "Belvill - check in on selections" (the job number goes in the notes).
+        const title = job ? jobTaskTitle(job.name, p.title) : p.title.replace(/\s*#\d{3,6}\b/g, "").trim();
+        const task = await hub.tasks.create({ title, due: p.due && /^\d{4}-\d{2}-\d{2}$/.test(p.due) ? p.due : nextWorkday(), notes: job ? withJobNote(notes, job.jobNumber) : notes });
         ids.push(task.id);
         (s.byThread[th.id] ??= []).push({ listId: task.listId, id: task.id, title: task.title });
         added.push({ title: task.title, jobNumber: match.jobNumber });

@@ -404,9 +404,10 @@ export async function offerWalkFollowups(hub: Hub, w: Walk): Promise<void> {
   }
   const promises = (w.promises ?? []).filter((p) => p.what.trim()).slice(0, 8);
   if (promises.length && hub.tasks.connected()) {
-    const titles = promises.map((p) => `${p.what.trim().replace(/\.$/, "")}${p.due ? ` (said: ${p.due})` : ""} #${n}`);
+    const { jobTaskTitle, withJobNote } = await import("./taskTitle.js");
+    const titles = promises.map((p) => jobTaskTitle(hub.jobs.get(n).name, `${p.what.trim().replace(/\.$/, "")}${p.due ? ` (said: ${p.due})` : ""}`));
     if (await hub.approver.confirm(`Add ${titles.length === 1 ? "this task" : `these ${titles.length} tasks`} to Google Tasks? (things you said you'd do on the walk)`, titles)) {
-      for (const title of titles) await hub.tasks.create({ title });
+      for (const title of titles) await hub.tasks.create({ title, notes: withJobNote("From the scope walk recording", n) });
       hub.say(`Added ${titles.length} task${titles.length === 1 ? "" : "s"} from the walk.`);
     }
   }

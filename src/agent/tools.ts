@@ -338,9 +338,13 @@ export function hubToolDefs(hub: Hub) {
     ),
     tool(
       "tasks_create",
-      "Add a Google Task for Hunter (asks him first); it shows on his phone right away. Put the job number in the title for job tasks (\"Call Eileen re #3226\"). due is a date, YYYY-MM-DD.",
+      "Add a Google Task for Hunter (asks him first); it shows on his phone right away. For a job, give jobNumber and write the title as the job's name, a spaced dash, then what to do in lower case (\"Belvill - check in on selections\"); Keystone enforces that format. due is a date, YYYY-MM-DD.",
       { title: z.string(), due: z.string().optional(), notes: z.string().optional(), listId: z.string().optional(), jobNumber: jobNumber.optional() },
       wrap(async (a) => {
+        if (a.jobNumber && hub.jobs.exists(a.jobNumber)) {
+          const { jobTaskTitle, withJobNote } = await import("../workflows/taskTitle.js");
+          a = { ...a, title: jobTaskTitle(hub.jobs.get(a.jobNumber).name, a.title), notes: withJobNote(a.notes, a.jobNumber) };
+        }
         if (!(await hub.approver.confirm(`Add this task?`, [a.title, a.due ? `Due ${a.due}` : "No due date", a.notes ?? ""].filter(Boolean)))) return "Hunter declined; nothing added.";
         const t = await hub.tasks.create(a);
         if (a.jobNumber && hub.jobs.exists(a.jobNumber)) hub.jobs.log(a.jobNumber, `Task: ${a.title}`);

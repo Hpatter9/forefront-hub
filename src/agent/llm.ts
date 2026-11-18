@@ -107,7 +107,7 @@ export function withHistory(prompt: string, history: ChatTurn[] = []): string {
   return `Earlier in this conversation:\n\n${lines}\n\nHunter's reply now: ${prompt}`;
 }
 
-export async function agentAsk(hub: Hub, prompt: string, opts: { jobNumber?: number; onMessage?: (m: SDKMessage) => void; maxSteps?: number; history?: ChatTurn[]; used?: Set<string> } = {}): Promise<string> {
+export async function agentAsk(hub: Hub, prompt: string, opts: { jobNumber?: number; onMessage?: (m: SDKMessage) => void; maxSteps?: number; history?: ChatTurn[]; used?: Set<string>; /** Only these Keystone tools (Gemini only). */ tools?: string[] } = {}): Promise<string> {
   const p = aiProvider(hub);
   if (p === "off") throw new Error(aiOffReason(hub));
   if (p === "claude") {
@@ -115,7 +115,7 @@ export async function agentAsk(hub: Hub, prompt: string, opts: { jobNumber?: num
     return claudeAsk(hub, withHistory(prompt, opts.history), opts);
   }
 
-  const defs = hubToolDefs(hub);
+  const defs = hubToolDefs(hub).filter((d: any) => !opts.tools || opts.tools.includes(d.name));
   const decls: FunctionDecl[] = defs.map((d: any) => ({ name: d.name, description: String(d.description).slice(0, 1000), parametersJsonSchema: toSchema(d.inputSchema) }));
   const system = `${systemPrompt(hub, opts.jobNumber)}
 

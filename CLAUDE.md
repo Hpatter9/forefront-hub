@@ -47,3 +47,8 @@
   fast-forwards to origin/main, keeps hand edits that don't clash and stashes ones that do, and never blocks the start.
   It only acts on Windows (or `KEYSTONE_UPDATE=1`), so a developer's copy is left alone. The app shows the running
   version and an "Update ready" chip (`src/server/version.ts`); exit code 75 means "restart me" to `Start Keystone.bat`.
+- Before every brief, `src/workflows/autopilot.ts` does what Keystone can itself (Gemini only, draft-only tools):
+  closes tasks already done, drafts replies/follow-ups/check-ins/walk-booking emails and email-only tasks, and queues
+  Homebase steps as Yes/No cards; the brief lists only what's left, grouped. Task titles are "Job name - what to do"
+  (`src/workflows/taskTitle.ts`, job number in the notes). A brief line that is a Google Task takes its ticked state
+  from Google, so a tick anywhere shows everywhere.

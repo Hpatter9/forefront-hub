@@ -79,7 +79,7 @@ describe("walk recordings", () => {
     const [w] = await scanWalks(t.hub, { now: new Date(at.getTime() + 3600e3), transcriber: async () => notes() });
     await offerWalkFollowups(t.hub, w);
     expect(JSON.stringify(t.homebase.writes)).toContain("Scope walk");
-    expect((await t.hub.tasks.tasks()).some((k) => k.title === "Send the estimate (said: Friday) #9001")).toBe(true);
+    expect((await t.hub.tasks.tasks()).some((k) => k.title === "Sample - send the estimate (said: Friday)")).toBe(true);
   });
 
   it("sends the audio to Gemini and gets structured notes back", async () => {

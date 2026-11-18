@@ -334,7 +334,7 @@ const server = http.createServer(async (req, res) => {
         tasksDue,
         huddle: huddleList(hub),
         walks: (await import("../workflows/walks.js")).walks(hub).filter((w) => w.status !== "filed").slice(-10),
-        tasksOpen: hub.tasks.connected() ? (await hub.tasks.tasks().catch(() => [])).filter((t) => !t.completed).sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999")).slice(0, 60) : [],
+        tasksOpen: hub.tasks.connected() ? (await hub.tasks.tasks().catch(() => [])).filter((t) => !t.completed).sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999") || a.title.localeCompare(b.title)).slice(0, 60) : [],
         tasksConnected: hub.tasks.connected(),
         calendarConnected: hub.calendar.connected(),
         activity,
@@ -346,7 +346,21 @@ const server = http.createServer(async (req, res) => {
         folders: all.length,
       });
     }
-    if (p === "/api/plan" && req.method === "GET") return send(res, 200, { ...readPlan(), schedule: BRIEF });
+    if (p === "/api/plan" && req.method === "GET") {
+      // A brief line that is a Google Task shows ticked when the task is done anywhere (brief, dashboard, phone,
+      // Google itself): its state is read from Google every time, not just from the brief's own ticks.
+      const cur = readPlan();
+      let taskState: Record<string, boolean> = {};
+      const tags = "tasks" in cur && cur.tasks ? Object.entries(cur.tasks) : [];
+      if (tags.length && hub.tasks.connected()) {
+        const all = await hub.tasks.tasks({ showCompleted: true }).catch(() => null);
+        if (all) {
+          const byId = new Map(all.map((t) => [t.id, t.completed]));
+          taskState = Object.fromEntries(tags.map(([tag, t]) => [tag, byId.has(t.id) ? !!byId.get(t.id) : true])); // a task that's gone counts as done
+        }
+      }
+      return send(res, 200, { ...cur, schedule: BRIEF, taskState });
+    }
     if (p === "/api/plan/check" && req.method === "POST") {
       // Tick an item of the brief off (or back on). Kept with the brief, so a new brief starts with none ticked.
       const b = await body(req);
@@ -378,6 +392,7 @@ const server = http.createServer(async (req, res) => {
       }
       savePlan({ ...cur, done, ticks });
       bus.emit({ type: "changed", what: "plan" });
+      if (gt) bus.emit({ type: "changed", what: "tasks" }); // the dashboard's task card and anything else listing it
       return send(res, 200, { done });
     }
     if (p === "/api/plan" && req.method === "POST") {
@@ -880,7 +895,13 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, t);
     }
     const tk = p.match(/^\/api\/tasks\/([^/]+)\/([^/]+)$/);
-    if (tk && req.method === "PATCH") return send(res, 200, await hub.tasks.update(decodeURIComponent(tk[1]), decodeURIComponent(tk[2]), await body(req)));
+    if (tk && req.method === "PATCH") {
+      const out = await hub.tasks.update(decodeURIComponent(tk[1]), decodeURIComponent(tk[2]), await body(req));
+      // Ticked on the dashboard (or anywhere else): the brief shows it too.
+      bus.emit({ type: "changed", what: "plan" });
+      bus.emit({ type: "changed", what: "tasks" });
+      return send(res, 200, out);
+    }
     if (tk && req.method === "DELETE") {
       await hub.tasks.remove(decodeURIComponent(tk[1]), decodeURIComponent(tk[2]));
       return send(res, 200, { ok: true });
@@ -1171,14 +1192,14 @@ function teamPeople() {
 const askConvs = new Map<string, { turns: import("../agent/llm.js").ChatTurn[]; job?: number; at: number }>();
 
 // ---- Plan my day: the last brief Claude wrote, shown on the dashboard
-interface Plan { state: "running" | "done" | "error"; /** Which AI and model wrote it. */ ai?: string; startedAt: string; finishedAt?: string; text: string; steps: string[]; error?: string; trigger?: "button" | "morning"; /** Items ticked off on the Brief tab, by item key. */ done?: Record<string, boolean>; /** Which job each tick was about, and its follow-up time before. */ ticks?: Record<string, { job: number; prev: string }>; /** The Google Tasks in this brief, by tag ({task:T1}). */ tasks?: Record<string, { listId: string; id: string; title: string }> }
+interface Plan { state: "running" | "done" | "error"; /** Which AI and model wrote it. */ ai?: string; startedAt: string; finishedAt?: string; text: string; steps: string[]; error?: string; trigger?: "button" | "morning"; /** Items ticked off on the Brief tab, by item key. */ done?: Record<string, boolean>; /** What Keystone handled itself before writing the brief. */ handled?: string[]; /** Which job each tick was about, and its follow-up time before. */ ticks?: Record<string, { job: number; prev: string }>; /** The Google Tasks in this brief, by tag ({task:T1}). */ tasks?: Record<string, { listId: string; id: string; title: string }> }
 
 function startPlan(trigger: "button" | "morning"): { taskId: string } | { error: string; code: number } {
   if (!aiReady(hub)) return { error: aiOffReason(hub), code: 400 };
   if (readPlan().state === "running") return { error: "Claude is already planning your day.", code: 409 };
   // Only my own, recent action items go in (older or other people's ones stay on the dashboard).
   const { items: list, left } = briefItems(reminders(hub, { needsUpload: new Set((lastSync?.needsUpload ?? []).map((x) => x.jobNumber)) }));
-  const buildPrompt = (myDayNote: string) => `Plan my day. Here is everything Keystone thinks needs me, as JSON (kind, job, title, detail, days waiting, threadId):\n${JSON.stringify(list.slice(0, 60))}\n${left.length ? `(${left.length} older items, or ones in other people's stages, are left out on purpose; don't go looking for them.)\n` : ""}\n${myDayNote}\n\nThis brief is only for me and my time. Rules:\n- Only use the items above. Don't search for other work to add, and don't add anything older than what's listed.\n- Each item's "step" is where that job is. Suggest only that step, never a later one: a Lead needs its scope walk set up (not an estimate); the estimate comes after the walk. If a job's walk is already on my calendar above, say when it is instead of asking me to book it.\n- Customer follow-ups are about twice a week, not daily: only the follow-ups listed above are due today.\n- Before you put an email on my list, check it's really waiting on me: the newest message is to me (not just cc'd), it's from a person (not an automated notice), and nothing from me came after it. If I already answered, leave it out.\n- Use ONLY the calendar events and tasks listed above. They are mine: my own calendar plus events I'm invited to on other people's calendars, and my own Google Tasks. Don't look up other calendars or tasks with Keystone's tools, and leave out other people's meetings and to-dos.\n- Every line in the brief is something I do. If something waits on someone else, either write it as my action (\"Ask Shannon whether the selections went out\") or leave it out.\n\nFor the top replies and follow-ups, read the thread or the job (Keystone's tools) and draft the email in Gmail for me (drafts only; I'll send).\n\nEmail buttons: whenever a line is about a specific email conversation, end that line with {email:THREAD_ID}. For a job's reply, use that job's threadId from the JSON above; otherwise only a thread you read for that same job, or the threadId a draft you made for it returned. Keystone checks each button against the job and removes any that don't match, e.g. \"1. #3184 Wegener: reply to Andrew about the revised scope {email:18c2f0a9b7e1d234}\". Keystone turns it into a View email button. Never invent an id; leave it off when you don't have one.\n\nGo buttons: end every line that's about a job with {go:JOB#:PLACE}, where PLACE is where I'd start the work: estimator (writing, pricing or revising an estimate, agreement, photo report), selections (the owner's finish picks and budgets), notes (team notes), photos, files (documents), or job (anything else). E.g. \"2. #3226 Augustine: start the estimate from the ESX {go:3226:estimator}\". Keystone turns it into a button that takes me there.\n\nTasks: every one of my Google Tasks listed above goes in the brief, each on its own line ending with its tag as {task:T#} (e.g. "Order tile samples {task:T2}"). Put a task under "Do in this order" when it fits there; put the rest under **My tasks**. Never list a task twice, and never invent a tag.\n\nYour final reply is my brief for the day, shown at the top of my dashboard. Write it in this shape, in markdown, and nothing else:\n**Today at a glance:** one or two sentences (what's booked, how many things are waiting, the one thing that matters most).\n\n**Do in this order**\n1. #<job> <Name>: what to do (one line each, most urgent first: an adjuster or homeowner waiting on me beats a stale job; money-heavy proposals before small ones).\n\n**My tasks**\n- <task> {task:T#} (my Google Tasks that aren't already in the list above; skip if none).\n\n**On the calendar:** the day's appointments, one line each (skip if none).\n\n**Drafts ready in Gmail:** one line per draft you made (skip if none).`;
+  const buildPrompt = (myDayNote: string, items: typeof list, autoNote: string) => `Plan my day. Here is everything Keystone thinks still needs me, as JSON (kind, job, title, detail, days waiting, threadId):\n${JSON.stringify(items.slice(0, 60))}\n\n${autoNote}\n${left.length ? `(${left.length} older items, or ones in other people's stages, are left out on purpose; don't go looking for them.)\n` : ""}\n${myDayNote}\n\nThis brief is only for me and my time. Rules:\n- Only use the items above. Don't search for other work to add, and don't add anything older than what's listed.\n- Each item's "step" is where that job is. Suggest only that step, never a later one: a Lead needs its scope walk set up (not an estimate); the estimate comes after the walk. If a job's walk is already on my calendar above, say when it is instead of asking me to book it.\n- Customer follow-ups are about twice a week, not daily: only the follow-ups listed above are due today.\n- Before you put an email on my list, check it's really waiting on me: the newest message is to me (not just cc'd), it's from a person (not an automated notice), and nothing from me came after it. If I already answered, leave it out.\n- Use ONLY the calendar events and tasks listed above. They are mine: my own calendar plus events I'm invited to on other people's calendars, and my own Google Tasks. Don't look up other calendars or tasks with Keystone's tools, and leave out other people's meetings and to-dos.\n- Every line in the brief is something I do. If something waits on someone else, either write it as my action (\"Ask Shannon whether the selections went out\") or leave it out.\n- Keystone has already done what it could before this brief (listed above). Don't list those one by one and don't draft them again; they go in one "Handled by Keystone" line.\n- Keep the brief short: when several items are the same kind of thing (estimates to write, jobs not touched this week, walks to book), put them on one line with the jobs named.\n- My tasks are written "Job name - what to do". Keep each task's wording exactly as it is and list a job's tasks next to each other.\n\nEmail buttons: whenever a line is about a specific email conversation, end that line with {email:THREAD_ID}. For a job's reply, use that job's threadId from the JSON above; otherwise only a thread you read for that same job, or the threadId a draft you made for it returned. Keystone checks each button against the job and removes any that don't match, e.g. \"1. #3184 Wegener: reply to Andrew about the revised scope {email:18c2f0a9b7e1d234}\". Keystone turns it into a View email button. Never invent an id; leave it off when you don't have one.\n\nGo buttons: end every line that's about a job with {go:JOB#:PLACE}, where PLACE is where I'd start the work: estimator (writing, pricing or revising an estimate, agreement, photo report), selections (the owner's finish picks and budgets), notes (team notes), photos, files (documents), or job (anything else). E.g. \"2. #3226 Augustine: start the estimate from the ESX {go:3226:estimator}\". Keystone turns it into a button that takes me there.\n\nTasks: every one of my Google Tasks listed above goes in the brief, each on its own line ending with its tag as {task:T#} (e.g. "Order tile samples {task:T2}"). Put a task under "Do in this order" when it fits there; put the rest under **My tasks**. Never list a task twice, and never invent a tag.\n\nYour final reply is my brief for the day, shown at the top of my dashboard. Write it in this shape, in markdown, and nothing else:\n**Today at a glance:** one or two sentences (what's booked, how many things are waiting, the one thing that matters most).\n\n**Do in this order**\n1. #<job> <Name>: what to do (one line each, most urgent first: an adjuster or homeowner waiting on me beats a stale job; money-heavy proposals before small ones).\n\n**My tasks**\n- <task> {task:T#} (my Google Tasks that aren't already in the list above; skip if none).\n\n**On the calendar:** the day's appointments, one line each (skip if none).\n\n**Handled by Keystone:** one line: what Keystone already did (e.g. "Drafted 4 replies and 2 follow-ups; closed 3 tasks you'd already done") and how many drafts are waiting in Gmail for me to review and send (skip if nothing).`;
   const plan: Plan = { state: "running", startedAt: new Date().toISOString(), text: "", steps: [], trigger };
   savePlan(plan);
 
@@ -1188,9 +1209,23 @@ function startPlan(trigger: "button" | "morning"): { taskId: string } | { error:
     try {
       const { withDraftSource } = await import("../workflows/generated.js");
       const note = await travelNote();
+      // Keystone does what it can first (free AI, drafts only), so the brief is only what needs me.
+      const { autopilot, autopilotNote } = await import("../workflows/autopilot.js");
+      const renamed = await (await import("../workflows/taskTitle.js")).reformatOpenTasks(hub).catch(() => 0);
+      if (renamed) hub.say(`Renamed ${renamed} task${renamed === 1 ? "" : "s"} to "Job name - what to do".`);
+      plan.steps.push("Keystone is handling what it can first: drafting replies and follow-ups, closing tasks that are done");
+      savePlan(plan); bus.emit({ type: "changed", what: "plan" });
+      const auto = await autopilot(hub, list).catch((e) => ({ ran: false, note: (e as Error).message, handled: [], leftForHunter: [], draftsWaiting: 0 }));
+      if (auto.handled.length) hub.say(`Before the brief, Keystone handled ${auto.handled.length} item${auto.handled.length === 1 ? "" : "s"} itself.`);
+      plan.handled = auto.handled.map((h) => h.what);
+      // Homebase steps don't become brief lines: they're put on the usual Yes/No cards.
+      const chores = list.filter((r) => r.kind === "log" || r.kind === "upload");
+      const done = new Set(auto.handled.map((h) => `${h.ref.kind}:${h.ref.jobNumber}`));
+      const left2 = list.filter((r) => !done.has(`${r.kind}:${r.jobNumber}`) && !chores.includes(r));
+      const choreNote = chores.length ? `\nHomebase steps Keystone has put on Yes/No cards for me (don't list them): ${chores.map((r) => `${r.kind === "log" ? "log the send-off for" : "upload the estimate files for"} #${r.jobNumber} ${r.name}`).join("; ")}.` : "";
       const day = await myDay();
       plan.tasks = day.tasks;
-      const prompt = buildPrompt(day.text);
+      const prompt = buildPrompt(day.text, left2, autopilotNote(auto) + choreNote);
       const used = new Set<string>();
       plan.text = await withDraftSource(trigger === "morning" ? "Morning brief" : "Plan my day", async () => (await import("../agent/llm.js")).agentAsk(hub, prompt + note, {
         used,
@@ -1211,6 +1246,7 @@ function startPlan(trigger: "button" | "morning"): { taskId: string } | { error:
       plan.ai = [...used].join(", ");
       if (plan.ai) hub.say(`Brief written by ${plan.ai}`);
       plan.state = "done";
+      if (chores.length) setTimeout(() => void runHomebaseChores(chores.map((r) => ({ kind: r.kind, jobNumber: r.jobNumber }))), 2000);
     } catch (e) {
       plan.state = "error";
       plan.error = (e as Error).message;
@@ -1221,6 +1257,21 @@ function startPlan(trigger: "button" | "morning"): { taskId: string } | { error:
       bus.emit({ type: "changed", what: "plan" });
     }
   });
+}
+
+/** The brief's Homebase steps, each on its own Yes/No card (sync and upload ask before they write). */
+function runHomebaseChores(list: { kind: string; jobNumber: number }[]) {
+  return task("Homebase steps from the brief", undefined, async () => {
+    const { uploadToHomebase } = await import("../workflows/files.js");
+    for (const c of list) {
+      try {
+        if (c.kind === "log") await sync(hub, c.jobNumber);
+        else await uploadToHomebase(hub, c.jobNumber);
+      } catch (e) {
+        hub.say(`#${c.jobNumber}: ${(e as Error).message}`);
+      }
+    }
+  }, "job");
 }
 
 // ---- the morning brief: on its own at 7:00 AM Denver time on weekdays (HUB_BRIEF_TIME=off stops it,

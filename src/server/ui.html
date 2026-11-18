@@ -3326,7 +3326,8 @@ async function renderBrief() {
     box.querySelectorAll("li").forEach((li) => {
       const plain = li.cloneNode(true); plain.querySelectorAll(".bgo, .bmail, .btask").forEach((x) => x.remove());
       const gtask = li.querySelector(".btask")?.dataset.t || "";
-      const key = briefKey(plain.textContent); const on = !!p.done?.[key]; total++; if (on) doneN++;
+      // A task line is done when the task is done anywhere (Google's state wins); other lines by their own tick.
+      const key = briefKey(plain.textContent); const on = gtask && p.taskState && gtask in p.taskState ? !!p.taskState[gtask] : !!p.done?.[key]; total++; if (on) doneN++;
       li.classList.add("bitem"); if (on) li.classList.add("done");
       li.insertAdjacentHTML("afterbegin", `<input type="checkbox" class="bchk" data-key="${key}" ${gtask ? `data-task="${gtask}"` : ""} ${on ? "checked" : ""} aria-label="Done">`);
     });
@@ -3354,6 +3355,8 @@ async function renderBrief() {
 document.addEventListener("change", async (e) => {
   const c = e.target.closest(".bchk"); if (!c) return;
   c.closest("li")?.classList.toggle("done", c.checked);
+  // The same task can be on more than one line of the brief: tick them all.
+  if (c.dataset.task) document.querySelectorAll(`.bchk[data-task="${c.dataset.task}"]`).forEach((x) => { if (x !== c) { x.checked = c.checked; x.closest("li")?.classList.toggle("done", c.checked); } });
   const li = c.closest("li"); const job = Number(li?.querySelector("[data-n]")?.dataset.n || li?.textContent.match(/#(\d{4})\b/)?.[1]) || undefined;
   try { await api("/api/plan/check", { method: "POST", body: { key: c.dataset.key, done: c.checked, job, task: c.dataset.task || undefined } }); if (c.dataset.task) { snack(c.checked ? "Checked off in Google Tasks too." : "Reopened in Google Tasks."); if (store.get("tab", "today") === "today") loadToday(); if (store.get("tab", "today") === "walks") loadWalks(); } } catch (err) { log(err.message, "t-err"); }
 });
@@ -3695,6 +3698,8 @@ es.onmessage = (m) => {
   }
   if (e.type === "changed" && e.what === "summaries") { if (mailLoaded && !$("#gm-listview").hidden && $("#gm-listview").style.display !== "none") applySummaries(); return; }
   if (e.type === "changed" && e.what === "plan") { renderBrief(); return; }
+  // A task ticked anywhere: the dashboard's task card and the Tasks panel catch up.
+  if (e.type === "changed" && e.what === "tasks") { if (store.get("tab", "today") === "today") loadToday(); if (store.get("tab", "today") === "cal" && $("#cal-tasks")) renderTaskPanel().catch(() => {}); return; }
   if (e.type === "changed") {
     if (e.what === "mail" && mailLoaded) { loadThreads(); if (mailThread) openThread(mailThread); }
     if ((e.what === "mail" || (e.what === "job" && !e.job)) && mailMode === "byjob" && store.get("tab", "today") === "mail" && bjJob) openBj(bjJob, true);
