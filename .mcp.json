@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "keystone": {
+      "command": "node",
+      "args": ["mcpb/server/index.cjs"],
+      "env": { "KEYSTONE_URL": "http://127.0.0.1:4317" }
+    }
+  }
+}

@@ -39,6 +39,8 @@
   `mcpb/server/index.cjs` as a local MCP server in the Claude desktop app (`Connect Claude app` writes the config file too); it
   proxies tool calls to the running Keystone (`src/server/claudeBridge.ts`), so Claude reads the job, runs the skill's
   scripts and saves results itself. Bridge tools are estimating only; the Claude app's tool prompt is the approval.
+  `.mcp.json` offers the same helper to Claude Code sessions opened on this folder (the desktop app's Code tab doesn't
+  load extensions).
 - Updates on Hunter's PC: `scripts/update.mjs` runs first in `npm run app` (so it runs however Keystone is launched),
   fast-forwards to origin/main, keeps hand edits that don't clash and stashes ones that do, and never blocks the start.
   It only acts on Windows (or `KEYSTONE_UPDATE=1`), so a developer's copy is left alone. The app shows the running
