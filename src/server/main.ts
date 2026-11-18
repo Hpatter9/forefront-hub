@@ -924,7 +924,7 @@ const server = http.createServer(async (req, res) => {
       if (!hub.jobs.exists(n)) await pullJob(hub, n, { quiet: true });
       const j = hub.jobs.get(n);
       const job = { jobNumber: n, name: j.name, address: j.address, stage: j.stage, insurance: j.insurance, customer: j.customer.name, carrier: j.carrier, claimNumber: j.claimNumber, estimate: j.estimate };
-      if (!st[2] && req.method === "GET") return send(res, 200, { job, claudeApp: await claudeAppConnected(), claude: claudeOnlyReady(hub), gemini: !!(hub.gemini && cfg.ai.geminiKey), geminiModel: cfg.ai.geminiModel, ...studio.view(n) });
+      if (!st[2] && req.method === "GET") return send(res, 200, { job, claudeApp: (await claudeAppConnected()) || !!claudeAppSeenAt, claudeAppSeenAt, claude: claudeOnlyReady(hub), gemini: !!(hub.gemini && cfg.ai.geminiKey), geminiModel: cfg.ai.geminiModel, ...studio.view(n) });
       if (req.method !== "POST") return send(res, 405, { error: "method" });
       if (st[2] === "upload") {
         const name = decodeURIComponent(String(req.headers["x-filename"] ?? "file"));
@@ -954,11 +954,13 @@ const server = http.createServer(async (req, res) => {
     }
     // ---- the Claude desktop app's way in (mcpb/server/index.cjs passes its tool calls here): estimates on the subscription
     if (p === "/api/claude-bridge/tools") {
+      claudeAppSeenAt = new Date().toISOString();
       const { bridge } = await import("./claudeBridge.js");
       const br = bridge(hub);
       return send(res, 200, { instructions: br.instructions, tools: br.list() });
     }
     if (p === "/api/claude-bridge/call" && req.method === "POST") {
+      claudeAppSeenAt = new Date().toISOString();
       const b = await body(req);
       const { bridge } = await import("./claudeBridge.js");
       const out = await bridge(hub).call(String(b.name ?? ""), b.arguments ?? {});
@@ -1050,6 +1052,9 @@ function scanAndOfferWalks(only?: string, redo = false) {
     hub.say(`Walk recordings: ${(e as Error).message}`);
   });
 }
+
+/** When the Claude app's helper last asked Keystone for anything (null until it has, since Keystone started). */
+let claudeAppSeenAt: string | null = null;
 
 /** Whether the Claude desktop app on this computer has been pointed at Keystone (Connect Claude app). */
 async function claudeAppConnected(): Promise<boolean> {

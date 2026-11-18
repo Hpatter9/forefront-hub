@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "keystone",
   "display_name": "Keystone",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Lets Claude work on Forefront jobs through Keystone on this computer: read a job's files, photos and notes, run the estimating scripts and price book, and save estimates into the job folder.",
   "long_description": "Keystone is Forefront Building + Restoration's job hub. This extension connects the Claude desktop app to the Keystone that is running on this computer, so estimates are written in Claude on your subscription. It holds no passwords or keys and only talks to Keystone at the local address below. Keystone has to be open for the tools to work.",
   "author": { "name": "Forefront Building + Restoration" },

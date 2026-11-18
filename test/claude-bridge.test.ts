@@ -57,6 +57,7 @@ describe("Keystone's tools for the Claude app (estimates on the subscription)", 
 describe("the helper the Claude app starts", () => {
   it("speaks the protocol and explains itself when Keystone isn't open", async () => {
     process.env.KEYSTONE_URL = "http://127.0.0.1:9"; // nothing listens here
+    process.env.KEYSTONE_HELPER_TEST = "1"; // load it for `handle` without it starting to serve
     const h = createRequire(import.meta.url)("../mcpb/server/index.cjs").handle;
     const init: any = await h({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } });
     expect(init.result).toMatchObject({ protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "keystone" } });

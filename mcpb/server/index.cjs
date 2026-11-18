@@ -7,6 +7,19 @@
  * Nothing but protocol messages may be written to stdout.
  */
 const { createInterface } = require("node:readline");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+
+// A small log, so a connection that doesn't work can be looked at: %TEMP%\keystone-claude-helper.log
+const LOG = path.join(os.tmpdir(), "keystone-claude-helper.log");
+function log(line) {
+  try {
+    if (fs.existsSync(LOG) && fs.statSync(LOG).size > 200000) fs.writeFileSync(LOG, "");
+    fs.appendFileSync(LOG, `${new Date().toISOString()} ${line}\n`);
+  } catch { /* logging is best effort */ }
+  try { process.stderr.write(`[keystone] ${line}\n`); } catch { /* same */ }
+}
 
 // (Anything that isn't a web address, such as an unfilled setting, falls back to Keystone's usual place.)
 const base = () => (/^https?:\/\//.test(process.env.KEYSTONE_URL || "") ? process.env.KEYSTONE_URL : "http://127.0.0.1:4317").replace(/\/$/, "");
@@ -61,15 +74,23 @@ async function handle(m) {
 
 module.exports = { handle };
 
-/** Runs when started by the Claude app (not when a test loads `handle`). */
-if (require.main === module) {
+// Always serve when started as a program, however the Claude app launches it (it doesn't always run the file the
+// way a terminal would). Only a test that loads this file for `handle` turns it off.
+if (process.env.KEYSTONE_HELPER_TEST !== "1") {
+  log(`started (node ${process.version}, ${process.platform}); Keystone at ${base()}`);
+  process.on("uncaughtException", (e) => log(`error: ${e && e.stack ? e.stack : e}`));
+  process.on("unhandledRejection", (e) => log(`error: ${e && e.stack ? e.stack : e}`));
   const rl = createInterface({ input: process.stdin });
-  rl.on("line", async (line) => {
+  // One request at a time, answered in the order they arrived.
+  let queue = Promise.resolve();
+  rl.on("line", (line) => { queue = queue.then(() => answer(line)).catch((e) => log(`error: ${e && e.message}`)); });
+  const answer = async (line) => {
     if (!line.trim()) return;
     let m;
     try { m = JSON.parse(line); } catch { return send({ id: null, error: { code: -32700, message: "Parse error" } }); }
+    if (m.method && m.method !== "ping") log(`request: ${m.method}${m.params && m.params.name ? ` ${m.params.name}` : ""}`);
     const out = await handle(m).catch((e) => (m.id === undefined ? null : { id: m.id, error: { code: -32603, message: e.message } }));
     if (out) send(out);
-  });
-  rl.on("close", () => process.exit(0));
+  };
+  rl.on("close", () => { log("stopped (the Claude app closed the connection)"); process.exit(0); });
 }
