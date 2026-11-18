@@ -214,7 +214,7 @@ export interface GeminiRun {
 }
 
 /** One message from Hunter, worked through to Gemini's answer (or its questions). */
-export async function geminiEstimate(hub: Hub, job: number, text: string, o: { history?: Turn[]; onStep?: (line: string) => void; onText?: (text: string) => void; stopped?: () => boolean; maxSteps?: number } = {}): Promise<GeminiRun> {
+export async function geminiEstimate(hub: Hub, job: number, text: string, o: { history?: Turn[]; onStep?: (line: string) => void; onText?: (text: string) => void; stopped?: () => boolean; maxSteps?: number; /** A specific Gemini model to use for the whole run (no stand-ins): for trying one model on purpose. */ model?: string } = {}): Promise<GeminiRun> {
   if (!hub.gemini || !hub.cfg.ai.geminiKey) throw new Error("Gemini isn't connected. Double-click Connect Gemini in the Keystone folder.");
   const tools = estimatorTools(hub, job);
   const system = estimatorSystem(hub, job);
@@ -227,14 +227,16 @@ export async function geminiEstimate(hub: Hub, job: number, text: string, o: { h
     let r: Awaited<ReturnType<NonNullable<Hub["gemini"]>["generate"]>> | undefined;
     for (let attempt = 0; !r; attempt++) {
       try {
-        r = await hub.gemini.generate({ model: hub.cfg.ai.geminiModel, fallbackModels: hub.cfg.ai.geminiFallbacks, system, contents, tools: tools.decls });
+        // A model picked on purpose is used alone: a quiet stand-in would make the trial meaningless.
+        r = await hub.gemini.generate({ model: o.model ?? hub.cfg.ai.geminiModel, fallbackModels: o.model ? [] : hub.cfg.ai.geminiFallbacks, system, contents, tools: tools.decls });
       } catch (e) {
-        if (attempt >= BUSY_WAITS.length || !BUSY_RX.test((e as Error).message)) throw e;
+        // A daily limit won't clear by waiting a minute: stop at once.
+        if (attempt >= BUSY_WAITS.length || !BUSY_RX.test((e as Error).message) || /daily|per ?day|billing/i.test((e as Error).message)) throw e;
         o.onStep?.(`Gemini is busy or at its free limit; trying again in ${Math.round(BUSY_WAITS[attempt] / 1000)} seconds`);
         await new Promise((res) => setTimeout(res, BUSY_WAITS[attempt]));
       }
     }
-    model = r.model ?? hub.cfg.ai.geminiModel;
+    model = r.model ?? o.model ?? hub.cfg.ai.geminiModel;
     if (!models.includes(model)) models.push(model);
     contents.push(r.turn);
     if (!r.calls.length) return { text: r.text || "(Gemini didn't say anything.)", contents, model, models };

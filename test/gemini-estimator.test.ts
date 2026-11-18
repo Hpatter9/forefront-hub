@@ -111,3 +111,39 @@ describe("Gemini writing in the Estimator", () => {
     expect((hub.gemini as MockGemini).requests[1].contents.map((c) => c.parts[0].text)).toEqual(["New estimate", "Which room?", "The hall bath"]);
   });
 });
+
+describe("trying a named Gemini model (Hydrogen, Argon)", () => {
+  it("uses exactly that model with no stand-in, and says which wrote the answer", async () => {
+    const { hub } = setup();
+    hub.cfg.ai.geminiFallbacks = ["lite"];
+    hub.gemini = new MockGemini(() => "Here's the scope.");
+    const studio = new Studio(hub, () => {});
+    await studio.send(6500, "New estimate", "gemini-hydrogen");
+    const req = (hub.gemini as MockGemini).requests[0];
+    expect(req.model).toBe("gemini-4-hydrogen");
+    expect(req.fallbackModels).toEqual([]);
+    const v = studio.view(6500);
+    expect(v.writer).toBe("gemini-hydrogen");
+    expect(v.turns.at(-1)!.text).toMatch(/Written by Gemini 4 Hydrogen \(gemini-4-hydrogen\)/);
+    expect(v.geminiChoices.map((c: { value: string }) => c.value)).toEqual(["gemini-hydrogen", "gemini-argon"]);
+  });
+
+  it("explains a model the key can't use instead of showing Google's wording alone", async () => {
+    const { hub } = setup();
+    hub.gemini = new MockGemini(() => { throw new Error("Gemini: gemini-4-argon hit its daily quota (You exceeded your current quota, please check your plan and billing details.)"); });
+    const studio = new Studio(hub, () => {});
+    await studio.send(6500, "New estimate", "gemini-argon");
+    expect(studio.view(6500).turns.at(-1)).toMatchObject({ role: "error", text: expect.stringMatching(/Gemini 4 Argon \(gemini-4-argon\) wouldn't run on your Gemini key.*free tier/) });
+  });
+
+  it("switching Gemini models starts that model fresh rather than handing it the other one's memory", async () => {
+    const { hub } = setup();
+    hub.gemini = new MockGemini(() => "ok");
+    const studio = new Studio(hub, () => {});
+    await studio.send(6500, "first", "gemini");
+    await studio.send(6500, "second", "gemini-argon");
+    const second = (hub.gemini as MockGemini).requests.at(-1)!;
+    expect(second.model).toBe("gemini-4-argon");
+    expect(second.contents.map((c) => c.parts[0].text)).toEqual(["second"]);
+  });
+});

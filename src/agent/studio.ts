@@ -16,7 +16,13 @@ import { jobWalks } from "../workflows/walks.js";
  */
 export type StudioRole = "user" | "assistant" | "tool" | "error" | "check" | "cost";
 /** Who writes: Claude's main model, Claude's cheaper model, or Gemini (free). */
-export type Writer = "claude" | "claude-lite" | "gemini";
+export type Writer = "claude" | "claude-lite" | "gemini" | "gemini-hydrogen" | "gemini-argon";
+/** Gemini models Hunter can pick by name to try on an estimate (GEMINI_HYDROGEN_MODEL / GEMINI_ARGON_MODEL change the ids). */
+export const GEMINI_CHOICES: Record<string, { model: string; label: string }> = {
+  "gemini-hydrogen": { model: process.env.GEMINI_HYDROGEN_MODEL || "gemini-4-hydrogen", label: "Gemini 4 Hydrogen" },
+  "gemini-argon": { model: process.env.GEMINI_ARGON_MODEL || "gemini-4-argon", label: "Gemini 4 Argon" },
+};
+export const isGemini = (w: Writer | undefined | null) => !!w && w.startsWith("gemini");
 /** The cheaper Claude model offered in the Estimator next to the main one. */
 export const LITE_MODEL = "claude-sonnet-5-5";
 export interface StudioTurn {
@@ -100,7 +106,7 @@ export class Studio {
   /** The conversation, whether Claude is working on it, and the job's documents and inputs. */
   view(job: number) {
     const s = this.load(job);
-    return { turns: s.turns, running: this.running(job), hasSession: !!s.sessionId || !!s.gemini?.length, writer: s.writer ?? null, cost: s.cost ?? 0, liteModel: LITE_MODEL, mainModel: this.hub.cfg.model, ...this.files(job) };
+    return { turns: s.turns, running: this.running(job), hasSession: !!s.sessionId || !!s.gemini?.length, writer: s.writer ?? null, cost: s.cost ?? 0, liteModel: LITE_MODEL, mainModel: this.hub.cfg.model, geminiChoices: Object.entries(GEMINI_CHOICES).map(([value, c]) => ({ value, label: c.label, model: c.model })), ...this.files(job) };
   }
 
   files(job: number) {
@@ -153,7 +159,7 @@ export class Studio {
   async send(job: number, text: string, ai: Writer = "claude"): Promise<void> {
     const before = this.estimateStamp(job);
     try {
-      await (ai === "gemini" ? this.sendGemini(job, text) : this.sendClaude(job, text, ai));
+      await (isGemini(ai) ? this.sendGemini(job, text, ai) : this.sendClaude(job, text, ai));
     } finally {
       // A new or changed estimate gets Keystone's free check, shown in the conversation.
       if (this.estimateStamp(job) !== before) await this.check(job).catch(() => {});
@@ -223,7 +229,8 @@ export class Studio {
   }
 
   /** The same conversation, written by Gemini (free) with the skill's instructions and scripts. A trial next to Claude. */
-  private async sendGemini(job: number, text: string): Promise<void> {
+  private async sendGemini(job: number, text: string, ai: Writer = "gemini"): Promise<void> {
+    const pick = GEMINI_CHOICES[ai]; // undefined for plain "gemini": the everyday model, with its stand-ins
     if (this.running(job)) throw new Error("The estimator is still working on this job. Wait, or press Stop.");
     const s = this.load(job);
     const add = (role: StudioRole, t: string) => {
@@ -232,21 +239,27 @@ export class Studio {
       this.save(job, s);
       this.emit({ kind: "turn", job, turn });
     };
-    s.writer = "gemini";
+    // A different Gemini model than last time starts from the conversation as shown, not the other model's memory.
+    if (s.writer && s.writer !== ai) s.gemini = undefined;
+    s.writer = ai;
     add("user", text);
     let stop = false;
     this.live.set(job, { interrupt: async () => void (stop = true) });
-    this.emit({ kind: "state", job, running: true, writer: "gemini" });
+    this.emit({ kind: "state", job, running: true, writer: ai });
     try {
       const { forSaving, geminiEstimate } = await import("./geminiEstimator.js");
       const { withDraftSource } = await import("../workflows/generated.js");
       await withDraftSource("Estimator", async () => {
-        const r = await geminiEstimate(this.hub, job, text, { history: s.gemini, stopped: () => stop, onStep: (line) => add("tool", line), onText: (t) => add("assistant", t) });
+        const r = await geminiEstimate(this.hub, job, text, { history: s.gemini, model: pick?.model, stopped: () => stop, onStep: (line) => add("tool", line), onText: (t) => add("assistant", t) });
         s.gemini = forSaving(r.contents).slice(-400);
-        add(r.stopped ? "error" : "assistant", r.stopped ? "Stopped." : `${r.text}\n\n(Written by Gemini: ${r.models.join(", ") || this.hub.cfg.ai.geminiModel}${r.models.some((m) => m !== this.hub.cfg.ai.geminiModel) ? `. The main model, ${this.hub.cfg.ai.geminiModel}, was busy or at its free limit for part of this, so a lighter one filled in` : ""}. This is a trial: check quantities and prices before you send anything.)`);
+        const main = pick?.model ?? this.hub.cfg.ai.geminiModel;
+        const who = pick ? `${pick.label} (${r.models.join(", ") || main})` : `Gemini: ${r.models.join(", ") || main}${r.models.some((m) => m !== main) ? `. The main model, ${main}, was busy or at its free limit for part of this, so a lighter one filled in` : ""}`;
+        add(r.stopped ? "error" : "assistant", r.stopped ? "Stopped." : `${r.text}\n\n(Written by ${who}. This is a trial: check quantities and prices before you send anything.)`);
       });
     } catch (e) {
-      add("error", (e as Error).message);
+      const msg = (e as Error).message;
+      // A model picked by name that this Gemini key can't use: say what that means instead of Google's wording.
+      add("error", pick && /quota|rate limit|billing|permission|not found|no longer available/i.test(msg) ? `${pick.label} (${pick.model}) wouldn't run on your Gemini key: ${msg.split("\n")[0].slice(0, 220)}. Google may not include this model in the free tier, or the key has used its allowance for now. The other choices under Written by still work.` : pick && /busy|unavailable|high demand|overloaded|timeout|fetch failed/i.test(msg) ? `${pick.label} is overloaded at Google right now (${msg.split("\n")[0].slice(0, 160)}). Try again in a few minutes; nothing was changed.` : msg);
     } finally {
       this.live.delete(job);
       this.save(job, s);

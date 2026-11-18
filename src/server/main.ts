@@ -945,9 +945,9 @@ const server = http.createServer(async (req, res) => {
       if (!text) return send(res, 400, { error: "Say what you want Claude to do." });
       // Claude (paid, the proven one) or Gemini (free, a trial): Hunter picks in the Estimator tab.
       if (b.ai === "app") return send(res, 400, { error: "Written by is set to the Claude app (your subscription), so nothing is sent from here. Use Get the files ready and Copy & open Claude." });
-      const ai = b.ai === "gemini" ? "gemini" : b.ai === "claude-lite" ? "claude-lite" : "claude";
-      if (ai === "gemini" && !(hub.gemini && cfg.ai.geminiKey)) return send(res, 400, { error: "Gemini isn't connected. Double-click Connect Gemini in the Keystone folder." });
-      if (ai !== "gemini" && !claudeOnlyReady(hub)) return send(res, 400, { error: "Writing with Claude needs a Claude API key: ANTHROPIC_API_KEY=sk-ant-... in Keystone's .env, then restart. Or switch the Estimator to Gemini (free)." });
+      const ai = ["gemini", "gemini-hydrogen", "gemini-argon", "claude-lite"].includes(b.ai) ? (b.ai as "gemini" | "gemini-hydrogen" | "gemini-argon" | "claude-lite") : "claude";
+      if (ai.startsWith("gemini") && !(hub.gemini && cfg.ai.geminiKey)) return send(res, 400, { error: "Gemini isn't connected. Double-click Connect Gemini in the Keystone folder." });
+      if (!ai.startsWith("gemini") && !claudeOnlyReady(hub)) return send(res, 400, { error: "Writing with Claude needs a Claude API key: ANTHROPIC_API_KEY=sk-ant-... in Keystone's .env, then restart. Or switch the Estimator to Gemini (free)." });
       if (studio.running(n)) return send(res, 409, { error: "The estimator is still working on this job." });
       studio.send(n, text, ai).then(() => bus.emit({ type: "changed", job: n, what: "job" })).catch((e) => console.error(e));
       return send(res, 202, { ok: true });
