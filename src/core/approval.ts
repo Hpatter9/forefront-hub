@@ -8,6 +8,14 @@ export interface Approver {
   confirm(action: string, details?: string[]): Promise<boolean>;
   /** Like confirm, but shows `text` for Hunter to edit; resolves the (edited) text, or null for no. */
   confirmText?(action: string, details: string[], text: string): Promise<string | null>;
+  /** Like confirm, but Hunter may type his own answer instead of Yes or No; `reply` is what he typed. */
+  confirmOrReply?(action: string, details: string[]): Promise<{ yes: boolean; reply?: string }>;
+}
+
+/** confirmOrReply where the approver has it, else a plain Yes/No. */
+export async function confirmOrReply(a: Approver, action: string, details: string[]): Promise<{ yes: boolean; reply?: string }> {
+  if (a.confirmOrReply) return a.confirmOrReply(action, details);
+  return { yes: await a.confirm(action, details) };
 }
 
 /** confirmText where the approver has it, else a plain confirm of the text as written. */
@@ -41,5 +49,13 @@ export class FixedApprover implements Approver {
   async confirmText(action: string, details: string[], text: string): Promise<string | null> {
     this.asked.push({ action, details, text });
     return this.answer ? text : null;
+  }
+  /** Set to answer the next confirmOrReply with typed text. */
+  reply?: string;
+  async confirmOrReply(action: string, details: string[]): Promise<{ yes: boolean; reply?: string }> {
+    this.asked.push({ action, details });
+    const reply = this.reply;
+    this.reply = undefined;
+    return reply ? { yes: false, reply } : { yes: this.answer };
   }
 }

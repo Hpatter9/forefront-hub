@@ -1030,8 +1030,9 @@
   <form id="ans-reply" class="ans-reply"><textarea id="ans-input" rows="2" placeholder="Reply… (Enter to send, Shift+Enter for a new line)"></textarea><button class="btn primary" type="submit">Reply</button></form>
   <div class="foot"><span class="row" id="ans-acts" style="flex:1;flex-wrap:wrap;gap:6px"></span><span class="small muted" id="ans-ai"></span><button class="btn" type="button" onclick="this.closest('dialog').close()">Done</button></div></dialog>
 
-<dialog id="approve"><div class="in"><h4 id="ap-title"></h4><ul id="ap-details"></ul><textarea id="ap-text" rows="3" hidden></textarea></div>
-  <div class="foot"><button class="btn" id="ap-no">No</button><button class="btn primary" id="ap-yes">Yes, go ahead</button></div></dialog>
+<dialog id="approve"><div class="in"><h4 id="ap-title"></h4><ul id="ap-details"></ul><textarea id="ap-text" rows="3" hidden></textarea>
+  <textarea id="ap-reply" rows="2" placeholder="Not a yes or no? Type your answer here" style="margin-top:10px;width:100%"></textarea></div>
+  <div class="foot"><button class="btn" id="ap-no">No</button><button class="btn" id="ap-send" hidden>Send my answer</button><button class="btn primary" id="ap-yes">Yes, go ahead</button></div></dialog>
 
 <dialog id="sendoff"><form method="dialog"><div class="in">
   <h4>Draft the send-off</h4>
@@ -3006,6 +3007,7 @@ function showApproval() {
   $("#ap-title").textContent = a.action;
   $("#ap-details").innerHTML = a.details.filter(Boolean).map((d) => `<li>${esc(d)}</li>`).join("");
   $("#ap-text").hidden = a.text === undefined; $("#ap-text").value = a.text ?? "";
+  $("#ap-reply").value = ""; $("#ap-send").hidden = true;
   if (!dlg.open) dlg.showModal();
 }
 async function answer(yes) {
@@ -3014,6 +3016,22 @@ async function answer(yes) {
   showApproval();
   await api(`/api/approvals/${a.id}`, { method: "POST", body: { yes, text } }).catch(() => {});
 }
+// A typed answer instead of Yes or No. Cards that take one use it directly; for the rest it goes to Keystone's AI
+// as an instruction about that question (anything it then writes still asks first).
+async function sendReply() {
+  const a = approvals[0], reply = $("#ap-reply").value.trim();
+  if (!a || !reply) return;
+  approvals.shift();
+  showApproval();
+  await api(`/api/approvals/${a.id}`, { method: "POST", body: { yes: false, reply } }).catch(() => {});
+  if (!a.replyAware) {
+    $("#prompt").value = `About Keystone's question "${a.action}"${a.details?.length ? ` (${a.details.filter(Boolean).join("; ").slice(0, 600)})` : ""}, my answer: ${reply}`;
+    $("#askform").requestSubmit();
+  }
+}
+$("#ap-reply").addEventListener("input", () => { $("#ap-send").hidden = !$("#ap-reply").value.trim(); });
+$("#ap-reply").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); } });
+$("#ap-send").addEventListener("click", sendReply);
 $("#ap-yes").addEventListener("click", () => answer(true));
 $("#ap-no").addEventListener("click", () => answer(false));
 $("#approve").addEventListener("cancel", (e) => { e.preventDefault(); answer(false); });

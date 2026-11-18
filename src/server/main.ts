@@ -240,6 +240,11 @@ const server = http.createServer(async (req, res) => {
       }, 400);
       return;
     }
+    if (p === "/api/status-updates" && req.method === "POST") {
+      const b = await body(req);
+      runStatusUpdates(!!b.force);
+      return send(res, 200, { ok: true });
+    }
     if (p === "/api/budget" && req.method === "GET") {
       const { budgetReport } = await import("../workflows/spend.js");
       return send(res, 200, { ...(await budgetReport(cfg.stateDir, hub.claudeCost)), adminKey: !!hub.claudeCost });
@@ -1052,7 +1057,7 @@ const server = http.createServer(async (req, res) => {
     const a = p.match(/^\/api\/approvals\/([\w-]+)$/);
     if (a && req.method === "POST") {
       const b = await body(req);
-      return send(res, approver.answer(a[1], !!b.yes, typeof b.text === "string" ? b.text : undefined) ? 200 : 404, { ok: true });
+      return send(res, approver.answer(a[1], !!b.yes, typeof b.text === "string" ? b.text : undefined, typeof b.reply === "string" ? b.reply : undefined) ? 200 : 404, { ok: true });
     }
     send(res, 404, { error: "not found" });
   } catch (e) {
@@ -1259,6 +1264,8 @@ function startPlan(trigger: "button" | "morning"): { taskId: string } | { error:
       if (plan.ai) hub.say(`Brief written by ${plan.ai}`);
       plan.state = "done";
       if (chores.length) setTimeout(() => void runHomebaseChores(chores.map((r) => ({ kind: r.kind, jobNumber: r.jobNumber }))), 2000);
+      // Coworkers see where each Proposal Submitted job stands (only jobs with something new since the last line).
+      if (hub.homebase.kind !== "mock") setTimeout(() => runStatusUpdates(), chores.length ? 60_000 : 5_000);
     } catch (e) {
       plan.state = "error";
       plan.error = (e as Error).message;
@@ -1270,6 +1277,38 @@ function startPlan(trigger: "button" | "morning"): { taskId: string } | { error:
     }
   });
 }
+
+/**
+ * The short "where we are" line on each Proposal Submitted job in Homebase, for coworkers (statusUpdates.ts). Once a
+ * day: the first time Keystone runs that day (a little after it opens), then again after the morning brief only if
+ * something new came in. One Yes/No card covers every job.
+ */
+let statusRunning = false;
+function runStatusUpdates(force = false) {
+  if (statusRunning) return;
+  statusRunning = true;
+  task("Proposal Submitted updates for Homebase", undefined, async () => {
+    try {
+      const r = await (await import("../workflows/statusUpdates.js")).updateProposalJobs(hub, { force });
+      if (r.problem) hub.say(r.problem);
+      else if (!r.written && !r.skipped) hub.say("No Proposal Submitted jobs of yours on Homebase right now.");
+      else if (!r.written) hub.say("Proposal Submitted updates: nothing new to write.");
+    } finally {
+      statusRunning = false;
+    }
+  }, "job");
+}
+const statusDayFile = path.join(cfg.stateDir, "status-updates-day.txt");
+function statusUpdatesDaily() {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Denver" });
+  let last = "";
+  try { last = readFileSync(statusDayFile, "utf8").trim(); } catch { /* first time */ }
+  if (last === today || hub.homebase.kind === "mock" || !aiReady(hub)) return;
+  try { mkdirSync(cfg.stateDir, { recursive: true }); writeFileSync(statusDayFile, today); } catch { /* still run */ }
+  runStatusUpdates();
+}
+setTimeout(statusUpdatesDaily, 3 * 60_000);
+setInterval(statusUpdatesDaily, 30 * 60_000);
 
 /** The brief's Homebase steps, each on its own Yes/No card (sync and upload ask before they write). */
 function runHomebaseChores(list: { kind: string; jobNumber: number }[]) {

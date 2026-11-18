@@ -210,6 +210,18 @@ export function hubToolDefs(hub: Hub) {
       wrap(async ({ jobNumber: n }) => (await import("../workflows/timeline.js")).timeline(hub, n)),
     ),
     tool(
+      "homebase_status_updates",
+      "Bring the short Proposal Submitted status line (for coworkers) up to date on all of Hunter's Proposal Submitted jobs in Homebase, from each job's latest activity. Hunter OKs every line on one card. force: rewrite even jobs with nothing new.",
+      { force: z.boolean().default(false) },
+      wrap(async ({ force }) => (await import("../workflows/statusUpdates.js")).updateProposalJobs(hub, { force })),
+    ),
+    tool(
+      "homebase_set_status_update",
+      "Write one job's Proposal Submitted status line in Homebase: one or two short sentences for coworkers, starting with today's date like \"11/18: \". Hunter OKs it first.",
+      { jobNumber, text: z.string().min(3).max(300) },
+      wrap(async ({ jobNumber: n, text }) => (await import("../workflows/statusUpdates.js")).setStatusUpdate(hub, n, text)),
+    ),
+    tool(
       "homebase_update_fields",
       "Change fields on the Homebase job (Hunter is shown each old -> new value and must OK it). Keys: detail, propertyType, estimator, preferredContactMethod, picturesLink, fundingType, claimStatus, claimNumber, carrier (an account id from homebase_find_account), deductible, poWoNumber, proposalAmount (also restamps the proposal date to today), estimatedCosts, desiredMargin, mitEstimatedInvoice, lockboxCode, gateCode, alarm, pets, parking, elevatorAccess, accessNotes, customerNotes, pmNotes, toolAccess, address ({street, unit, city, state, zip}).",
       { jobNumber, changes: z.record(z.string(), z.any()) },

@@ -66,3 +66,12 @@
   Estimator asks before a paid Claude run. Record the cost of any new Claude or Gemini call path the same way.
 - Every Estimator writer can make Gmail drafts (never send): Claude through the hub tools, Gemini (all models) via
   `gmail_create_draft` in `HUB_TOOLS`, the Claude app via `keystone_create_draft` on the bridge.
+- Proposal Submitted status line (`src/workflows/statusUpdates.ts`): a dated one- or two-sentence "where we are" line
+  on each of Hunter's Proposal Submitted jobs in Homebase, for coworkers. Gemini writes it from the job's timeline,
+  only when something new happened; one card OKs every job's line. Runs a few minutes after the first start of the
+  day and after the morning brief; also the `homebase_status_updates` / `homebase_set_status_update` tools and
+  POST /api/status-updates. The field is found by name (a key with "update" in it), or HOMEBASE_UPDATE_FIELD.
+- Question cards take a typed answer as well as Yes/No (`#ap-reply`). `confirm` treats a typed answer as no and the
+  page sends it to the Ask box as an instruction; callers that can use it call `confirmOrReply` (e.g. the status
+  card: "Williams: new text" or "skip Williams").
+

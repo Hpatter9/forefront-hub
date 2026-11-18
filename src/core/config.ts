@@ -26,7 +26,7 @@ export interface Config {
   model: string;
   /** A fast, cheaper model for small jobs like one-line email summaries. */
   fastModel: string;
-  homebase: { driver: "mock" | "browser" | "api"; url: string; apiToken: string; authFile: string; me: string };
+  homebase: { driver: "mock" | "browser" | "api"; url: string; apiToken: string; authFile: string; me: string; /** The job field for the Proposal Submitted update line (blank: found by name). */ updateField?: string };
   gmail: { driver: "mock" | "google"; clientId: string; clientSecret: string; address: string; tokenFile: string };
   companycam: { driver: "mock" | "rest"; token: string };
   docusketch: { downloadsDir: string };
@@ -104,6 +104,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
       apiToken: e("HOMEBASE_API_TOKEN"),
       authFile: path.join(root, "auth", "homebase.json"),
       me: e("HOMEBASE_ME", "Hunter Patterson"),
+      updateField: e("HOMEBASE_UPDATE_FIELD"),
     },
     gmail: {
       driver: live && gmailReady ? "google" : "mock",
