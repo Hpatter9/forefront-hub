@@ -229,8 +229,23 @@ const server = http.createServer(async (req, res) => {
       return res.end(readFileSync(path.join(HERE, "ui.html")));
     }
     if (p === "/api/events") return bus.attach(res);
+    if (p === "/api/update" && req.method === "POST") {
+      // Restart into the newer version: the start file sees exit code 75, updates and starts Keystone again.
+      // (The update is applied here too, so it lands even if Keystone was started some other way than the start file.)
+      send(res, 200, { ok: true });
+      setTimeout(async () => {
+        const { spawnSync } = await import("node:child_process");
+        try { spawnSync(process.execPath, [path.join(cfg.hubRoot, "scripts", "update.mjs")], { cwd: cfg.hubRoot, stdio: "inherit", timeout: 300_000 }); } catch { /* the start file tries again */ }
+        process.exit(75);
+      }, 400);
+      return;
+    }
     if (p === "/api/status") {
+      const ver = await import("./version.js");
       return send(res, 200, {
+        version: await ver.runningVersion(cfg.hubRoot),
+        updatesWaiting: await ver.updatesWaiting(cfg.hubRoot).catch(() => 0),
+        lastUpdate: ver.lastUpdate(cfg.hubRoot),
         lines: describe(hub),
         homebase: hub.homebase.kind,
         gmail: hub.gmail.kind,

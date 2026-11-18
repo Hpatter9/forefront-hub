@@ -8,7 +8,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "app": "tsx src/server/main.ts",
+    "app": "node scripts/update.mjs && tsx src/server/main.ts",
+    "update": "node scripts/update.mjs",
     "hub": "tsx src/cli/main.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

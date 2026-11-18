@@ -38,3 +38,7 @@
   Better still, `Connect Claude app` registers `src/mcp/stdio.ts` as a local MCP server in the Claude desktop app; it
   proxies tool calls to the running Keystone (`src/server/claudeBridge.ts`), so Claude reads the job, runs the skill's
   scripts and saves results itself. Bridge tools are estimating only; the Claude app's tool prompt is the approval.
+- Updates on Hunter's PC: `scripts/update.mjs` runs first in `npm run app` (so it runs however Keystone is launched),
+  fast-forwards to origin/main, keeps hand edits that don't clash and stashes ones that do, and never blocks the start.
+  It only acts on Windows (or `KEYSTONE_UPDATE=1`), so a developer's copy is left alone. The app shows the running
+  version and an "Update ready" chip (`src/server/version.ts`); exit code 75 means "restart me" to `Start Keystone.bat`.

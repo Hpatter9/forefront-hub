@@ -1186,11 +1186,32 @@ $("#globalq").addEventListener("keydown", (e) => { if (e.key !== "Enter") return
 $("#logo").addEventListener("click", (e) => { e.preventDefault(); showTab("today"); });
 
 // ============================================================= status
+// Which version is running, and a one-click restart when a newer one is waiting on GitHub.
+function showVersion() {
+  let el = $("#verchip");
+  if (!el) { el = document.createElement("button"); el.id = "verchip"; el.type = "button"; el.className = "chip"; el.style.cssText = "cursor:pointer;font:inherit"; $("#chips").after(el); }
+  const v = status.version, n = status.updatesWaiting || 0, lu = status.lastUpdate;
+  el.hidden = !v;
+  if (!v) return;
+  const when = v.at ? new Date(v.at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : v.hash;
+  el.textContent = n ? `Update ready (${n})` : `Version ${when}`;
+  el.classList.toggle("primary", !!n);
+  el.style.borderColor = n ? "var(--accent)" : ""; el.style.color = n ? "var(--accent)" : "";
+  el.title = `Running: ${v.hash}, ${v.at ? new Date(v.at).toLocaleString() : ""}\n${v.subject}\n\n${lu ? `Last start: ${lu.updated ? `updated (${lu.changes} change${lu.changes === 1 ? "" : "s"})` : lu.ok ? "already up to date" : `couldn't update: ${lu.note || ""}`}${(lu.notes || []).length ? `\n${lu.notes.join("\n")}` : ""}` : ""}\n\n${n ? "Click to restart Keystone into the newer version." : "Keystone checks GitHub every time it starts. Click to check now."}`;
+  el.onclick = async () => {
+    if (!(status.updatesWaiting > 0)) { snack("Checking GitHub…"); await loadStatus(); snack(status.updatesWaiting ? `A newer version is ready (${status.updatesWaiting} change${status.updatesWaiting === 1 ? "" : "s"}). Click Update ready.` : "Keystone is up to date."); return; }
+    if (!confirm("Restart Keystone now to get the newer version? It takes about half a minute. Anything running (a sync, an estimate) will stop.")) return;
+    await api("/api/update", { method: "POST", body: {} }).catch(() => {});
+    document.body.insertAdjacentHTML("beforeend", `<div style="position:fixed;inset:0;background:rgba(3,10,22,.85);z-index:999;display:grid;place-items:center;color:#eaf3ff;font-size:20px;text-align:center;padding:24px"><div>Updating Keystone…<br><span style="font-size:15px;color:#a9c3e6">This page comes back by itself. If it doesn't within a minute, start Keystone from the desktop icon.</span></div></div>`);
+    const back = setInterval(async () => { try { const r = await fetch("/api/status"); if (r.ok) { clearInterval(back); location.reload(); } } catch { /* still restarting */ } }, 3000);
+  };
+}
 async function loadStatus() {
   status = await api("/api/status");
   meta = await api("/api/meta").catch(() => meta);
     $("#prompt").placeholder = `Ask ${AI()}, or drop files here, e.g. “who's waiting on me?”, “draft a follow-up to the Wegener homeowner”`;
   const chip = (label, on, title) => `<span class="chip ${on ? "" : "off"}" title="${esc(title)}">${on ? "●" : "○"} ${label}</span>`;
+  showVersion();
   $("#chips").innerHTML = [
     chip("Homebase", status.homebase !== "mock", `Homebase: ${status.homebase}`),
     chip("Gmail", status.gmail === "google", status.gmail === "google" ? (status.gmailFull ? "Connected" : "Connected for drafts only; reconnect to send from Keystone") : "Not connected (test inbox)"),
