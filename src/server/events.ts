@@ -4,6 +4,8 @@ import type { Approver } from "../core/approval.js";
 
 export type HubEvent =
   | { type: "log"; text: string; job?: number }
+  /** Shown on screen for a few seconds (the result of something Hunter asked for, or a problem he should see). */
+  | { type: "notice"; text: string }
   | { type: "approval"; id: string; action: string; details: string[]; text?: string; replyAware?: boolean }
   | { type: "approval-done"; id: string; answer: boolean }
   | { type: "task"; id: string; state: "running" | "done" | "error"; label: string; error?: string; job?: number }

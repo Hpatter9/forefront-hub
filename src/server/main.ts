@@ -265,7 +265,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === "/api/status-updates" && req.method === "POST") {
       const b = await body(req);
-      runStatusUpdates(!!b.force);
+      runStatusUpdates(b.force !== false, true);
       return send(res, 200, { ok: true });
     }
     if (p === "/api/budget" && req.method === "GET") {
@@ -1307,15 +1307,21 @@ function startPlan(trigger: "button" | "morning"): { taskId: string } | { error:
  * something new came in. One Yes/No card covers every job.
  */
 let statusRunning = false;
-function runStatusUpdates(force = false) {
-  if (statusRunning) return;
+function runStatusUpdates(force = false, asked = false) {
+  if (statusRunning) { if (asked) bus.emit({ type: "notice", text: "Already working on the Proposal Submitted Notes; the card will pop up when they're ready." }); return; }
   statusRunning = true;
-  task("Proposal Submitted updates for Homebase", undefined, async () => {
+  // What happened is shown on screen (not only in the activity log): always when Hunter asked, and for problems.
+  const tell = (text: string, problem = false) => { hub.say(text); if (asked || problem) bus.emit({ type: "notice", text }); };
+  task("Proposal Submitted Notes for Homebase", undefined, async () => {
     try {
       const r = await (await import("../workflows/statusUpdates.js")).updateProposalJobs(hub, { force });
-      if (r.problem) hub.say(r.problem);
-      else if (!r.written && !r.skipped) hub.say("No Proposal Submitted jobs of yours on Homebase right now.");
-      else if (!r.written) hub.say("Proposal Submitted updates: nothing new to write.");
+      if (r.problem) tell(`Proposal Submitted Notes: ${r.problem}`, true);
+      else if (!r.written && !r.skipped) tell(`Proposal Submitted Notes: Homebase shows no Proposal Submitted jobs with ${cfg.homebase.me} on them.`);
+      else if (!r.written) tell(`Proposal Submitted Notes: nothing written (${r.skipped} job${r.skipped === 1 ? "" : "s"} had nothing new, couldn't be read, or you said no). The activity log has the details.`);
+      // The day only counts as done when the run worked; a problem is tried again on the next check.
+      if (!r.problem) { try { mkdirSync(cfg.stateDir, { recursive: true }); writeFileSync(statusDayFile, new Date().toLocaleDateString("en-CA", { timeZone: "America/Denver" })); } catch { /* fine */ } }
+    } catch (e) {
+      tell(`Proposal Submitted Notes couldn't run: ${(e as Error).message}`, true);
     } finally {
       statusRunning = false;
     }
@@ -1327,7 +1333,6 @@ function statusUpdatesDaily() {
   let last = "";
   try { last = readFileSync(statusDayFile, "utf8").trim(); } catch { /* first time */ }
   if (last === today || hub.homebase.kind === "mock" || !aiReady(hub)) return;
-  try { mkdirSync(cfg.stateDir, { recursive: true }); writeFileSync(statusDayFile, today); } catch { /* still run */ }
   runStatusUpdates();
 }
 setTimeout(statusUpdatesDaily, 3 * 60_000);

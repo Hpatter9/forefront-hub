@@ -1332,6 +1332,7 @@ async function loadToday() {
   const notesCard = await teamNotesCard();
   $("#today").innerHTML = `
     <div class="todayhead"><div style="flex:1;min-width:240px"><h2>Dashboard</h2><div class="dateline">${esc(longDate)} · ${t.open} open jobs${d.lastSync ? ` · synced ${fmtWhen(d.lastSync)}` : ""}</div></div>
+      <button class="btn" id="hbnotes" title="Write each Proposal Submitted job's current status into its Proposal Submitted Notes on Homebase (you OK them first)">Update Homebase notes</button>
       <button class="btn primary" id="plan" ${status.agent ? "" : `disabled title='${AI()} is off on this machine'`}>Plan my day with ${AI()}</button></div>
     ${textsStale() ? `<div class="banner" style="border-left-color:var(--bad)"><b>Your iPhone hasn't backed up since ${new Date(status.texts.backupAt).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.</b> Keystone can't see texts newer than that. Plug the phone into this PC, open <b>Apple Devices</b> and click <b>Back Up Now</b>, then <b>Sync now</b> here.</div>` : ""}
     ${!d.autoFiling ? `<div class="banner">Incoming job emails file themselves to Homebase once Gmail is fully connected${status.gmail === "google" ? ": double-click <b>Connect Gmail</b> in the Keystone folder (forefront-hub) once more and click Allow" : ""}.</div>` : ""}
@@ -1373,6 +1374,10 @@ async function loadToday() {
       </div>
     </div>`;
   $("#plan")?.addEventListener("click", startPlan);
+  $("#hbnotes")?.addEventListener("click", async () => {
+    try { await api("/api/status-updates", { method: "POST", body: {} }); snack("Writing the current status for each Proposal Submitted job. A card will pop up for your OK in a minute or two."); }
+    catch (e) { snack(e.message); }
+  });
   renderBrief();
 }
 $("#today").addEventListener("click", (e) => {
@@ -1913,7 +1918,7 @@ async function moveThreads(ids, target) {
 function snack(text, undo) {
   let el = $("#snack"); if (!el) { el = document.createElement("div"); el.id = "snack"; el.className = "snack"; document.body.appendChild(el); }
   el.innerHTML = `<span>${esc(text)}</span>${undo ? `<button type="button">Undo</button>` : ""}`; el.hidden = false;
-  clearTimeout(el._t); el._t = setTimeout(() => (el.hidden = true), 8000);
+  clearTimeout(el._t); el._t = setTimeout(() => (el.hidden = true), Math.max(8000, Math.min(45000, text.length * 90))); // long messages stay up long enough to read
   if (undo) el.querySelector("button").onclick = () => { el.hidden = true; undo(); };
 }
 
@@ -3772,6 +3777,7 @@ const es = new EventSource("/api/events");
 es.onmessage = (m) => {
   const e = JSON.parse(m.data);
   if (e.type === "log") log(e.text);
+  if (e.type === "notice") snack(e.text);
   if (e.type === "studio") onStudio(e);
   if (e.type === "subreport") onSubReport(e);
   if (e.type === "answer") onAnswer(e);
