@@ -14,6 +14,8 @@ export const SCOPES = {
   gmailCompose: "https://www.googleapis.com/auth/gmail.compose",
   calendar: "https://www.googleapis.com/auth/calendar",
   tasks: "https://www.googleapis.com/auth/tasks",
+  /** For the Claude hand-off folder only (connectors/drive). Full Drive, because that folder is shared in from another account. */
+  drive: "https://www.googleapis.com/auth/drive",
 };
 
 export interface GoogleOpts {
@@ -69,7 +71,7 @@ export class GoogleAuth {
       server.on("request", (req, res) => {
         const u = new URL(req.url ?? "/", redirect);
         const c = u.searchParams.get("code");
-        res.end(c ? "Gmail, Google Calendar and Google Tasks are connected to the Forefront hub. You can close this tab." : `Error: ${u.searchParams.get("error")}`);
+        res.end(c ? "Gmail, Google Calendar, Google Tasks and Google Drive are connected to the Forefront hub. You can close this tab." : `Error: ${u.searchParams.get("error")}`);
         c ? resolve(c) : reject(new Error(u.searchParams.get("error") ?? "no code"));
       });
       console.log(`Opening Google sign-in. If it doesn't open, paste this into your browser:\n${url}\n`);

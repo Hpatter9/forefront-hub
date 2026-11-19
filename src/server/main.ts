@@ -662,6 +662,21 @@ const server = http.createServer(async (req, res) => {
             bus.emit({ type: "subreport", job: n, file: path.relative(hub.jobs.folder(n), r.file).split(path.sep).join("/"), questions: r.questions, rooms: r.rooms, photos: r.photos, ai: r.model ?? "" } as never);
           }, "job"));
         }
+        case "drive-send": {
+          // The job's package to Google Drive, for a Claude chat that can't see this PC (workflows/driveHandoff.ts).
+          if (!hub.jobs.exists(n)) await pullJob(hub, n, { quiet: true, lookups: false }).catch(() => {});
+          return send(res, 202, task(`Send #${n} to Claude (Google Drive)`, n, async () => {
+            try { await (await import("../workflows/driveHandoff.js")).sendToDrive(hub, n, b.action, b.note ?? ""); bus.emit({ type: "notice", text: `#${n} is in Google Drive for Claude. In your Claude chat, say what you want done on job ${n}.` }); }
+            catch (e) { bus.emit({ type: "notice", text: `Couldn't send #${n} to Drive: ${(e as Error).message}` }); throw e; }
+          }, "job"));
+        }
+        case "drive-pull":
+          return send(res, 202, task(`Get what Claude made for #${n}`, n, async () => {
+            try {
+              const got = await checkDriveResults(n);
+              if (!got) bus.emit({ type: "notice", text: `Nothing new from Claude for #${n} in Google Drive yet.` });
+            } catch (e) { bus.emit({ type: "notice", text: `Couldn't check Drive for #${n}: ${(e as Error).message}` }); throw e; }
+          }, "job"));
         case "claude-package": {
           // Everything for the Claude app (your subscription) in one folder. Free: Gemini does the reading.
           if (!hub.jobs.exists(n)) await pullJob(hub, n, { quiet: true, lookups: false }).catch(() => {});
@@ -1338,6 +1353,24 @@ function statusUpdatesDaily() {
 }
 setTimeout(statusUpdatesDaily, 3 * 60_000);
 setInterval(statusUpdatesDaily, 30 * 60_000);
+
+// ---- Claude hand-off through Google Drive: bring in what Claude made, then run the free check on it.
+async function checkDriveResults(n?: number): Promise<number> {
+  const { pullFromDrive } = await import("../workflows/driveHandoff.js");
+  const got = await pullFromDrive(hub, n);
+  for (const g of got) {
+    bus.emit({ type: "notice", text: `Claude's work on #${g.jobNumber} is in the job: ${g.files.join(", ")}` });
+    if (g.files.some((f) => f.toLowerCase() === "estimate.json")) await studio.check(g.jobNumber).catch(() => {});
+    bus.emit({ type: "changed", job: g.jobNumber, what: "job" });
+  }
+  return got.length;
+}
+let driveBusy = false;
+setInterval(() => {
+  if (driveBusy || !hub.drive?.connected() || hub.drive.kind === "mock") return;
+  driveBusy = true;
+  checkDriveResults().catch(() => {}).finally(() => { driveBusy = false; });
+}, 2 * 60_000);
 
 // ---- iPhone texts: when the phone is plugged in and its backup is old, back it up (workflows/autoBackup.ts).
 async function checkPhoneBackup(force = false) {

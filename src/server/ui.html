@@ -3729,7 +3729,9 @@ function renderHandoff(d) {
       <p class="small muted" style="margin:10px 0 4px">Or the manual way (works on the website too):</p>`
     : `<div class="banner" style="border-left-color:var(--warn, #ffb38a)"><b>Skip the dragging:</b> double-click <b>Connect Claude app</b> in the Keystone folder once. After that you just tell the Claude app "New estimate for job ${d.job.jobNumber}" and it reads the job and saves the PDFs here by itself.</div>
       <p class="small muted" style="margin:10px 0 4px">Until then, the manual way:</p>`}
-    <p class="muted" style="margin-top:0">Keystone writes the request with everything it knows about #${d.job.jobNumber} ${esc(d.job.name)}; you attach the files and drop the PDFs back here.</p>
+    <div class="banner"><b>Write it in a Claude chat (through Google Drive):</b> pick what you want below, add a note if you like, and press <b>Send to Claude chat</b>. Then in your Claude chat just say what you want on job ${d.job.jobNumber}. When Claude finishes, the PDFs come back here by themselves within a couple of minutes (or press <b>Get what Claude made</b>).
+      <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn primary" type="button" id="ho-drive">Send to Claude chat</button><button class="btn" type="button" id="ho-drive-get">Get what Claude made</button></div></div>
+    <p class="muted" style="margin-top:10px">Or by hand: Keystone writes the request with everything it knows about #${d.job.jobNumber} ${esc(d.job.name)}; you attach the files and drop the PDFs back here.</p>
     <div class="hacts">${HANDOFF.map(([k, v]) => `<button type="button" class="${k === handoffAct ? "on" : ""}" data-hact="${k}">${esc(v)}</button>`).join("")}</div>
     <textarea id="ho-note" rows="2" placeholder="${handoffAct === "revise" ? "What to change (e.g. make the hallway LVP instead of carpet)" : "Anything to add for Claude (optional)"}"></textarea>
     <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" id="ho-pack">1. Get the files ready</button><button class="btn primary" type="button" id="ho-go">2. Copy &amp; open Claude</button><button class="btn" type="button" id="ho-back">3. Add what Claude made</button><button class="btn" type="button" id="ho-folder">Show the job's files</button></div>
@@ -3772,6 +3774,14 @@ function renderHandoff(d) {
   });
   $("#ho-folder").addEventListener("click", async () => { try { const r = await api(`/api/jobs/${d.job.jobNumber}/open-folder`, { method: "POST", body: {} }); snack(`Opened ${r.folder}`); } catch (e) { log(e.message, "t-err"); } });
   $("#ho-back").addEventListener("click", () => $("#est-pick").click());
+  $("#ho-drive").addEventListener("click", async () => {
+    try { await api(`/api/jobs/${d.job.jobNumber}/drive-send`, { method: "POST", body: { action: handoffAct, note: $("#ho-note")?.value || "" } }); snack("Getting the job's files together and putting them in Google Drive. This takes a minute or two; you'll see a message when it's there."); }
+    catch (e) { snack(e.message); }
+  });
+  $("#ho-drive-get").addEventListener("click", async () => {
+    try { await api(`/api/jobs/${d.job.jobNumber}/drive-pull`, { method: "POST", body: {} }); snack("Checking Google Drive for Claude's files…"); }
+    catch (e) { snack(e.message); }
+  });
 }
 const es = new EventSource("/api/events");
 es.onmessage = (m) => {

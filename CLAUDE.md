@@ -89,4 +89,10 @@
   private venv in `.hub/iphone-tools`, installed on first use) into the folder Apple Devices uses. Clicking the Texts
   chip does it now (POST /api/texts/backup). IPHONE_AUTO_BACKUP=off turns it off. Untested against a real phone on
   Windows when written: failures are said once and retried hourly; Apple Devices' Back Up Now is the fallback.
+- Drive hand-off (`src/workflows/driveHandoff.ts`, `src/connectors/drive`): for writing estimates in a Claude chat that
+  can't see the PC (Claude Code on the web). "Send to Claude chat" on the Estimator's hand-off panel uploads the
+  hand-off package plus Request.md to Google Drive "Keystone hand-off/<job# name>/for-claude"; Claude saves PDFs and
+  estimate.json in ".../from-claude"; Keystone checks every 2 minutes (or "Get what Claude made"), asks before
+  replacing an estimate (old one to estimate/revisions) and runs the free check. The root folder lives in Hunter's
+  personal Drive and is shared with Keystone's Google account, hence the full `drive` scope (re-run Connect Gmail).
 
