@@ -103,6 +103,21 @@ export function belongsToJob(all: { signs: Map<number, JobSigns>; shared: Set<st
   return { belongs: false, why: "the address is on several jobs and nothing in it says which" };
 }
 
+/**
+ * Which job an email conversation is about, or null when it isn't clearly one job: its Homebase log address
+ * (office+<job#>@), a sure sign of exactly one job (claim number, street, job number), or people who are only on
+ * one job.
+ */
+export function jobOfMail(all: { signs: Map<number, JobSigns>; shared: Set<string> }, text: string, people: string[]): number | null {
+  const logged = [...new Set([...`${text} ${people.join(" ")}`.matchAll(/office\+(\d{3,6})@/gi)].map((m) => Number(m[1])))].filter((n) => all.signs.has(n));
+  if (logged.length === 1) return logged[0];
+  const sure = [...all.signs].filter(([, s]) => sureSign(s, text)).map(([n]) => n);
+  if (sure.length === 1) return sure[0];
+  if (sure.length > 1) return null;
+  const hits = [...all.signs.keys()].filter((n) => belongsToJob(all, n, text, people).belongs);
+  return hits.length === 1 ? hits[0] : null;
+}
+
 /** The same test for a search result, which only has the newest message's subject, snippet and address lines. */
 export function summaryBelongs(all: { signs: Map<number, JobSigns>; shared: Set<string> }, jobNumber: number, t: { subject: string; snippet?: string; from: string; to?: string; cc?: string }): boolean {
   const people = [t.from, ...(t.to ?? "").split(","), ...(t.cc ?? "").split(",")];
