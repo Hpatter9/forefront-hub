@@ -226,6 +226,14 @@ export class ApiHomebase implements HomebaseClient {
   }
 
   private vocab?: Record<string, any>;
+  async apiDocs(): Promise<string> {
+    const headers: Record<string, string> = { Accept: "application/json, text/markdown, text/plain, text/html" };
+    if (this.opts.token) headers.Authorization = `Bearer ${this.opts.token}`;
+    const res = await (this.opts.fetch ?? fetch)(`${this.opts.url}/api/v1/docs`, { headers });
+    if (!res.ok) throw new HomebaseError(`Homebase GET /docs: ${res.status}`, res.status);
+    return res.text();
+  }
+
   async vocabulary() {
     this.vocab ??= await this.call<Record<string, any>>("GET", "/vocabulary");
     return this.vocab;

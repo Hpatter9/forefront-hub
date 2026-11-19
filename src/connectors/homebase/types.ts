@@ -129,6 +129,8 @@ export interface HomebaseClient {
   searchContacts?(q: string): Promise<HbPerson[]>;
   searchAccounts?(q: string, kind?: string): Promise<{ id: string; name: string; kind: string }[]>;
   vocabulary?(): Promise<Record<string, any>>;
+  /** Homebase's own API reference (GET /docs), as text: for finding where a field lives. */
+  apiDocs?(): Promise<string>;
   /** Which jobs an email is probably about, from its addresses, job numbers, streets and claim numbers. */
   suggestJobs?(clues: { addresses?: string[]; numbers?: string[]; streets?: string[]; claims?: string[] }): Promise<JobSummary[]>;
   close?(): Promise<void>;

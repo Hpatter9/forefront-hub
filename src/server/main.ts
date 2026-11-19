@@ -1318,8 +1318,9 @@ function runStatusUpdates(force = false, asked = false) {
       if (r.problem) tell(`Proposal Submitted Notes: ${r.problem}`, true);
       else if (!r.written && !r.skipped) tell(`Proposal Submitted Notes: Homebase shows no Proposal Submitted jobs with ${cfg.homebase.me} on them.`);
       else if (!r.written) tell(`Proposal Submitted Notes: nothing written (${r.skipped} job${r.skipped === 1 ? "" : "s"} had nothing new, couldn't be read, or you said no). The activity log has the details.`);
-      // The day only counts as done when the run worked; a problem is tried again on the next check.
-      if (!r.problem) { try { mkdirSync(cfg.stateDir, { recursive: true }); writeFileSync(statusDayFile, new Date().toLocaleDateString("en-CA", { timeZone: "America/Denver" })); } catch { /* fine */ } }
+      // The day counts as done once the run finished (a missing field won't fix itself in half an hour); a run that
+      // broke off (offline, Homebase down) is tried again on the next check.
+      { try { mkdirSync(cfg.stateDir, { recursive: true }); writeFileSync(statusDayFile, new Date().toLocaleDateString("en-CA", { timeZone: "America/Denver" })); } catch { /* fine */ } }
     } catch (e) {
       tell(`Proposal Submitted Notes couldn't run: ${(e as Error).message}`, true);
     } finally {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MockGemini } from "../src/connectors/gemini/index.js";
 import { FixedApprover } from "../src/core/approval.js";
 import { EventBus, WebApprover } from "../src/server/events.js";
-import { applyReply, findUpdateField, setStatusUpdate, updateProposalJobs } from "../src/workflows/statusUpdates.js";
+import { applyReply, docLines, fieldMap, findUpdateField, setStatusUpdate, updateProposalJobs } from "../src/workflows/statusUpdates.js";
 import { timeline } from "../src/workflows/timeline.js";
 import { testHub } from "./helpers.js";
 
@@ -65,6 +65,29 @@ describe("the Proposal Submitted status line in Homebase", () => {
   it("sets one job's line on request, dated, after asking", async () => {
     const { hub } = await setup();
     expect(await setStatusUpdate(hub, 9002, "Signed agreement expected Friday")).toMatch(/Saved on Homebase #9002: \d{1,2}\/\d{1,2}: Signed agreement expected Friday/);
+  });
+});
+
+describe("when Homebase doesn't hand over a notes field", () => {
+  it("saves a help file with field names only and the API reference's matching lines", async () => {
+    const { hub } = await setup();
+    hub.homebase.rawJob = async () => ({ jobNumber: "9002", brief: { customerNotes: "Dana prefers texts", productionNotes: null }, stages: [{ name: "Proposal Submitted", note: "secret" }] });
+    hub.homebase.apiDocs = async () => "## Projects\nGET /projects/:id\n### Stage notes\nPATCH /projects/:id/stage-notes {stage, note}: the dashboard's per-stage notes\nunrelated line\nmore\nmore";
+    const r = await updateProposalJobs(hub);
+    expect(r.written).toBe(0);
+    expect(r.problem).toMatch(/didn't hand Keystone a Proposal Submitted Notes field on job #9002.*homebase-notes-help\.txt/);
+    const { readFileSync } = await import("node:fs");
+    const help = readFileSync(`${hub.cfg.stateDir}/homebase-notes-help.txt`, "utf8");
+    expect(help).toContain("brief.customerNotes: string");
+    expect(help).toContain("stages[].note: string");
+    expect(help).toContain("PATCH /projects/:id/stage-notes");
+    expect(help).not.toContain("Dana"); expect(help).not.toContain("secret");
+  });
+
+  it("maps fields by kind and picks the reference's lines about notes", () => {
+    expect(fieldMap({ a: 1, b: { c: null, d: ["x"] }, e: [{ f: true }] })).toEqual(["a: number", "b.c: empty", "b.d: list of 1", "e: list of 1", "e[].f: boolean"]);
+    expect(docLines("one\ntwo\nproposalSubmittedNotes: string\nfour\nfive\nsix")).toEqual(["two", "proposalSubmittedNotes: string", "four", "five"]);
+    expect(docLines('{"paths":{"/projects/{id}/notes":{}}}').join(" ")).toContain("/projects/{id}/notes");
   });
 });
 

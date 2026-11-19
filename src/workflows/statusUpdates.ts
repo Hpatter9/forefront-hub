@@ -43,6 +43,47 @@ export function findUpdateField(raw: Record<string, any>, override = ""): FieldP
   return { candidates: flat.filter((f) => /update|status|note|comment|summary/i.test(f.key)).map((f) => `${f.path} (${Array.isArray(f.value) ? "list" : f.value === null ? "empty" : typeof f.value})`).slice(0, 30) };
 }
 
+/** Every field name on a job with its kind (never its value), lists included: for finding a field Keystone can't see. */
+export function fieldMap(raw: unknown, at = "", depth = 0, out: string[] = []): string[] {
+  if (depth > 6 || out.length > 600) return out;
+  if (Array.isArray(raw)) {
+    out.push(`${at}: list of ${raw.length}`);
+    if (raw.length && raw[0] && typeof raw[0] === "object") fieldMap(raw[0], `${at}[]`, depth + 1, out);
+  } else if (raw && typeof raw === "object") {
+    for (const [k, v] of Object.entries(raw)) {
+      const p = at ? `${at}.${k}` : k;
+      if (v && typeof v === "object") fieldMap(v, p, depth + 1, out);
+      else out.push(`${p}: ${v === null ? "empty" : typeof v}`);
+    }
+  }
+  return out;
+}
+
+/** The lines of Homebase's API reference that talk about notes, proposals or the dashboard, with a little around each. */
+export function docLines(docs: string, max = 220): string[] {
+  let text = docs;
+  try { text = JSON.stringify(JSON.parse(docs), null, 1); } catch { /* not JSON: use as is */ }
+  const lines = text.replace(/<[^>]+>/g, " ").split(/\r?\n/).map((l) => l.trimEnd()).filter((l) => l.trim());
+  const keep = new Set<number>();
+  lines.forEach((l, i) => { if (/proposal.?submitted|submitted.?note|stage.?note|dashboard|proposal\w*note|notes?\b/i.test(l)) for (let j = Math.max(0, i - 1); j <= Math.min(lines.length - 1, i + 2); j++) keep.add(j); });
+  return [...keep].sort((a, b) => a - b).slice(0, max).map((i) => lines[i].slice(0, 300));
+}
+
+/**
+ * When the notes field can't be found: writes a small help file (field names and kinds only, no job details, plus
+ * the matching lines of Homebase's API reference) so the right field can be worked out. Returns the file's path.
+ */
+export async function writeFieldHelp(hub: Hub, n: number, raw: Record<string, any>): Promise<string> {
+  const file = path.join(hub.cfg.stateDir, "homebase-notes-help.txt");
+  let docs: string[] = [];
+  let docsNote = "";
+  try { docs = docLines((await hub.homebase.apiDocs?.()) ?? ""); if (!docs.length) docsNote = "(nothing about notes found in the API reference, or this connection has none)"; }
+  catch (e) { docsNote = `(couldn't read the API reference: ${(e as Error).message})`; }
+  mkdirSync(hub.cfg.stateDir, { recursive: true });
+  writeFileSync(file, [`Keystone couldn't find the Proposal Submitted Notes field. Made ${new Date().toISOString()} from job #${n}.`, "No customer details are in this file: field names and kinds only.", "", "== Every field on the job ==", ...fieldMap(raw), "", "== Homebase API reference: lines about notes, proposals, the dashboard ==", docsNote, ...docs].join("\n"));
+  return file;
+}
+
 interface State { [job: string]: { text: string; at: string; basedOn: string } }
 const stateFile = (hub: Hub) => path.join(hub.cfg.stateDir, "status-updates.json");
 const load = (hub: Hub): State => { try { return existsSync(stateFile(hub)) ? JSON.parse(readFileSync(stateFile(hub), "utf8")) : {}; } catch { return {}; } };
@@ -112,9 +153,11 @@ export async function updateProposalJobs(hub: Hub, o: { force?: boolean } = {}):
   let skipped = 0;
   for (const j of jobs) {
     try {
-      const pick = findUpdateField(await hub.homebase.rawJob(j.jobNumber), override);
+      const raw = await hub.homebase.rawJob(j.jobNumber);
+      const pick = findUpdateField(raw, override);
       if ("candidates" in pick) {
-        return { written: 0, skipped: jobs.length, problem: `Couldn't find the Proposal Submitted update field on Homebase job #${j.jobNumber}. Its fields that might be it: ${pick.candidates.join(", ") || "(none)"}. Set HOMEBASE_UPDATE_FIELD in .env to the right one.` };
+        const help = await writeFieldHelp(hub, j.jobNumber, raw).catch(() => "");
+        return { written: 0, skipped: jobs.length, problem: `Homebase didn't hand Keystone a Proposal Submitted Notes field on job #${j.jobNumber} (the closest it has: ${pick.candidates.join(", ") || "none"}).${help ? ` Keystone saved what it found in ${help}: send that file to Claude so the right field can be set.` : ""}` };
       }
       const d = await draftUpdate(hub, j.jobNumber, { current: pick.current, force: o.force });
       if (!d || d.text === pick.current.trim()) { skipped++; continue; }
