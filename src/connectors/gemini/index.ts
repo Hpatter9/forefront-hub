@@ -36,6 +36,8 @@ export interface GenerateRequest {
   stream?: boolean;
   /** Models to try in turn when the first is busy, gone or failing (Google retires and overloads models). */
   fallbackModels?: string[];
+  /** Run on the paid key (a heavy model picked by name). Everyday work leaves this off and uses the free key first. */
+  paid?: boolean;
 }
 export interface GenerateResult {
   /** The model's turn as-is (kept whole when it's sent back, as Gemini asks for function-call turns). */
@@ -44,6 +46,8 @@ export interface GenerateResult {
   calls: { name: string; args: Record<string, unknown>; id?: string }[];
   /** The model that actually answered (a fallback when the first was busy). */
   model?: string;
+  /** Which key answered, when Keystone has both a free and a paid one. */
+  key?: "free" | "paid";
   /** Tokens used, as Google reports them (output includes thinking). */
   usage?: { input: number; output: number };
 }
@@ -213,6 +217,54 @@ export class MeteredGemini implements GeminiClient {
   uploadFile(file: string, mimeType: string) { return this.inner.uploadFile(file, mimeType); }
 }
 
+/**
+ * Two keys, so nothing has to be swapped: everyday work goes to the free key (no cost, daily limits) and moves to
+ * the paid key only when the free one can't answer (used up for the day, down); heavy models picked by name
+ * (`paid: true`) go straight to the paid key. A file uploaded for a request lives with the key that uploaded it, so
+ * a request that carries one stays on that key. `paidFallback: false` keeps everyday work free-only.
+ */
+export class TieredGemini implements GeminiClient {
+  private uploads = new Map<string, "free" | "paid">();
+  /** Called once each time everyday work has to move to the paid key (so Hunter can be told). */
+  onPaidFallback?: (why: string) => void;
+  constructor(private free: GeminiClient, private paid: GeminiClient, private paidFallback = true) {}
+  get kind() { return this.free.kind; }
+
+  private keyOfFiles(req: GenerateRequest): "free" | "paid" | null {
+    for (const t of req.contents) for (const p of t.parts) { const u = (p as { fileData?: { fileUri?: string } }).fileData?.fileUri; if (u && this.uploads.has(u)) return this.uploads.get(u)!; }
+    return null;
+  }
+
+  async generate(req: GenerateRequest): Promise<GenerateResult> {
+    const pinned = this.keyOfFiles(req);
+    if (req.paid || pinned === "paid") return { ...(await this.paid.generate(req)), key: "paid" };
+    try {
+      return { ...(await this.free.generate(req)), key: "free" };
+    } catch (e) {
+      if (!this.paidFallback || pinned === "free") throw e;
+      this.onPaidFallback?.((e as Error).message);
+      return { ...(await this.paid.generate(req)), key: "paid" };
+    }
+  }
+
+  async uploadFile(file: string, mimeType: string) {
+    try {
+      const r = await this.free.uploadFile(file, mimeType);
+      this.uploads.set(r.uri, "free");
+      return r;
+    } catch (e) {
+      if (!this.paidFallback) throw e;
+      const r = await this.paid.uploadFile(file, mimeType);
+      this.uploads.set(r.uri, "paid");
+      return r;
+    }
+  }
+}
+
 export function makeGemini(cfg: Config): GeminiClient | null {
-  return cfg.ai.geminiKey ? new MeteredGemini(new LiveGemini(cfg.ai.geminiKey), cfg.stateDir) : null;
+  const { geminiFreeKey: free, geminiPaidKey: paid } = cfg.ai;
+  // Both: free first, paid behind it (only the paid key's use is counted as spending).
+  if (free && paid) return new TieredGemini(new LiveGemini(free), new MeteredGemini(new LiveGemini(paid), cfg.stateDir), cfg.ai.geminiPaidFallback !== false);
+  if (free) return new LiveGemini(free);
+  return paid ? new MeteredGemini(new LiveGemini(paid), cfg.stateDir) : null;
 }

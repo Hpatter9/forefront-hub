@@ -22,7 +22,7 @@ export interface Config {
    * GEMINI_API_KEY, else Claude if there's an Anthropic key, else off. The Estimator tab and setting up
    * selections use the Claude-only estimating skill, so they need Claude.
    */
-  ai: { provider: "claude" | "gemini" | "off"; geminiKey: string; geminiModel: string; geminiFastModel: string; geminiFallbacks?: string[]; /** Models named in .env that aren't free Flash models, so everyday work doesn't use them. */ geminiIgnored?: string[] };
+  ai: { provider: "claude" | "gemini" | "off"; /** Any Gemini key (the free one when there are two). */ geminiKey: string; geminiFreeKey?: string; geminiPaidKey?: string; /** Everyday work may move to the paid key when the free one can't answer. */ geminiPaidFallback?: boolean; geminiModel: string; geminiFastModel: string; geminiFallbacks?: string[]; /** Models named in .env that aren't free Flash models, so everyday work doesn't use them. */ geminiIgnored?: string[] };
   model: string;
   /** A fast, cheaper model for small jobs like one-line email summaries. */
   fastModel: string;
@@ -87,7 +87,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
     anthropicApiKey,
     anthropicAdminKey: e("ANTHROPIC_ADMIN_KEY"),
     ai: (() => {
-      const geminiKey = e("GEMINI_API_KEY", e("GOOGLE_API_KEY"));
+      // Two Gemini keys can sit side by side: a free one for everyday work and a paid one behind it (and for the
+      // heavy models). GEMINI_API_KEY alone is "the key" as before.
+      const geminiFreeKey = e("GEMINI_FREE_API_KEY");
+      const geminiPaidKey = e("GEMINI_API_KEY", e("GOOGLE_API_KEY"));
+      const geminiKey = geminiFreeKey || geminiPaidKey;
       const want = e("HUB_AI").toLowerCase();
       const provider: Config["ai"]["provider"] =
         want === "off" ? "off" : want === "gemini" ? (geminiKey ? "gemini" : "off") : want === "claude" ? (anthropicApiKey ? "claude" : "off") : geminiKey ? "gemini" : "off";
@@ -96,6 +100,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
       return {
         provider,
         geminiKey,
+        geminiFreeKey,
+        geminiPaidKey,
+        geminiPaidFallback: !/^(off|0|false|no)$/i.test(e("GEMINI_PAID_FALLBACK")),
         // Everyday work only ever runs on Google's free Flash models. A heavier model named in .env (Pro, Hydrogen,
         // Argon...) is ignored here: those are picked by name in the Estimator's "Written by", nowhere else.
         geminiModel: everydayModel(e("GEMINI_MODEL"), FREE_GEMINI[0]),

@@ -229,7 +229,7 @@ export async function geminiEstimate(hub: Hub, job: number, text: string, o: { h
     for (let attempt = 0; !r; attempt++) {
       try {
         // A model picked on purpose is used alone: a quiet stand-in would make the trial meaningless.
-        r = await hub.gemini.generate({ model: o.model ?? hub.cfg.ai.geminiModel, fallbackModels: o.model ? [] : hub.cfg.ai.geminiFallbacks, system, contents, tools: tools.decls });
+        r = await hub.gemini.generate({ model: o.model ?? hub.cfg.ai.geminiModel, fallbackModels: o.model ? [] : hub.cfg.ai.geminiFallbacks, paid: !!o.model, system, contents, tools: tools.decls });
       } catch (e) {
         // A daily limit won't clear by waiting a minute: stop at once.
         if (attempt >= BUSY_WAITS.length || !BUSY_RX.test((e as Error).message) || /daily|per ?day|billing/i.test((e as Error).message)) throw e;

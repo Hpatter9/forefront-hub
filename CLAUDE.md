@@ -99,4 +99,8 @@
   heavier GEMINI_MODEL / GEMINI_FAST_MODEL in .env is ignored (shown in the status line), fallbacks always end with
   the free list, and the connector moves to the next model on any failure except a bad key. Heavy models run only
   when picked by name in the Estimator.
+- Two Gemini keys (`TieredGemini` in `src/connectors/gemini`): GEMINI_FREE_API_KEY runs everyday work; GEMINI_API_KEY
+  (paid) is used only when the free key can't answer (said once a day; GEMINI_PAID_FALLBACK=off stops it) and for
+  models picked by name (`paid: true`). Only the paid key's use is metered as spending. `Connect Gemini` asks F or P
+  and saves the right variable. With one key, everything works as before.
 
