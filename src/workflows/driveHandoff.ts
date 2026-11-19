@@ -46,7 +46,7 @@ export async function sendToDrive(hub: Hub, n: number, action: HandoffAction = "
   const pkg = await handoffPackage(hub, n);
   const job = hub.jobs.get(n);
   const { prompt } = handoffPrompt(hub, n, action, note);
-  writeFileSync(path.join(pkg.folder, "Request.md"), [`# Request for job #${n} ${job.name}`, "", `Sent from Keystone ${new Date().toLocaleString("en-US", { timeZone: "America/Denver" })} (Denver time).`, "", `**What Hunter wants:** ${HANDOFF_ACTIONS[action] ?? action}${note.trim() ? `\n\n**His note:** ${note.trim()}` : ""}`, "", `When you're done, put the PDFs and estimate.json in this job's "${FROM}" folder in Drive. Keystone brings them into the job.`, "", "## The request as Keystone words it", "", prompt].join("\n"));
+  writeFileSync(path.join(pkg.folder, "Request.md"), [`# Request for job #${n} ${job.name}`, "", `Sent from Keystone ${new Date().toLocaleString("en-US", { timeZone: "America/Denver" })} (Denver time).`, "", `**What Hunter wants:** ${HANDOFF_ACTIONS[action]?.label ?? action}${note.trim() ? `\n\n**His note:** ${note.trim()}` : ""}`, "", `When you're done, put the PDFs and estimate.json in this job's "${FROM}" folder in Drive. Keystone brings them into the job.`, "", "## The request as Keystone words it", "", prompt].join("\n"));
   const name = `${n} ${job.name}`.replace(/[\\/:*?"<>|]/g, " ").trim();
   const folder = await d.ensureFolder(name, root.id);
   const forF = await d.ensureFolder(FOR, folder.id), fromF = await d.ensureFolder(FROM, folder.id);

@@ -23,11 +23,15 @@ describe("writing estimates in a Claude chat through Google Drive", () => {
     const { hub, root, put } = setup();
     put("notes/notes.txt", "Lockbox on the side gate.");
     put("sketch/Sample.ESX", "esx");
+    put("photos/Tour_1/measurements_1st floor.jpg", "jpg"); put("photos/Tour_1/measurements_1st floor.png", "png"); put("photos/Tour_1/image_wall_measurements_B1.png", "png");
     const r = await sendToDrive(hub, 9001, "estimate", "Don't forget the washer and dryer reset");
+    // DocuSketch's measured floor plans always go (one copy each), and the request names what was asked.
+    expect(r.files).toEqual(expect.arrayContaining(["Sketch measurements_1st floor.jpg", "Sketch image_wall_measurements_B1.png"]));
+    expect(r.files).not.toContain("Sketch measurements_1st floor.png");
     expect(r.folder).toBe(`${DRIVE_ROOT}/9001 Sample`);
     expect(r.files).toEqual(expect.arrayContaining(["Job brief.md", "Request.md", "Sample.ESX"]));
     const dir = path.join(root, DRIVE_ROOT, "9001 Sample", "for-claude");
-    expect(readFileSync(path.join(dir, "Request.md"), "utf8")).toMatch(/job #9001 Sample[\s\S]*washer and dryer reset[\s\S]*from-claude/);
+    expect(readFileSync(path.join(dir, "Request.md"), "utf8")).toMatch(/job #9001 Sample[\s\S]*What Hunter wants:\*\* New estimate[\s\S]*washer and dryer reset[\s\S]*from-claude/);
     expect(readFileSync(path.join(dir, "Job brief.md"), "utf8")).toContain("Lockbox on the side gate.");
     expect(existsSync(path.join(root, DRIVE_ROOT, "9001 Sample", "from-claude"))).toBe(true);
     // A stale file from an earlier send is cleared out.

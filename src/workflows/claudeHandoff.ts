@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Hub } from "../hub.js";
 import { jobDossier, sketchFiles, type JobDossier } from "./dossier.js";
@@ -120,6 +120,16 @@ export async function handoffPackage(hub: Hub, n: number): Promise<{ folder: str
   const sketch = sketchFiles(hub, n);
   for (const f of sketch.filter((x) => /\.(esx|pdf)$/i.test(x)).slice(0, 8)) add(f);
   if (!d.photos.sheets?.length) for (const f of sketch.filter((x) => /\.(jpe?g|png)$/i.test(x)).slice(0, 12)) add(f);
+  // DocuSketch's floor plans with the measurements on them are what quantities come from when there's no ESX:
+  // always in (one copy of each; the .jpg when both a .jpg and a .png exist).
+  const plans = sketch.filter((x) => /(^|[\\/])(image_wall_measurements|measurements|common)_[^/]*\.(jpe?g|png)$/i.test(x));
+  const stem = (x: string) => path.basename(x).replace(/\.(jpe?g|png)$/i, "").toLowerCase();
+  for (const f of plans.filter((x) => /\.jpe?g$/i.test(x) || !plans.some((y) => y !== x && stem(y) === stem(x) && /\.jpe?g$/i.test(y))).slice(0, 12)) add(f, `Sketch ${path.basename(f)}`);
+  // The sketch pages the current estimate prints (estimate.json "sketches"), so a revision can render them again.
+  try {
+    const est = JSON.parse(readFileSync(path.join(root, "estimate", "estimate.json"), "utf8"));
+    for (const s of est.sketches ?? []) if (typeof s?.image === "string") add(existsSync(path.join(root, "estimate", s.image)) ? path.join("estimate", s.image) : s.image, `Estimate sketch ${path.basename(s.image)}`);
+  } catch { /* no estimate yet */ }
   for (const w of d.notes.walks.slice(0, 4)) add(w.file, `Walk ${path.basename(w.file)}`);
   for (const s of d.photos.sheets ?? []) add(s, `Photos ${path.basename(s)}`);
   for (const r of d.itel) add(r.file);
