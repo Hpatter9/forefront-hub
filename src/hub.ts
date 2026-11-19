@@ -72,7 +72,7 @@ export function describe(hub: Hub): string[] {
     `jobs        ${c.jobsRoot}`,
     `skill       ${c.skillDir}${hub.skill.check() ? `  (!) ${hub.skill.check()}` : ""}`,
     `python      ${c.python}`,
-    `ai          ${c.ai.provider === "gemini" ? `Gemini (${c.ai.geminiModel}; quick jobs ${c.ai.geminiFastModel})` : c.ai.provider === "claude" ? `Claude (${c.model})` : "off: add GEMINI_API_KEY or ANTHROPIC_API_KEY to .env"}`,
+    `ai          ${c.ai.provider === "gemini" ? `Gemini (${c.ai.geminiModel}; quick jobs ${c.ai.geminiFastModel})${c.ai.geminiIgnored?.length ? `. Not used for everyday work: ${c.ai.geminiIgnored.join(", ")} (set in .env; only the free Flash models run here)` : ""}` : c.ai.provider === "claude" ? `Claude (${c.model})` : "off: add GEMINI_API_KEY or ANTHROPIC_API_KEY to .env"}`,
     `homebase    ${hub.homebase.kind}${hub.homebase.kind === "browser" ? `  login: ${path.relative(c.hubRoot, c.homebase.authFile)}` : ""}`,
     `gmail       ${hub.gmail.kind}${hub.gmail.kind === "mock" ? `  (drafts go to ${path.join(c.stateDir, "outbox")})` : ` ${c.gmail.address}`}`,
     `companycam  ${hub.photos.kind}`,

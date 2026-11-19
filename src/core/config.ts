@@ -22,7 +22,7 @@ export interface Config {
    * GEMINI_API_KEY, else Claude if there's an Anthropic key, else off. The Estimator tab and setting up
    * selections use the Claude-only estimating skill, so they need Claude.
    */
-  ai: { provider: "claude" | "gemini" | "off"; geminiKey: string; geminiModel: string; geminiFastModel: string; geminiFallbacks?: string[] };
+  ai: { provider: "claude" | "gemini" | "off"; geminiKey: string; geminiModel: string; geminiFastModel: string; geminiFallbacks?: string[]; /** Models named in .env that aren't free Flash models, so everyday work doesn't use them. */ geminiIgnored?: string[] };
   model: string;
   /** A fast, cheaper model for small jobs like one-line email summaries. */
   fastModel: string;
@@ -40,6 +40,12 @@ export interface Config {
   /** Where mocks keep their state (mock outbox, mock Homebase writes). */
   stateDir: string;
 }
+
+/** Google's free-tier models, in the order everyday work tries them. */
+export const FREE_GEMINI = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"];
+/** A Flash model (free tier), not a paid or preview heavyweight. */
+export const isFreeGemini = (m: string) => /flash/i.test(m) && !/pro|ultra|hydrogen|argon|image|tts|live/i.test(m);
+const everydayModel = (wanted: string, fallback: string) => (wanted && isFreeGemini(wanted) ? wanted : fallback);
 
 /** Reads .env from the Keystone folder (never committed) and fills in defaults. Mock wherever credentials are missing. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT): Config {
@@ -90,10 +96,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
       return {
         provider,
         geminiKey,
-        geminiModel: e("GEMINI_MODEL", "gemini-3.5-flash"),
-        geminiFastModel: e("GEMINI_FAST_MODEL", "gemini-flash-lite-latest"),
+        // Everyday work only ever runs on Google's free Flash models. A heavier model named in .env (Pro, Hydrogen,
+        // Argon...) is ignored here: those are picked by name in the Estimator's "Written by", nowhere else.
+        geminiModel: everydayModel(e("GEMINI_MODEL"), FREE_GEMINI[0]),
+        geminiFastModel: everydayModel(e("GEMINI_FAST_MODEL"), "gemini-flash-lite-latest"),
+        geminiIgnored: [e("GEMINI_MODEL"), e("GEMINI_FAST_MODEL")].filter((m) => m && !isFreeGemini(m)),
         // Tried in turn when a model is busy or retired.
-        geminiFallbacks: e("GEMINI_FALLBACK_MODELS", "gemini-flash-latest,gemini-flash-lite-latest").split(",").map((x) => x.trim()).filter(Boolean),
+        geminiFallbacks: [...e("GEMINI_FALLBACK_MODELS").split(",").map((x) => x.trim()).filter(isFreeGemini), ...FREE_GEMINI].filter((m, i, a) => a.indexOf(m) === i),
       };
     })(),
     model: e("HUB_MODEL", "claude-opus-5-5"),

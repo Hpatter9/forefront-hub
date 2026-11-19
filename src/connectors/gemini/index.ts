@@ -73,8 +73,9 @@ export class LiveGemini implements GeminiClient {
         return { ...(await this.once({ ...req, model })), model };
       } catch (e) {
         last = e as Error;
-        // A bad key or a malformed request won't get better on another model.
-        if (!/busy|unavailable|no longer available|not found|high demand|overloaded|quota|rate limit/i.test(last.message)) throw last;
+        // Only a bad key stops here. Anything else (busy, retired, over quota, needs billing, not allowed on this
+        // key) goes on to the next model, so everyday work lands on a free one that answers.
+        if (/didn't accept the Gemini API key/i.test(last.message)) throw last;
       }
     }
     throw last ?? new Error("Gemini: no model to use.");

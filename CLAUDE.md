@@ -95,4 +95,8 @@
   estimate.json in ".../from-claude"; Keystone checks every 2 minutes (or "Get what Claude made"), asks before
   replacing an estimate (old one to estimate/revisions) and runs the free check. The root folder lives in Hunter's
   personal Drive and is shared with Keystone's Google account, hence the full `drive` scope (re-run Connect Gmail).
+- Everyday Gemini work only runs on free Flash models (`FREE_GEMINI`, `isFreeGemini` in `src/core/config.ts`): a
+  heavier GEMINI_MODEL / GEMINI_FAST_MODEL in .env is ignored (shown in the status line), fallbacks always end with
+  the free list, and the connector moves to the next model on any failure except a bad key. Heavy models run only
+  when picked by name in the Estimator.
 
