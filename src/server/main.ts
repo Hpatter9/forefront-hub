@@ -257,6 +257,12 @@ const server = http.createServer(async (req, res) => {
       }, 400);
       return;
     }
+    if (p === "/api/texts/backup" && req.method === "POST") {
+      // "Back up my phone now" (the Texts chip): same as the automatic one, without waiting for it to be old.
+      if (!hub.phoneBackup) return send(res, 400, { error: "iPhone auto-backup is off on this machine." });
+      void checkPhoneBackup(true).then((r) => { if (r === "no-phone") hub.say("No iPhone is plugged into this PC. Plug it in with its cable and try again."); });
+      return send(res, 200, { ok: true });
+    }
     if (p === "/api/status-updates" && req.method === "POST") {
       const b = await body(req);
       runStatusUpdates(!!b.force);
@@ -1326,6 +1332,22 @@ function statusUpdatesDaily() {
 }
 setTimeout(statusUpdatesDaily, 3 * 60_000);
 setInterval(statusUpdatesDaily, 30 * 60_000);
+
+// ---- iPhone texts: when the phone is plugged in and its backup is old, back it up (workflows/autoBackup.ts).
+async function checkPhoneBackup(force = false) {
+  try {
+    const r = await (await import("../workflows/autoBackup.js")).autoBackup(hub, { force });
+    if (r === "done") bus.emit({ type: "changed", what: "timeline" });
+    return r;
+  } catch (e) {
+    console.error(e);
+    return "failed" as const;
+  }
+}
+if (hub.phoneBackup) {
+  setTimeout(() => void checkPhoneBackup(), 90_000);
+  setInterval(() => void checkPhoneBackup(), 5 * 60_000);
+}
 
 /** The brief's Homebase steps, each on its own Yes/No card (sync and upload ask before they write). */
 function runHomebaseChores(list: { kind: string; jobNumber: number }[]) {

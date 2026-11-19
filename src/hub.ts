@@ -1,3 +1,4 @@
+import { makePhoneBackup, type PhoneBackup } from "./connectors/iphoneBackup/index.js";
 import { makeClaudeCost, type ClaudeCost } from "./connectors/anthropicCost/index.js";
 import { makeGemini, type GeminiClient } from "./connectors/gemini/index.js";
 import { makeTravel, type TravelClient } from "./connectors/travel/index.js";
@@ -30,6 +31,8 @@ export interface Hub {
   photos: PhotoClient;
   /** Text messages from the iPhone's backup (off unless turned on). */
   texts: TextsClient;
+  /** Starts iPhone backups itself when the phone is plugged in (null when off). */
+  phoneBackup?: PhoneBackup | null;
   sketches: SketchSource;
   skill: EstimateSkill;
   approver: Approver;
@@ -50,6 +53,7 @@ export function makeHub(cfg: Config = loadConfig(), approver: Approver = new Cli
     claudeCost: makeClaudeCost(cfg.anthropicAdminKey),
     photos: makeCompanyCam(cfg),
     texts: makeTexts(cfg),
+    phoneBackup: makePhoneBackup(cfg),
     sketches: new DocuSketch(gmail, cfg.docusketch.downloadsDir),
     skill: new EstimateSkill(cfg.skillDir, cfg.python),
     approver,

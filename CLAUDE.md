@@ -84,4 +84,9 @@
   `RULES`, estimate PDFs rendered, brief ticks), each event counted once by id into `.hub/game.json`, with daily caps;
   quests, a boss (longest-waiting job; actions on it are hits; beaten when it leaves the waiting list), badges,
   streak. It never changes what Keystone does. New kinds of work: add a RULES line for the job-log text they write.
+- iPhone auto-backup (`src/workflows/autoBackup.ts`, `src/connectors/iphoneBackup`): every 5 minutes, if a phone is
+  plugged in by cable and the newest backup is over 3 hours old, Keystone runs `pymobiledevice3 backup2 backup` (a
+  private venv in `.hub/iphone-tools`, installed on first use) into the folder Apple Devices uses. Clicking the Texts
+  chip does it now (POST /api/texts/backup). IPHONE_AUTO_BACKUP=off turns it off. Untested against a real phone on
+  Windows when written: failures are said once and retried hourly; Apple Devices' Back Up Now is the fallback.
 

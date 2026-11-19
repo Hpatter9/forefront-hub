@@ -1278,11 +1278,18 @@ async function loadStatus() {
     chip("Homebase", status.homebase !== "mock", `Homebase: ${status.homebase}`),
     chip("Gmail", status.gmail === "google", status.gmail === "google" ? (status.gmailFull ? "Connected" : "Connected for drafts only; reconnect to send from Keystone") : "Not connected (test inbox)"),
     ...(status.walks ? [chip("Walks", status.walks.on, status.walks.on ? `Walk recordings are picked up from ${status.walks.dir}` : status.walks.problem || "Not set up")] : []),
-    ...(status.texts ? [chip(textsStale() ? "Texts: old backup" : "Texts", status.texts.connected && !textsStale(), status.texts.connected ? `iPhone texts with job contacts, as of the phone's last backup: ${new Date(status.texts.backupAt).toLocaleString()}${textsStale() ? ". That's more than a day old: plug the iPhone into this PC, open Apple Devices and click Back Up Now." : ""}` : status.texts.problem || "Not connected")] : []),
+    ...(status.texts ? [chip(textsStale() ? "Texts: old backup" : "Texts", status.texts.connected && !textsStale(), status.texts.connected ? `iPhone texts with job contacts, as of the phone's last backup: ${new Date(status.texts.backupAt).toLocaleString()}${textsStale() ? ". That's more than a day old: plug the iPhone into this PC, open Apple Devices and click Back Up Now." : ""}\n\nKeystone backs the phone up by itself when it's plugged into this PC and the backup is a few hours old. Click here to back it up now.` : status.texts.problem || "Not connected")] : []),
     chip("CompanyCam", status.companycam === "rest", status.companycam === "rest" ? "Connected" : "Not connected"),
     chip(status.ai?.name && status.ai.provider !== "off" ? status.ai.name : "AI", status.agent, status.agent ? `${status.ai?.name || "Claude"} is on (${status.ai?.model || ""})${status.ai?.provider === "gemini" ? (status.estimator ? ". Only the Estimator tab uses the Claude API; everything else is on Gemini (free)." : ". The Estimator tab needs Claude: add ANTHROPIC_API_KEY to Keystone's .env.") : ""}` : status.ai?.offReason || "Off: no AI key on this machine"),
   ].join("");
 }
+// Clicking the Texts chip backs the phone up now (when it's plugged in), instead of opening Apple Devices.
+$("#chips").addEventListener("click", async (e) => {
+  const c = e.target.closest(".chip");
+  if (!c || !/Texts/.test(c.textContent)) return;
+  try { await api("/api/texts/backup", { method: "POST", body: {} }); snack("Backing up the iPhone if it's plugged in. Watch the activity log; type the passcode on the phone if it asks."); }
+  catch (err) { snack(err.message); }
+});
 async function loadSyncState() {
   try {
     const s = await api("/api/sync-all");
