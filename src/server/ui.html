@@ -673,6 +673,68 @@
   .gm-more { border: 0; background: #e8eaed; color: #444746; border-radius: 6px; padding: 0 8px; height: 16px; line-height: 14px; font-size: 13px; letter-spacing: 1px; cursor: pointer; margin: 4px 0 8px; display: block; }
   .gm-more:hover { background: #dadce0; }
 
+  /* ---- the email editor (compose window, replies in the conversation, drafts): Gmail's white box */
+  dialog.gcomp { background: #fff; color: #1f1f1f; border: 0; border-radius: 8px 8px 0 0; box-shadow: 0 8px 10px 1px rgba(0,0,0,.14), 0 3px 14px 2px rgba(0,0,0,.12), 0 5px 5px -3px rgba(0,0,0,.2); overflow: hidden; z-index: 40; }
+  dialog.gcomp .gc-form { display: flex; flex-direction: column; height: min(600px, 82vh); max-height: 92vh; }
+  .gcomp .gc-h { background: #f2f6fc; color: #041e49; border-radius: 8px 8px 0 0; font: 500 14px var(--sans); padding: 8px 8px 8px 16px; cursor: default; }
+  .gcomp .gc-h span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gcomp .gc-h button { color: #444746; width: 26px; height: 26px; border-radius: 4px; } .gcomp .gc-h button:hover { background: #dde3ea; } .gcomp .gc-h button .ms { font-size: 18px; }
+  #cp-host { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .gcomp.min .gc-form { height: auto !important; } .gcomp.min .gc-form > :not(.gc-h) { display: none; } .gcomp.min .gc-h { cursor: pointer; }
+  dialog.gcomp.big .gc-form { height: 100%; max-height: none; } dialog.gcomp.sized .gc-form { max-height: none; }
+  .gcomp .gc-grip::after { border-color: #9aa0a6; }
+  .ge { flex: 1; display: flex; flex-direction: column; min-height: 0; background: #fff; color: #1f1f1f; font: 14px/1.5 Arial, Helvetica, sans-serif; position: relative; }
+  .ge.dropping::after { content: "Drop files here to attach them"; position: absolute; inset: 0; display: grid; place-items: center; background: rgba(232,240,254,.92); color: #0b57d0; font: 500 18px var(--sans); border: 2px dashed #0b57d0; border-radius: 8px; pointer-events: none; z-index: 2; }
+  .ge-banner { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 16px 2px; }
+  .ge-banner .tagd { display: inline-flex; gap: 4px; align-items: center; background: #f2b600; color: #3d2e00; font-weight: 700; font-size: 12px; padding: 2px 10px 2px 7px; border-radius: 999px; } .ge-banner .tagd .ms { font-size: 15px; }
+  .ge-banner .tagd.plain { background: none; color: #d93025; padding: 0; font-size: 14px; font-weight: 500; }
+  .ge-banner .nots { color: #7a5c00; font-size: 12.5px; font-weight: 600; }
+  .ge-rcp { display: flex; align-items: flex-start; gap: 8px; margin: 0 16px; padding: 4px 0; border-bottom: 1px solid #eceff1; }
+  .ge-rcp[hidden] { display: none; }
+  .ge-rcp > .lb { color: #5f6368; padding-top: 6px; min-width: 26px; }
+  .ge-kind { display: inline-flex; align-items: center; border: 0; background: none; color: #444746; cursor: pointer; padding: 5px 0 0; border-radius: 4px; } .ge-kind:hover { background: #f1f3f4; } .ge-kind .ms { font-size: 20px; } .ge-kind .ms + .ms { margin-left: -4px; }
+  .ge-chips { flex: 1; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; min-width: 0; cursor: text; min-height: 32px; }
+  .ge-chips input { flex: 1; min-width: 140px; width: auto; border: 0 !important; outline: 0 !important; box-shadow: none !important; background: transparent !important; color: #1f1f1f !important; font: inherit; padding: 5px 0; border-radius: 0; }
+  .ge-chip { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; height: 26px; padding: 0 4px 0 10px; border: 1px solid #c4c7c5; border-radius: 13px; background: #fff; font-size: 13.5px; color: #1f1f1f; white-space: nowrap; cursor: default; }
+  .ge-chip > span { overflow: hidden; text-overflow: ellipsis; } .ge-chip:hover { background: #f1f3f4; }
+  .ge-chip.bad { border-color: #d93025; color: #d93025; background: #fce8e6; }
+  .ge-chip button { border: 0; background: none; color: #5f6368; cursor: pointer; padding: 0; width: 18px; height: 18px; border-radius: 50%; font-size: 15px; line-height: 16px; } .ge-chip button:hover { background: #dadce0; color: #1f1f1f; }
+  .ge-ccb { display: flex; padding-top: 2px; } .ge-ccb button { border: 0; background: none; color: #5f6368; cursor: pointer; font: inherit; padding: 4px 5px; border-radius: 4px; } .ge-ccb button:hover { text-decoration: underline; color: #1f1f1f; } .ge-ccb button[hidden] { display: none; }
+  input.ge-subj { margin: 0 16px; width: auto; padding: 9px 0; border: 0 !important; border-bottom: 1px solid #eceff1 !important; outline: 0 !important; box-shadow: none !important; border-radius: 0; font: inherit; color: #1f1f1f !important; background: transparent !important; } input.ge-subj[hidden] { display: none; }
+  .ge-scroll { flex: 1; min-height: 0; overflow: auto; padding: 12px 16px 6px; }
+  .ge-body { min-height: 130px; outline: 0; overflow-wrap: anywhere; color: #222; } .ge.inline .ge-body { min-height: 84px; }
+  .ge-body a, .ge-quote a, .ge-sig a { color: #15c; } .ge-body blockquote { margin: 0 0 0 .8ex; border-left: 1px solid #ccc; padding-left: 1ex; color: #5f6368; } .ge-body ul, .ge-body ol { margin: 0; padding-left: 2.2em; }
+  .ge-body img, .ge-quote img, .ge-sig img { max-width: 100%; height: auto; }
+  .ge-sig { margin-top: 14px; color: #5f6368; font-size: 13px; cursor: default; } .ge-sig > div:first-child { color: #9aa0a6; }
+  .ge-quote { margin-top: 6px; color: #5f6368; overflow-wrap: anywhere; } .ge-quote blockquote { margin: 0 0 0 .8ex; border-left: 1px solid #ccc; padding-left: 1ex; } .ge-quote table { max-width: 100%; }
+  .ge .gm-more { margin-top: 12px; }
+  .ge-atts { display: flex; flex-direction: column; gap: 4px; padding: 0 16px; } .ge-atts:not(:empty) { padding-bottom: 6px; }
+  .ge-att { display: flex; align-items: center; gap: 8px; background: #f5f5f5; padding: 5px 6px 5px 10px; font-size: 13px; max-width: 460px; border-radius: 2px; }
+  .ge-att .nm { font-weight: 700; color: #15c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ge-att small { color: #5f6368; white-space: nowrap; }
+  .ge-att button { margin-left: auto; border: 0; background: none; color: #5f6368; cursor: pointer; font-size: 17px; line-height: 1; width: 22px; height: 22px; border-radius: 50%; } .ge-att button:hover { background: #dadce0; }
+  .ge-fmt { display: flex; gap: 1px; align-items: center; flex-wrap: wrap; margin: 2px 12px 0; padding: 2px 6px; border-radius: 6px; background: #fff; box-shadow: 0 1px 2px rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15); } .ge-fmt[hidden] { display: none; }
+  .ge-fmt button, .ge-ib { width: 32px; height: 32px; flex: none; border: 0; background: none; border-radius: 4px; color: #444746; cursor: pointer; display: grid; place-items: center; padding: 0; } .ge-fmt button:hover, .ge-ib:hover { background: #f1f3f4; color: #1f1f1f; } .ge-fmt .ms, .ge-ib .ms { font-size: 20px; }
+  .ge-fmt i.sep { width: 1px; height: 20px; background: #dadce0; margin: 0 5px; }
+  .ge-foot { display: flex; align-items: center; gap: 2px; padding: 8px 12px 10px 16px; flex-wrap: wrap; }
+  .ge-send { background: #0b57d0; color: #fff; border: 0; border-radius: 18px; height: 36px; padding: 0 24px; font: 500 14px var(--sans); cursor: pointer; margin-right: 8px; } .ge-send:hover { background: #0a4cb8; box-shadow: 0 1px 3px rgba(0,0,0,.3); } .ge-send:disabled { opacity: .55; cursor: default; }
+  select.ge-job { width: auto; max-width: 170px; height: 30px; margin-left: 6px; border: 1px solid #dadce0 !important; border-radius: 15px; background: #fff !important; color: #444746 !important; font: 13px var(--sans); padding: 0 8px; }
+  .ge-saved { color: #5f6368; font-size: 12px; margin: 0 10px; white-space: nowrap; }
+  .ge.inline { border: 1px solid #dadce0; border-radius: 8px; box-shadow: 0 1px 2px rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15); overflow: hidden; } .ge.inline .ge-scroll { overflow: visible; }
+  .gm-msg.draft { border: 0; background: none; margin: 0; padding: 12px 24px 12px 16px; } .gm-msg.draft .ge.inline { border-left: 3px solid #f2b600; }
+  .gm-replybox[hidden] { display: none; } .gm-msg.gm-replybox { border-top: 0; }
+  .gm-sending { margin: 10px 24px 0 72px; color: #5f6368; font-size: 13px; }
+  .gm-menu { position: fixed; z-index: 90; min-width: 180px; max-width: 340px; max-height: 60vh; overflow: auto; background: #fff; color: #1f1f1f; border-radius: 4px; box-shadow: 0 2px 6px 2px rgba(60,64,67,.15), 0 1px 2px rgba(60,64,67,.3); padding: 6px 0; font: 14px var(--sans); }
+  .gm-menu button { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: 0; background: none; color: #1f1f1f; padding: 7px 16px; cursor: pointer; font: inherit; } .gm-menu button:hover { background: #f1f3f4; } .gm-menu button:disabled { color: #9aa0a6; cursor: default; background: none; }
+  .gm-menu button .ms { font-size: 20px; color: #444746; } .gm-menu button span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gm-menu hr { border: 0; border-top: 1px solid #e8eaed; margin: 6px 0; } .gm-menu .h { color: #5f6368; font-size: 12.5px; padding: 6px 16px; }
+  .gm-selbox { display: inline-flex; align-items: center; margin-left: 11px; } .gm-ib.sm { width: 22px; height: 32px; border-radius: 4px; }
+  .gm-sep { display: inline-block; width: 1px; height: 20px; background: var(--g-line); margin: 0 8px; flex: none; } .gm-seln { color: var(--g-mut); font-size: 13px; margin-left: 10px; }
+  .gm-mh { cursor: pointer; align-items: center; } .gm-mh .clip { font-size: 16px; color: var(--g-mut); }
+  .gm-mact { display: inline-flex; margin-left: 4px; } .gm-mact .gm-ib { width: 32px; height: 32px; } .gm-msg.col .gm-mact, .gm-msg.col .gm-mh .em, .gm-msg.col .gm-details { display: none; }
+  .gm-to { display: flex; align-items: center; gap: 0; } .gm-det { border: 0; background: none; color: #5f6368; cursor: pointer; padding: 0; height: 18px; width: 20px; border-radius: 4px; display: grid; place-items: center; } .gm-det:hover { background: #f1f3f4; } .gm-det .ms { font-size: 18px; }
+  .gm-details { display: inline-block; border: 1px solid #dadce0; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,.15); padding: 10px 14px; margin: 0 0 10px; font-size: 13px; color: #1f1f1f; max-width: 100%; } .gm-details[hidden] { display: none; }
+  .gm-details th { text-align: right; color: #5f6368; font-weight: 400; padding: 2px 10px 2px 0; vertical-align: top; white-space: nowrap; } .gm-details td { padding: 2px 0; } .gm-details .achip { font-size: 13px; }
+  .gm-atts { border-top: 1px solid #e8eaed; padding-top: 12px; margin-top: 14px; } .gm-attn { flex-basis: 100%; font-weight: 700; font-size: 13px; color: #1f1f1f; } .gm-att small { color: #5f6368; flex: none; }
   /* ---- dragging emails onto labels */
   .gr[draggable="true"] { cursor: grab; }
   .gr.dragging { opacity: .45; }
@@ -1106,19 +1168,11 @@
   <input type="hidden" id="tk-id"><input type="hidden" id="tk-list">
   </div><div class="foot"><button class="btn" value="delete" id="tk-del" style="margin-right:auto">Delete</button><button class="btn" value="cancel">Cancel</button><button class="btn primary" value="save">Save</button></div></form></dialog>
 
-<dialog id="composedlg" class="gcomp"><form method="dialog" id="composeform">
+<dialog id="composedlg" class="gcomp"><div class="gc-form">
   <div class="gc-grip" id="cp-grip" title="Drag to resize"></div>
-  <div class="gc-h"><span id="cp-title">New Message</span><button type="button" id="cp-big" title="Make bigger"><span class="ms">open_in_full</span></button><button type="button" id="cp-min" title="Minimize"><span class="ms">minimize</span></button><button value="cancel" title="Save &amp; close"><span class="ms">close</span></button></div>
-  <div class="gc-f"><span>Job</span><select id="cp-job"><option value="">(none)</option></select></div>
-  <div class="gc-f"><span>To</span><input type="text" id="cp-to" autocomplete="off"></div>
-  <div class="gc-f"><span>Cc</span><input type="text" id="cp-cc" autocomplete="off"></div>
-  <div class="gc-f"><span>Bcc</span><input type="text" id="cp-bcc" autocomplete="off"></div>
-  <div class="gc-f"><input type="text" id="cp-subject" placeholder="Subject"></div>
-  <textarea id="cp-body" placeholder="Your Gmail signature is added when it sends."></textarea>
-  <div class="gc-files" id="cp-files"></div>
-  <div class="gc-foot"><button class="gc-send" value="send">Send</button><button class="gc-ghost" value="draft">Save draft</button><span style="flex:1"></span><button class="gc-ghost" value="cancel" title="Discard"><span class="ms">delete</span></button></div>
-  <input type="hidden" id="cp-thread"><input type="hidden" id="cp-reply">
-</form></dialog>
+  <div class="gc-h"><span id="cp-title">New Message</span><button type="button" id="cp-min" title="Minimize"><span class="ms">minimize</span></button><button type="button" id="cp-big" title="Full screen"><span class="ms">open_in_full</span></button><button type="button" id="cp-x" title="Save &amp; close"><span class="ms">close</span></button></div>
+  <div id="cp-host"></div>
+</div></dialog>
 
 <script>
 const $ = (s, el = document) => el.querySelector(s);
@@ -1748,6 +1802,7 @@ async function loadMail() {
   const [labels, gen] = await Promise.all([api("/api/mail/labels").catch(() => []), api("/api/mail/generated").catch(() => null)]);
   if (gen) genCount = gen.count;
   const user = labels.filter((l) => l.type === "user").sort((a, b) => a.name.localeCompare(b.name));
+  mailUserLabels = user;
   const inbox = labels.find((l) => l.id === "INBOX");
   $("#mailcount").textContent = inbox?.unread || ""; $("#mailcount").hidden = !inbox?.unread;
   $("#labels").innerHTML = `<button class="gm-compose" id="compose" type="button">${msI("edit")}<span class="nm">Compose</span></button>` +
@@ -1777,24 +1832,36 @@ $("#mq").addEventListener("keydown", (e) => { if (e.key === "Enter" && $("#gm").
 function bjAllMail() { mailMode = "inbox"; applyMailMode(); mailPages = [null]; mailPage = 0; showList(); loadThreads(); snack("Searching all mail. Press By job to go back."); }
 $("#mq-clear").addEventListener("click", () => { $("#mq").value = ""; $("#mq-clear").hidden = true; if ($("#gm").classList.contains("byjob")) { bjSearch(""); return; } mailPages = [null]; mailPage = 0; loadThreads(); });
 
-function showList() { $("#gm-listview").style.display = "flex"; $("#reader").hidden = true; mailThread = null; if (mailMode === "byjob") applyMailMode(); }
+function showList() { flushInline(); $("#gm-listview").style.display = "flex"; $("#reader").hidden = true; mailThread = null; if (mailMode === "byjob") applyMailMode(); }
 function renderMailBar() {
   const any = mailSel.size > 0, all = mailRows.length && mailSel.size === mailRows.length;
-  $("#gm-bar").innerHTML = `<input type="checkbox" class="gm-cb" id="gm-all" ${all ? "checked" : ""} aria-label="Select all" style="margin:0 11px">
-    ${any ? `<button class="gm-ib" data-bulk="archive" title="Archive">${msI("archive")}</button><button class="gm-ib" data-bulk="spam" title="Report spam">${msI("report")}</button><button class="gm-ib" data-bulk="trash" title="Delete">${msI("delete")}</button><button class="gm-ib" data-bulk="read" title="Mark as read">${msI("drafts")}</button><button class="gm-ib" data-bulk="unread" title="Mark as unread">${msI("mark_email_unread")}</button>`
-      : `<button class="gm-ib" id="gm-refresh" title="Refresh">${msI("refresh")}</button>`}
-    <div class="gm-pg"><span>${mailRows.length ? `${mailPage * 30 + 1}–${mailPage * 30 + mailRows.length}` : "0"}${mailNext ? " of many" : ""}</span><button class="gm-ib" id="gm-prev" title="Newer" ${mailPage ? "" : "disabled"}>${msI("chevron_left")}</button><button class="gm-ib" id="gm-next" title="Older" ${mailNext ? "" : "disabled"}>${msI("chevron_right")}</button></div>`;
-  $("#gm-all").onchange = (e) => { mailSel = e.target.checked ? new Set(mailRows.map((t) => t.id)) : new Set(); $$("#threads .gr").forEach((r) => { r.classList.toggle("sel", mailSel.has(r.dataset.t)); r.querySelector(".gm-cb").checked = mailSel.has(r.dataset.t); }); renderMailBar(); };
-  $("#gm-refresh") && ($("#gm-refresh").onclick = () => loadThreads());
+  const selUnread = mailRows.some((t) => mailSel.has(t.id) && t.unread);
+  $("#gm-bar").innerHTML = `<span class="gm-selbox"><input type="checkbox" class="gm-cb" id="gm-all" ${all ? "checked" : ""} aria-label="Select"><button class="gm-ib sm" id="gm-selmenu" type="button" title="Select">${msI("arrow_drop_down")}</button></span>
+    ${any ? `<button class="gm-ib" data-bulk="archive" title="Archive">${msI("archive")}</button><button class="gm-ib" data-bulk="spam" title="Report spam">${msI("report")}</button><button class="gm-ib" data-bulk="trash" title="Delete">${msI("delete")}</button><i class="gm-sep"></i><button class="gm-ib" data-bulk="${selUnread ? "read" : "unread"}" title="${selUnread ? "Mark as read" : "Mark as unread"}">${msI(selUnread ? "drafts" : "mark_email_unread")}</button><button class="gm-ib" id="gm-move" title="Move to">${msI("drive_file_move")}</button><button class="gm-ib" id="gm-label" title="Labels">${msI("label")}</button>`
+      : `<button class="gm-ib" id="gm-refresh" title="Refresh">${msI("refresh")}</button>`}<button class="gm-ib" id="gm-more" type="button" title="More">${msI("more_vert")}</button>
+    ${any ? `<span class="gm-seln">${mailSel.size} selected</span>` : ""}
+    <div class="gm-pg"><span>${mailRows.length ? `${mailPage * 30 + 1}–${mailPage * 30 + mailRows.length}` : "0"}${mailNext ? " of many" : mailRows.length ? ` of ${mailPage * 30 + mailRows.length}` : ""}</span><button class="gm-ib" id="gm-prev" title="Newer" ${mailPage ? "" : "disabled"}>${msI("chevron_left")}</button><button class="gm-ib" id="gm-next" title="Older" ${mailNext ? "" : "disabled"}>${msI("chevron_right")}</button></div>`;
+  $("#gm-all").indeterminate = any && !all;
+  const pick = (fn) => { mailSel = new Set(mailRows.filter(fn).map((t) => t.id)); $$("#threads .gr").forEach((r) => { r.classList.toggle("sel", mailSel.has(r.dataset.t)); r.querySelector(".gm-cb").checked = mailSel.has(r.dataset.t); }); renderMailBar(); };
+  $("#gm-all").onchange = () => pick(() => !any);
+  $("#gm-selmenu").onclick = (e) => gmMenu(e.currentTarget, [{ label: "All", run: () => pick(() => true) }, { label: "None", run: () => pick(() => false) }, { label: "Read", run: () => pick((t) => !t.unread) }, { label: "Unread", run: () => pick((t) => t.unread) }, { label: "Starred", run: () => pick((t) => t.starred) }, { label: "Unstarred", run: () => pick((t) => !t.starred) }]);
+  const bulk = async (change, ids = [...mailSel]) => { await Promise.all(ids.map((id) => api(`/api/mail/threads/${id}/modify`, { method: "POST", body: change }).catch(() => {}))); loadThreads(); loadMailCounts(); };
+  $("#gm-more").onclick = (e) => gmMenu(e.currentTarget, any
+    ? [{ icon: "drafts", label: "Mark as read", run: () => bulk({ remove: ["UNREAD"] }) }, { icon: "mark_email_unread", label: "Mark as unread", run: () => bulk({ add: ["UNREAD"] }) }, "-", { icon: "star", label: "Add star", run: () => bulk({ add: ["STARRED"] }) }, { icon: "star_border", label: "Remove star", run: () => bulk({ remove: ["STARRED"] }) }]
+    : [{ icon: "drafts", label: "Mark all as read", disabled: !mailRows.some((t) => t.unread), run: () => bulk({ remove: ["UNREAD"] }, mailRows.filter((t) => t.unread).map((t) => t.id)) }, { head: mailRows.length ? "Tick emails to see more to do with them." : "Nothing here." }]);
+  $("#gm-move") && ($("#gm-move").onclick = (e) => gmMenu(e.currentTarget, moveItems([...mailSel])));
+  $("#gm-label") && ($("#gm-label").onclick = (e) => gmMenu(e.currentTarget, labelItems([...mailSel])));
+  $("#gm-refresh") && ($("#gm-refresh").onclick = () => { loadThreads(); loadMailCounts(); });
   $("#gm-prev").onclick = () => { if (mailPage) { mailPage--; loadThreads(); } };
   $("#gm-next").onclick = () => { if (mailNext) { mailPage++; mailPages[mailPage] = mailNext; loadThreads(); } };
 }
 $("#gm-bar").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-bulk]"); if (!b) return;
-  const change = { archive: { remove: ["INBOX"] }, spam: { add: ["SPAM"], remove: ["INBOX"] }, trash: { trash: true }, read: { remove: ["UNREAD"] }, unread: { add: ["UNREAD"] } }[b.dataset.bulk];
-  const ids = [...mailSel];
+  const how = b.dataset.bulk, ids = [...mailSel];
+  if (["archive", "spam", "trash"].includes(how)) { mailSel = new Set(); if (how === "archive" && mailLabel !== "INBOX") { await Promise.all(ids.map((id) => api(`/api/mail/threads/${id}/modify`, { method: "POST", body: { remove: ["INBOX"] } }).catch(() => {}))); snack(`${ids.length === 1 ? "Conversation" : `${ids.length} conversations`} archived.`); loadThreads(); loadMailCounts(); return; } const change = how === "archive" ? { remove: ["INBOX"] } : how === "spam" ? { add: ["SPAM"], remove: ["INBOX"] } : { trash: true }; ids.forEach((id) => $(`#threads .gr[data-t="${CSS.escape(id)}"]`)?.remove()); await Promise.all(ids.map((id) => api(`/api/mail/threads/${id}/modify`, { method: "POST", body: change }).catch(() => {}))); renderMailBar(); loadMailCounts(); snack(`${ids.length === 1 ? "Conversation" : `${ids.length} conversations`} ${how === "archive" ? "archived" : how === "spam" ? "marked as spam" : "moved to Trash"}.`, async () => { await Promise.all(ids.map((id) => api(`/api/mail/threads/${id}/modify`, { method: "POST", body: undoOf(change) }).catch(() => {}))); loadThreads(); loadMailCounts(); }); return; }
+  const change = { read: { remove: ["UNREAD"] }, unread: { add: ["UNREAD"] } }[how];
   await Promise.all(ids.map((id) => api(`/api/mail/threads/${id}/modify`, { method: "POST", body: change }).catch(() => {})));
-  mailSel = new Set(); loadThreads(); loadMailCounts();
+  loadThreads(); loadMailCounts();
 });
 async function loadMailCounts() { const labels = await api("/api/mail/labels").catch(() => []); const inbox = labels.find((l) => l.id === "INBOX"); $("#mailcount").textContent = inbox?.unread || ""; $("#mailcount").hidden = !inbox?.unread; const b = $('#labels [data-label="INBOX"] b'); if (b) b.textContent = inbox?.unread || ""; const gen = await api("/api/mail/generated").catch(() => null); if (gen) { genCount = gen.count; const lab = $('#labels [data-label="HUB_DRAFTS"]'); if (lab) { lab.querySelector("b")?.remove(); if (genCount) lab.insertAdjacentHTML("beforeend", `<b class="gc">${genCount}</b>`); } } }
 async function loadThreads() {
@@ -1924,34 +1991,6 @@ function snack(text, undo) {
 
 // ---- editing a draft right where it is in the conversation (same draft, attachments and Bcc kept)
 const noSig = (b) => { const t = String(b || "").replace(/\r/g, ""); const i = t.search(/\n-- ?\n(?![\s\S]*\n-- ?\n)/); return (i >= 0 ? t.slice(0, i) : t).replace(/\s+$/, ""); };
-function editDraftInline(i) {
-  const m = threadView.messages[i], card = $(`#reader .gm-msg[data-mi="${i}"]`); if (!card) return;
-  const box = card.querySelector(".gm-body"), acts = card.querySelector(".gm-draftacts");
-  card.querySelector(".gm-to").hidden = true;
-  box.innerHTML = `<div class="gm-dedit">
-    <label><span>To</span><input type="text" data-f="to" value="${esc(m.to.join(", "))}"></label>
-    <label><span>Cc</span><input type="text" data-f="cc" value="${esc(m.cc.join(", "))}"></label>
-    <label><span>Bcc</span><input type="text" data-f="bcc" value="${esc((m.bcc || []).join(", "))}" title="office+<job#> here files the email in Homebase"></label>
-    <label><span>Subject</span><input type="text" data-f="subject" value="${esc(m.subject)}"></label>
-    <textarea data-f="body" rows="10">${esc(noSig(m.body))}</textarea>
-    <div class="small" style="color:#5f6368">Your Gmail signature is added when it's saved.${m.attachments.length ? ` Attachments stay on: ${esc(m.attachments.map((a) => a.filename).join(", "))}.` : ""}</div>
-  </div>`;
-  acts.innerHTML = `<button class="gm-pill" type="button" data-dsave="${i}" data-how="save">${msI("save")}Save draft</button><button class="gm-pill send" type="button" data-dsave="${i}" data-how="send">${msI("send")}Save &amp; send…</button><button class="gm-pill" type="button" data-dcancel="1">Cancel</button>`;
-  const ta = box.querySelector("textarea"); const fit = () => { ta.style.height = "auto"; ta.style.height = Math.max(180, ta.scrollHeight + 4) + "px"; }; ta.addEventListener("input", fit); fit(); ta.focus();
-  for (const f of ["to", "cc", "bcc"]) wireAddr(box.querySelector(`[data-f="${f}"]`));
-}
-async function saveDraftInline(i, thenSend) {
-  const m = threadView.messages[i], card = $(`#reader .gm-msg[data-mi="${i}"]`);
-  const v = (f) => card.querySelector(`[data-f="${f}"]`).value;
-  card.querySelectorAll("[data-dsave]").forEach((b) => (b.disabled = true));
-  try {
-    const r = await api(`/api/mail/drafts/${encodeURIComponent(m.id)}/save?thread=${encodeURIComponent(threadView.id)}`, { method: "POST", body: { to: v("to"), cc: v("cc"), bcc: v("bcc"), subject: v("subject"), body: v("body") } });
-    if (thenSend) await api(`/api/mail/drafts/${encodeURIComponent(r.messageId || m.id)}/send?thread=${encodeURIComponent(threadView.id)}`, { method: "POST", body: {} });
-    else snack("Draft saved.");
-    openThread(mailThread);
-  } catch (err) { log(err.message, "t-err"); card.querySelectorAll("[data-dsave]").forEach((b) => (b.disabled = false)); }
-}
-
 // ---- who's on an email: every address visible, one click copies it
 const ME_ADDR = "hunter@forefrontteam.com";
 function addrChip(x) {
@@ -1973,6 +2012,7 @@ document.addEventListener("click", async (e) => {
 async function openThread(id) {
   $("#gm").classList.remove("byjob"); // one thread at a time uses the reader; Back returns to By job
   if (!mailLoaded) await loadMail();
+  await flushInline(); // anything being typed in the conversation on screen is kept as a draft first
   mailThread = id;
   $("#gm-listview").style.display = "none"; const rd = $("#reader"); rd.hidden = false;
   rd.innerHTML = `<div class="gm-bar"><button class="gm-ib" id="gm-back" title="Back">${msI("arrow_back")}</button></div><div class="gm-empty">Loading…</div>`;
@@ -1982,34 +2022,52 @@ async function openThread(id) {
   threadView = t;
   if (t.messages.some((m) => m.labelIds?.includes("UNREAD"))) api(`/api/mail/threads/${id}/modify`, { method: "POST", body: { remove: ["UNREAD"] } }).then(loadMailCounts).catch(() => {});
   const last = t.messages.at(-1), job = t.jobs[0], starred = t.messages.some((m) => m.labelIds?.includes("STARRED"));
+  // A draft on its own (not part of a conversation) opens in the compose window, as in Gmail.
+  if (t.messages.length === 1 && isDraftMsg(t.messages[0])) { showList(); openCompose(draftOpts(t, 0, job?.jobNumber)); return; }
   const labelsOn = [...new Set(t.messages.flatMap((m) => m.labelIds || []))].filter((l) => ["INBOX", "SENT", "IMPORTANT"].includes(l));
+  const me = ME_ADDR;
+  // Replies answer the newest real message (never a draft sitting in the thread) and keep the thread's subject.
+  const rmsg = [...t.messages].reverse().find((m) => !isDraftMsg(m)) || last;
+  const lastReal = t.messages.lastIndexOf(rmsg);
+  const ago = (d) => { const s = (Date.now() - new Date(d)) / 1000; if (!(s >= 0)) return ""; const u = s < 3600 ? [Math.max(1, Math.round(s / 60)), "minute"] : s < 86400 ? [Math.round(s / 3600), "hour"] : s < 86400 * 30 ? [Math.round(s / 86400), "day"] : null; return u ? ` (${u[0]} ${u[1]}${u[0] === 1 ? "" : "s"} ago)` : ""; };
+  const when = (d) => (isNaN(Date.parse(d)) ? "" : `${new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}${ago(d)}`);
+  const short = (x) => (addrOf(x).toLowerCase() === me ? "me" : nameOf(x) === addrOf(x) ? addrOf(x).split("@")[0] : nameOf(x).split(/\s+/)[0]);
+  const toLine = (m) => `to ${[...m.to, ...m.cc].map(short).join(", ") || "(no one yet)"}${m.bcc?.length ? `, bcc: ${m.bcc.map(short).join(", ")}` : ""}`;
+  const detRow = (k, v) => (v ? `<tr><th>${k}:</th><td>${v}</td></tr>` : "");
+  const others = (list) => list.filter((a) => addrOf(a).toLowerCase() !== me && !/^office\+\d+@/i.test(addrOf(a)));
+  const uniq = (list) => list.filter((a, i) => list.findIndex((b) => addrOf(b).toLowerCase() === addrOf(a).toLowerCase()) === i);
+  const allTo = (m) => uniq(addrOf(m.from).toLowerCase() === me ? others(m.to) : [m.from, ...others(m.to)]);
+  const msgHtml = (m, i) => (isDraftMsg(m)
+    ? `<div class="gm-msg draft" data-mi="${i}">${avatar(m.from)}<div style="min-width:0"><div class="ge-host" data-draft="${i}"></div></div></div>`
+    : `<div class="gm-msg ${i === lastReal || m.labelIds?.includes("UNREAD") ? "" : "col"}" data-mi="${i}">${avatar(m.from)}<div style="min-width:0">
+          <div class="gm-mh"><b>${esc(nameOf(m.from))}</b><button type="button" class="em" data-copy="${esc(addrOf(m.from))}" title="Copy address">&lt;${esc(addrOf(m.from))}&gt;</button>${m.attachments.length ? `<span class="ms clip" title="Has attachments">attach_file</span>` : ""}<span class="when">${when(m.date)}</span><span class="gm-mact"><button type="button" class="gm-ib" data-mreply="${i}" title="Reply">${msI("reply")}</button><button type="button" class="gm-ib" data-mmore="${i}" title="More">${msI("more_vert")}</button></span></div>
+          <div class="snip">${esc(m.body.replace(/\s+/g, " ").slice(0, 200))}</div>
+          <div class="gm-to"><span>${esc(toLine(m))}</span><button type="button" class="gm-det" data-mdet title="Show details">${msI("arrow_drop_down")}</button></div>
+          <div class="gm-details" hidden><table>${detRow("from", addrChip(m.from))}${detRow("to", m.to.map(addrChip).join(", "))}${detRow("cc", m.cc.map(addrChip).join(", "))}${detRow("bcc", (m.bcc || []).map(addrChip).join(", "))}${detRow("date", esc(isNaN(Date.parse(m.date)) ? "" : new Date(m.date).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })))}${detRow("subject", esc(m.subject || ""))}</table></div>
+          <div class="gm-body">${m.html ? `<iframe sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" data-i="${i}" title="Message" scrolling="no"></iframe>` : textMail(m.body)}</div>
+          ${m.attachments.length ? `<div class="gm-atts">${m.attachments.length > 1 ? `<div class="gm-attn">${m.attachments.length} Attachments</div>` : `<div class="gm-attn">One attachment</div>`}${m.attachments.map((a) => `<a class="gm-att" href="/api/mail/attachment/${esc(m.id)}/${esc(a.id)}?name=${encodeURIComponent(a.filename)}" target="_blank" title="${esc(a.filename)}">${msI(/\.pdf$/i.test(a.filename) ? "picture_as_pdf" : /\.(jpe?g|png|gif|heic|webp)$/i.test(a.filename) ? "image" : "attach_file")}<span>${esc(a.filename)}</span>${a.size ? `<small>${fmtBytes(a.size)}</small>` : ""}</a>`).join("")}</div>` : ""}
+        </div></div>`);
+  const multi = allTo(rmsg).length + others(rmsg.cc).length > 1;
   rd.innerHTML = `<div class="gm-bar"><button class="gm-ib" id="gm-back" title="Back to ${esc(GLABELS.find((g) => g[0] === mailLabel)?.[1] || "list")}">${msI("arrow_back")}</button>
       <button class="gm-ib" data-m="archive" title="Archive">${msI("archive")}</button><button class="gm-ib" data-m="spam" title="Report spam">${msI("report")}</button><button class="gm-ib" data-m="trash" title="Delete">${msI("delete")}</button>
-      <span style="width:12px"></span><button class="gm-ib" data-m="unread" title="Mark as unread">${msI("mark_email_unread")}</button><button class="gm-ib" data-m="star" title="${starred ? "Unstar" : "Star"}">${msI("star", starred)}</button></div>
+      <i class="gm-sep"></i><button class="gm-ib" data-m="unread" title="Mark as unread">${msI("mark_email_unread")}</button><button class="gm-ib" data-m="move" title="Move to">${msI("drive_file_move")}</button><button class="gm-ib" data-m="label" title="Labels">${msI("label")}</button><button class="gm-ib" data-m="star" title="${starred ? "Starred" : "Not starred"}">${msI("star", starred)}</button></div>
     <div class="gm-th">
       <h1>${esc(t.messages[0]?.subject || "(no subject)")}${labelsOn.map((l) => `<span class="chip">${esc(GLABELS.find((g) => g[0] === l)?.[1] || l)}</span>`).join("")}${t.jobs.map((j) => `<a href="#" class="chip" data-do="open" data-n="${j.jobNumber}" title="${esc(j.stage)}">#${j.jobNumber} ${esc(j.name)}</a>`).join("")}</h1>
       ${peopleRow(t)}
       <div class="gm-filebar">${t.jobs.length ? t.jobs.map((j) => `<button class="gm-pill" data-do="filethread" data-thread="${esc(t.id)}" data-n="${j.jobNumber}" type="button">${msI("drive_file_move")}File to #${j.jobNumber}</button>`).join("") : `<span>Not matched to a job.</span>`}
         <select id="fileto-job" aria-label="File to another job"><option value="">File to another job…</option>${jobs.map((j) => `<option value="${j.jobNumber}">#${j.jobNumber} ${esc(j.name)}</option>`).join("")}</select><button class="gm-pill" data-do="filethread" data-thread="${esc(t.id)}" type="button">File</button></div>
-      ${t.messages.map((m, i) => `<div class="gm-msg ${m.draft ? "draft" : ""} ${i < t.messages.length - 1 && t.messages.length > 2 && !m.draft ? "col" : ""}" data-mi="${i}">${avatar(m.from)}<div style="min-width:0">
-          ${m.draft ? `<div class="gm-draftbar"><span class="tagd">${m.draft.generated ? `${msI("auto_awesome")} AI draft${m.draft.source && m.draft.source !== "Claude" ? ` · ${esc(m.draft.source)}` : ""}` : `${msI("draft")} Draft`}</span><span class="nots">Not sent. Nothing goes out until you press Send and confirm.</span></div>` : ""}
-          <div class="gm-mh"><b>${esc(nameOf(m.from))}</b><button type="button" class="em" data-copy="${esc(addrOf(m.from))}" title="Copy address">&lt;${esc(addrOf(m.from))}&gt;</button><span class="when">${m.draft ? (m.date && !isNaN(Date.parse(m.date)) ? `Draft saved ${new Date(m.date).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Draft") : new Date(m.date).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span></div>
-          <div class="snip">${esc(m.body.slice(0, 160))}</div>
-          <div class="gm-to">to ${m.to.map(addrChip).join(" ")}${m.cc.length ? ` <span class="lbl">cc</span> ${m.cc.map(addrChip).join(" ")}` : ""}${m.bcc?.length ? ` <span class="lbl">bcc</span> ${m.bcc.map(addrChip).join(" ")}` : ""}</div>
-          <div class="gm-body">${m.html ? `<iframe sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" data-i="${i}" title="Message" scrolling="no"></iframe>` : textMail(m.body)}</div>
-          ${m.draft ? `<div class="gm-draftacts"><button class="gm-pill send" type="button" data-dsend="${esc(m.id)}">${msI("send")}Send…</button><button class="gm-pill" type="button" data-dedit="${i}">${msI("edit")}Edit</button><button class="gm-pill" type="button" data-ddel="${esc(m.id)}">${msI("delete")}Delete draft</button></div>` : ""}
-          ${m.attachments.length ? `<div class="gm-atts">${m.attachments.map((a) => `<a class="gm-att" href="/api/mail/attachment/${esc(m.id)}/${esc(a.id)}?name=${encodeURIComponent(a.filename)}" target="_blank">${msI(/\.pdf$/i.test(a.filename) ? "picture_as_pdf" : /\.(jpe?g|png|gif|heic)$/i.test(a.filename) ? "image" : "attach_file")}<span>${esc(a.filename)}</span></a>`).join("")}</div>` : ""}
-        </div></div>`).join("")}
-      <div class="gm-replies"><button class="gm-pill" id="replybtn" type="button">${msI("reply")}Reply</button><button class="gm-pill" id="replyall" type="button">${msI("reply_all")}Reply all</button><button class="gm-pill" id="fwd" type="button">${msI("forward")}Forward</button>${status.agent ? `<button class="gm-pill ai" id="claudereply" type="button">${msI("auto_awesome")}Draft reply with ${AI()}</button>` : ""}</div>
+      ${t.messages.map(msgHtml).join("")}
+      <div class="gm-msg gm-replybox" id="gm-replybox" hidden>${avatar("Hunter")}<div style="min-width:0"><div class="ge-host"></div></div></div>
+      <div class="gm-replies" id="gm-replies"><button class="gm-pill" data-reply="reply" type="button">${msI("reply")}Reply</button>${multi ? `<button class="gm-pill" data-reply="all" type="button">${msI("reply_all")}Reply all</button>` : ""}<button class="gm-pill" data-reply="forward" type="button">${msI("forward")}Forward</button>${status.agent ? `<button class="gm-pill ai" id="claudereply" type="button">${msI("auto_awesome")}Draft reply with ${AI()}</button>` : ""}</div>
     </div>`;
-  $("#gm-back").onclick = () => { showList(); loadThreads(); };
-  $$("#reader .gm-msg.col").forEach((el) => el.addEventListener("click", () => el.classList.remove("col"), { once: true }));
+  $("#gm-back").onclick = async () => { await flushInline(); showList(); loadThreads(); };
   // HTML email as Gmail shows it: full height (no inner scroll box), the sender's own layout, quoted history folded.
   // The frame may be measured (allow-same-origin) but can't run scripts (no allow-scripts).
   $$("#reader iframe").forEach((f) => {
     const m = t.messages[Number(f.dataset.i)];
     f.srcdoc = `<!doctype html><html><head><base target="_blank"><style>html,body{margin:0;padding:0;background:#fff}body{font:14px/1.55 Arial,Helvetica,sans-serif;color:#222;overflow-wrap:anywhere;padding:2px 0 8px}img{max-width:100%;height:auto}table{max-width:100%}a{color:#0b57d0}.gmail_quote,blockquote[type=cite],#appendonsend,div[id*=divRplyFwdMsg],div[id*=divRplyFwdMsg]~*{display:none}body.showq .gmail_quote,body.showq blockquote[type=cite],body.showq #appendonsend,body.showq div[id*=divRplyFwdMsg],body.showq div[id*=divRplyFwdMsg]~*{display:block}</style></head><body>${m.html}</body></html>`;
-    const fit = () => { try { f.style.height = f.contentDocument.documentElement.scrollHeight + "px"; } catch {} };
+    const fit = () => { try { if (f.offsetParent) f.style.height = f.contentDocument.documentElement.scrollHeight + "px"; } catch {} };
+    f._fit = fit;
     f.onload = () => {
       fit();
       try {
@@ -2025,30 +2083,85 @@ async function openThread(id) {
     };
   });
   $$("#reader .gm-more[data-q]").forEach((b) => (b.onclick = () => { b.nextElementSibling.hidden = !b.nextElementSibling.hidden; }));
-  const me = "hunter@forefrontteam.com";
-  const quote = (m) => `\n\nOn ${new Date(m.date).toLocaleString("en-US")}, ${m.from} wrote:\n${m.body.split("\n").map((l) => "> " + l).join("\n")}`;
-  // Replies answer the newest real message (never a draft sitting in the thread) and keep the thread's subject.
-  const rmsg = [...t.messages].reverse().find((m) => !m.labelIds?.includes("DRAFT")) || last;
-  const replyTo = () => { const from = addrOf(rmsg.from); return from.toLowerCase() === me ? rmsg.to.join(", ") : from; };
+
+  // ---- answering right in the conversation, the way Gmail does it
   const re = reSubject(t.messages[0].subject || rmsg.subject);
-  $("#replybtn").onclick = () => openCompose({ reply: true, to: replyTo(), subject: re, body: quote(rmsg), threadId: t.id, inReplyTo: rmsg.messageIdHeader, references: refsFor(rmsg), job: job?.jobNumber });
-  $("#replyall").onclick = () => openCompose({ reply: true, to: [replyTo(), ...rmsg.to].map(addrOf).filter((a) => a.toLowerCase() !== me).filter((a, i, arr) => arr.indexOf(a) === i).join(", "), cc: rmsg.cc.map(addrOf).filter((a) => a.toLowerCase() !== me).join(", "), subject: re, body: quote(rmsg), threadId: t.id, inReplyTo: rmsg.messageIdHeader, references: refsFor(rmsg), job: job?.jobNumber });
-  $("#fwd").onclick = () => openCompose({ subject: `Fwd: ${last.subject}`, body: `\n\n---------- Forwarded message ---------\nFrom: ${last.from}\nDate: ${last.date}\nSubject: ${last.subject}\nTo: ${last.to.join(", ")}\n\n${last.body}`, job: job?.jobNumber });
+  const replyOpts = (kind, m, carry = {}) => {
+    const base = { job: job?.jobNumber, ...carry };
+    if (kind === "forward") return { ...base, to: "", cc: "", subject: `Fwd: ${String(m.subject || t.messages[0].subject || "").replace(/^(\s*fwd?\s*:\s*)+/i, "")}`, quoteHtml: fwdQuote(m), quoteOpen: true, threadId: "", inReplyTo: "", references: "", inThread: false, files: [...(carry.files || []).filter((f) => !f.ref?.msg), ...m.attachments.map((a) => ({ label: a.filename, size: a.size, ref: { msg: m.id, id: a.id, name: a.filename } }))] };
+    const to = addrOf(m.from).toLowerCase() === me ? m.to : [m.from];
+    return { ...base, to: (kind === "all" ? allTo(m) : to).join(", "), cc: kind === "all" ? others(m.cc).join(", ") : "", subject: re, quoteHtml: replyQuote(m), threadId: t.id, inReplyTo: m.messageIdHeader, references: refsFor(m), inThread: true, files: (carry.files || []).filter((f) => !f.ref?.msg) };
+  };
+  let bottomEd = null;
+  const box = $("#gm-replybox"), boxHost = box.querySelector(".ge-host");
+  const closeBox = () => { bottomEd = null; box.hidden = true; boxHost.innerHTML = ""; $("#gm-replies").hidden = false; };
+  const popOut = (ed, after) => { const s = ed.snapshot(); ed.detach(); after(); openCompose({ ...s, title: s.subject }); };
+  const openReply = (kind, mi, carry) => {
+    const m = mi != null ? t.messages[mi] : rmsg;
+    bottomEd?.detach();
+    box.hidden = false; $("#gm-replies").hidden = true;
+    bottomEd = mkEditor(boxHost, replyOpts(kind, m, carry), { inline: true, kind,
+      onClose: (why) => { closeBox(); if (why === "sent") $("#gm-replies").insertAdjacentHTML("beforebegin", `<div class="gm-sending">Answer the card to send it. Say no and it stays here as a draft.</div>`); },
+      onKind: (k) => { const s = bottomEd.snapshot(); openReply(k, mi, { html: s.html, files: s.files, draftId: s.draftId, draftMsgId: s.draftMsgId, header: s.header, dirty: true }); },
+      onPop: () => popOut(bottomEd, closeBox) });
+    box.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    bottomEd.focus(kind === "forward" ? "to" : "body");
+  };
+  rd._reply = openReply;
+  // Drafts sitting in the conversation are open to type in where they are.
+  $$("#reader [data-draft]").forEach((h) => {
+    const i = Number(h.dataset.draft), card = h.closest(".gm-msg");
+    const ed = mkEditor(h, draftOpts(t, i, job?.jobNumber), { inline: true, kind: "draft",
+      onClose: (why) => { card.remove(); if (why === "sent") $("#gm-replies").insertAdjacentHTML("beforebegin", `<div class="gm-sending">Answer the card to send it. Say no and it stays here as a draft.</div>`); if (!$("#reader .gm-msg:not(.gm-replybox)")) { showList(); loadThreads(); loadMailCounts(); } },
+      onPop: () => popOut(ed, () => card.remove()) });
+  });
   $("#claudereply") && ($("#claudereply").onclick = () => askClaude(`Read Gmail thread ${t.id}${job ? ` (job #${job.jobNumber})` : ""} and draft my reply in Gmail as a draft in that thread, in my voice. Don't send it.`, job?.jobNumber));
 }
+/** What the editor needs to reopen a draft that's already in Gmail. */
+function draftOpts(t, i, jobN) {
+  const m = t.messages[i], sp = m.html ? splitDraftHtml(m.html) : { html: textToHtml(noSig(m.body)), quoteHtml: "" };
+  const prev = t.messages.slice(0, i).reverse().find((x) => !isDraftMsg(x)) || [...t.messages].reverse().find((x) => !isDraftMsg(x));
+  const tag = m.draft?.generated ? `<span class="tagd">${msI("auto_awesome")} AI draft${m.draft.source && m.draft.source !== "Claude" ? ` · ${esc(m.draft.source)}` : ""}</span>` : `<span class="tagd plain">Draft</span>`;
+  return { existed: true, draftMsgId: m.id, header: m.messageIdHeader, threadId: t.id, inReplyTo: prev?.messageIdHeader || "", references: prev ? refsFor(prev) : "", inThread: !!prev, to: m.to.join(", "), cc: m.cc.join(", "), bcc: (m.bcc || []).join(", "), subject: m.subject, title: m.subject, html: sp.html, quoteHtml: sp.quoteHtml, keep: m.attachments.map((a) => a.filename), job: jobN,
+    banner: `${tag}<span class="nots">Not sent. Nothing goes out until you press Send and confirm.</span>` };
+}
 $("#reader").addEventListener("click", async (e) => {
-  const ds = e.target.closest("[data-dsend]"), dd = e.target.closest("[data-ddel]"), de = e.target.closest("[data-dedit]");
-  if (ds) { try { await api(`/api/mail/drafts/${encodeURIComponent(ds.dataset.dsend)}/send?thread=${encodeURIComponent(mailThread)}`, { method: "POST", body: {} }); } catch (err) { log(err.message, "t-err"); } return; }
-  if (dd) { if (!confirm("Delete this draft?")) return; try { await api(`/api/mail/drafts/${encodeURIComponent(dd.dataset.ddel)}/delete?thread=${encodeURIComponent(mailThread)}`, { method: "POST", body: {} }); snack("Draft deleted."); if ((threadView?.messages || []).filter((x) => x.id !== dd.dataset.ddel).length) openThread(mailThread); else { showList(); loadThreads(); } } catch (err) { log(err.message, "t-err"); } return; }
-  if (de) { editDraftInline(Number(de.dataset.dedit)); return; }
-  const dsave = e.target.closest("[data-dsave]");
-  if (dsave) { await saveDraftInline(Number(dsave.dataset.dsave), dsave.dataset.how === "send"); return; }
-  const dcancel = e.target.closest("[data-dcancel]"); if (dcancel) { openThread(mailThread); return; }
+  const rp = e.target.closest("[data-reply]"); if (rp) { $("#reader")._reply?.(rp.dataset.reply); return; }
+  const mr = e.target.closest("[data-mreply]"); if (mr) { $("#reader")._reply?.("reply", Number(mr.dataset.mreply)); return; }
+  const mm = e.target.closest("[data-mmore]");
+  if (mm) { const i = Number(mm.dataset.mmore), go = (k) => () => $("#reader")._reply?.(k, i); gmMenu(mm, [{ icon: "reply", label: "Reply", run: go("reply") }, { icon: "reply_all", label: "Reply to all", run: go("all") }, { icon: "forward", label: "Forward", run: go("forward") }, "-", { icon: "content_copy", label: "Copy sender's address", run: () => navigator.clipboard.writeText(addrOf(threadView.messages[i].from)).then(() => snack("Address copied.")).catch(() => {}) }]); return; }
+  const det = e.target.closest("[data-mdet]"); if (det) { const d = det.closest(".gm-msg").querySelector(".gm-details"); d.hidden = !d.hidden; return; }
+  // A message folds and unfolds on a click of its top line (a folded one opens from anywhere on it).
+  const card = e.target.closest(".gm-msg:not(.draft):not(.gm-replybox)");
+  if (card && !e.target.closest("button, a, iframe, .gm-details, .gm-body, .gm-atts")) {
+    if (card.classList.contains("col")) { card.classList.remove("col"); card.querySelectorAll("iframe").forEach((f) => f._fit?.()); return; }
+    if (e.target.closest(".gm-mh, .gm-av") && $$("#reader .gm-msg:not(.draft):not(.gm-replybox)").length > 1) { card.classList.add("col"); return; }
+  }
   const b = e.target.closest("[data-m]"); if (!b || !mailThread) return;
+  const id = mailThread;
+  if (b.dataset.m === "move") { gmMenu(b, moveItems([id], true)); return; }
+  if (b.dataset.m === "label") { gmMenu(b, labelItems([id])); return; }
   const starred = threadView?.messages.some((m) => m.labelIds?.includes("STARRED"));
   const change = { archive: { remove: ["INBOX"] }, spam: { add: ["SPAM"], remove: ["INBOX"] }, unread: { add: ["UNREAD"] }, trash: { trash: true }, star: starred ? { remove: ["STARRED"] } : { add: ["STARRED"] } }[b.dataset.m];
-  try { await api(`/api/mail/threads/${mailThread}/modify`, { method: "POST", body: change }); if (b.dataset.m === "star") openThread(mailThread); else { showList(); loadThreads(); loadMailCounts(); } } catch (err) { log(err.message, "t-err"); }
+  try {
+    await flushInline();
+    await api(`/api/mail/threads/${id}/modify`, { method: "POST", body: change });
+    if (b.dataset.m === "star") { openThread(id); return; }
+    showList(); loadThreads(); loadMailCounts();
+    const said = { archive: "Conversation archived.", spam: "Conversation marked as spam.", trash: "Conversation moved to Trash.", unread: "Conversation marked as unread." }[b.dataset.m];
+    snack(said, async () => { await api(`/api/mail/threads/${id}/modify`, { method: "POST", body: b.dataset.m === "unread" ? { remove: ["UNREAD"] } : undoOf(change) }).catch(() => {}); loadThreads(); loadMailCounts(); });
+  } catch (err) { log(err.message, "t-err"); }
 });
+/** "Move to" and "Label as" menus, for the open conversation or the ticked ones. */
+let mailUserLabels = [];
+function moveItems(ids, leave) {
+  const go = (target) => async () => { if (leave) { await flushInline(); showList(); } moveThreads(ids, target); };
+  return [{ head: "Move to:" }, ...(mailLabel !== "INBOX" ? [{ icon: "inbox", label: "Inbox", run: go("INBOX") }] : []), ...mailUserLabels.filter((l) => l.id !== mailLabel).map((l) => ({ icon: "label", label: l.name, run: go(l.id) })), "-", { icon: "report", label: "Spam", run: go("SPAM") }, { icon: "delete", label: "Trash", run: go("TRASH") }];
+}
+function labelItems(ids) {
+  if (!mailUserLabels.length) return [{ head: "No labels yet. Make them in Gmail and they show here." }];
+  return [{ head: "Label as:" }, ...mailUserLabels.map((l) => ({ icon: "label", label: l.name, run: async () => { await Promise.all(ids.map((id) => api(`/api/mail/threads/${id}/modify`, { method: "POST", body: { add: [l.id] } }).catch(() => {}))); snack(`${ids.length === 1 ? "Conversation" : `${ids.length} conversations`} added to "${l.name}".`, async () => { await Promise.all(ids.map((id) => api(`/api/mail/threads/${id}/modify`, { method: "POST", body: { remove: [l.id] } }).catch(() => {}))); loadThreads(); }); if (!mailThread) loadThreads(); } }))];
+}
 
 // ---- By job: each job's whole conversation (email, texts, calls) as one back-and-forth
 let mailMode = store.get("mailmode", "byjob"), bjJob = store.get("bjjob", null), bjData = null, bjList = [];
@@ -2122,8 +2235,7 @@ function bjReply(id, all) {
   const first = bjData.items.find((i) => i.kind === "email" && i.threadId === x.threadId) || x;
   const others = (list) => (list || []).map(addrOf).filter((a) => a && a.toLowerCase() !== me && !/^office\+\d+@/i.test(a));
   const to = x.fromMe ? others(x.to) : [addrOf(x.from), ...(all ? others(x.to) : [])];
-  const quoted = `\n\nOn ${new Date(x.at).toLocaleString("en-US")}, ${x.from} wrote:\n${(x.full || x.body).split("\n").map((l) => "> " + l).join("\n")}`;
-  openCompose({ reply: true, to: [...new Set(to)].join(", "), cc: all ? others(x.cc).join(", ") : "", subject: reSubject(first.subject), body: quoted, threadId: x.threadId, inReplyTo: x.messageIdHeader, references: refsFor(x), job: n });
+  openCompose({ to: [...new Set(to)].join(", "), cc: all ? others(x.cc).join(", ") : "", subject: reSubject(first.subject), quoteHtml: replyQuote({ date: x.at, from: x.from, body: x.full || x.body }), focus: "body", threadId: x.threadId, inReplyTo: x.messageIdHeader, references: refsFor(x), job: n });
 }
 document.addEventListener("click", (e) => {
   const jb = e.target.closest("[data-bjjob]"); if (jb) { openBj(Number(jb.dataset.bjjob)); return; }
@@ -2137,54 +2249,264 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("[data-bjnew]") && bjData) { const j = bjData.job; openCompose({ to: j.customer.email || "", subject: "", job: j.jobNumber }); }
 });
 
-// ---- compose (send only on your click + confirm)
-let composeFiles = [];
-let composeReplace = "";
+// ---- the email editor (Gmail's compose box): one box for a new message, a reply written in the conversation, and a
+// draft opened again. Its draft is saved to Gmail a moment after typing stops and when the box closes, like Gmail.
+// Nothing is sent until Send is pressed and the card is answered.
 let composeRefs = "";
 /** "Re: " once on the thread's subject, and the References chain for a reply (keeps it one conversation everywhere). */
 const reSubject = (subj) => "Re: " + String(subj || "").replace(/^(\s*(re|aw|sv)\s*:\s*)+/i, "").trim();
 const refsFor = (m) => [...new Set((`${m.references || ""} ${m.messageIdHeader || ""}`.match(/<[^<>\s]+>/g) || []))].slice(-20).join(" ");
+const editors = new Set();
+let sigCache = null;
+const getSig = () => (sigCache ??= api("/api/mail/signature").then((r) => safeHtml(r.html || "")).catch(() => ""));
+/** HTML with anything that could run taken out (scripts, styles, frames, on-click attributes): formatting only. */
+function safeHtml(html) {
+  const d = new DOMParser().parseFromString(`<body>${html || ""}</body>`, "text/html");
+  d.querySelectorAll("script,style,iframe,object,embed,form,link,meta,base,title").forEach((x) => x.remove());
+  d.querySelectorAll("*").forEach((el) => { for (const a of [...el.attributes]) if (/^on/i.test(a.name) || /^\s*javascript:/i.test(a.value)) el.removeAttribute(a.name); });
+  return d.body.innerHTML;
+}
+const textToHtml = (t) => { const s = String(t || "").replace(/\r/g, "").replace(/^\n+|\s+$/g, ""); return s ? s.split("\n").map((l) => `<div>${esc(l) || "<br>"}</div>`).join("") : ""; };
+const splitAddrs = (v) => (String(v || "").match(/(?:"[^"]*"|<[^>]*>|[^,;])+/g) || []).map((x) => x.trim()).filter(Boolean);
+const fmtBytes = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))}K`);
+const isDraftMsg = (m) => !!m.draft || !!m.labelIds?.includes("DRAFT");
+/** A saved draft's HTML taken apart again: what was typed, without the signature (added back on save) and the quoted original. */
+function splitDraftHtml(html) {
+  const d = new DOMParser().parseFromString(`<body>${html || ""}</body>`, "text/html");
+  const q = d.querySelector(".gmail_quote, blockquote[type=cite]");
+  let quoteHtml = "";
+  if (q) { quoteHtml = q.outerHTML; q.remove(); }
+  const sig = d.querySelector(".gmail_signature");
+  if (sig) {
+    const dash = sig.previousElementSibling;
+    if (dash && /^--\s*$/.test(dash.textContent)) { const br = dash.previousElementSibling; dash.remove(); if (br && br.tagName === "BR") br.remove(); }
+    sig.remove();
+  }
+  const trim = (el) => { while (el.lastChild && (el.lastChild.nodeName === "BR" || (el.lastChild.nodeType === 3 && !el.lastChild.textContent.trim()))) el.lastChild.remove(); };
+  let root = d.body; trim(root);
+  while (root.childNodes.length === 1 && root.firstElementChild?.tagName === "DIV" && root.firstElementChild.getAttribute("dir") === "ltr") { root = root.firstElementChild; trim(root); }
+  return { html: safeHtml(root.innerHTML), quoteHtml: safeHtml(quoteHtml) };
+}
+const gAttrDate = (d) => { const t = new Date(d); return isNaN(t) ? String(d || "") : `${t.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })} at ${t.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`; };
+const origHtml = (m) => (m.html ? safeHtml(m.html) : textToHtml(m.body));
+const replyQuote = (m) => `<div class="gmail_quote"><div dir="ltr" class="gmail_attr">On ${esc(gAttrDate(m.date))} ${esc(nameOf(m.from))} &lt;<a href="mailto:${esc(addrOf(m.from))}">${esc(addrOf(m.from))}</a>&gt; wrote:<br></div><blockquote class="gmail_quote" style="margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex">${origHtml(m)}</blockquote></div>`;
+const fwdQuote = (m) => `<div class="gmail_quote"><div dir="ltr" class="gmail_attr">---------- Forwarded message ---------<br>From: <b>${esc(nameOf(m.from))}</b> &lt;${esc(addrOf(m.from))}&gt;<br>Date: ${esc(gAttrDate(m.date))}<br>Subject: ${esc(m.subject || "")}<br>To: ${esc((m.to || []).join(", "))}<br>${m.cc?.length ? `Cc: ${esc(m.cc.join(", "))}<br>` : ""}</div><br><br>${origHtml(m)}</div>`;
+
+/** A small pop-up menu under a button (Gmail's "More", "Move to", "Select" menus). */
+function gmMenu(anchor, items) {
+  $("#gm-menu")?.remove();
+  const m = document.createElement("div"); m.id = "gm-menu"; m.className = "gm-menu";
+  m.innerHTML = items.map((it, i) => (it === "-" ? `<hr>` : it.head ? `<div class="h">${esc(it.head)}</div>` : `<button type="button" data-i="${i}" ${it.disabled ? "disabled" : ""}>${it.icon ? msI(it.icon) : ""}<span>${esc(it.label)}</span></button>`)).join("");
+  document.body.appendChild(m);
+  const r = anchor.getBoundingClientRect(), z = ZOOM();
+  m.style.left = `${Math.max(8, Math.min(r.left / z, innerWidth / z - m.offsetWidth - 8))}px`;
+  const below = r.bottom / z + 2;
+  m.style.top = `${below + m.offsetHeight > innerHeight / z - 8 ? Math.max(8, r.top / z - m.offsetHeight - 2) : below}px`;
+  m.addEventListener("click", (e) => { const b = e.target.closest("[data-i]"); if (!b) return; m.remove(); items[Number(b.dataset.i)].run?.(); });
+  setTimeout(() => document.addEventListener("mousedown", function off(e) { if (m.contains(e.target)) return; m.remove(); document.removeEventListener("mousedown", off, true); }, true), 0);
+}
+
+const GE_FMT = [["undo", "undo", "Undo (Ctrl-Z)"], ["redo", "redo", "Redo (Ctrl-Y)"], 0, ["bold", "format_bold", "Bold (Ctrl-B)"], ["italic", "format_italic", "Italic (Ctrl-I)"], ["underline", "format_underlined", "Underline (Ctrl-U)"], 0, ["insertOrderedList", "format_list_numbered", "Numbered list"], ["insertUnorderedList", "format_list_bulleted", "Bulleted list"], ["outdent", "format_indent_decrease", "Indent less"], ["indent", "format_indent_increase", "Indent more"], ["quote", "format_quote", "Quote"], 0, ["strikeThrough", "strikethrough_s", "Strikethrough"], ["removeFormat", "format_clear", "Remove formatting"]];
+
+function mkEditor(host, o, ui = {}) {
+  for (const e of editors) if (!e.host.isConnected) editors.delete(e);
+  const st = { draftId: o.draftId || "", draftMsgId: o.draftMsgId || "", header: o.header || "", threadId: o.threadId || "", inReplyTo: o.inReplyTo || "", references: o.references || "", inThread: !!o.inThread, quoteHtml: o.quoteHtml || "", subject: o.subject || "", keep: [...(o.keep || [])], files: [...(o.files || [])], dirty: !!o.dirty, chain: Promise.resolve(), timer: 0, gone: false, dead: false, existed: !!(o.existed || o.draftMsgId || o.draftId), saved: false, busy: 0 };
+  const inline = !!ui.inline, showSubj = !inline;
+  const kindIcon = { all: "reply_all", forward: "forward" }[ui.kind] || "reply";
+  const rcpRow = (f, label) => `<div class="ge-rcp" data-f="${f}" ${f === "to" ? "" : "hidden"}>${f === "to" && inline && ui.onKind ? `<button type="button" class="ge-kind" title="Type of response">${msI(kindIcon)}${msI("arrow_drop_down")}</button>` : `<span class="lb">${label}</span>`}<div class="ge-chips"><input type="text" autocomplete="off" spellcheck="false" aria-label="${label}"></div>${f === "to" ? `<span class="ge-ccb"><button type="button" data-show="cc" title="Add Cc recipients">Cc</button><button type="button" data-show="bcc" title="Add Bcc recipients">Bcc</button></span>${inline && ui.onPop ? `<button type="button" class="ge-ib ge-pop" title="Pop out reply">${msI("open_in_new")}</button>` : ""}` : ""}</div>`;
+  host.innerHTML = `<div class="ge ${inline ? "inline" : ""}">
+    ${o.banner ? `<div class="ge-banner">${o.banner}</div>` : ""}
+    ${rcpRow("to", "To")}${rcpRow("cc", "Cc")}${rcpRow("bcc", "Bcc")}
+    <input type="text" class="ge-subj" placeholder="Subject" aria-label="Subject" ${showSubj ? "" : "hidden"}>
+    <div class="ge-scroll"><div class="ge-body" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Message Body"></div>
+      <div class="ge-sig" hidden title="Your Gmail signature. It's added when the email is saved or sent."></div>
+      ${st.quoteHtml ? `<button type="button" class="gm-more ge-qb" title="Show trimmed content">•••</button><div class="ge-quote" hidden></div>` : ""}</div>
+    <div class="ge-atts"></div>
+    <div class="ge-fmt" ${store.get("geFmt", true) ? "" : "hidden"}>${GE_FMT.map((b) => (b ? `<button type="button" data-cmd="${b[0]}" title="${b[2]}">${msI(b[1])}</button>` : `<i class="sep"></i>`)).join("")}</div>
+    <div class="ge-foot"><button type="button" class="ge-send" title="Send (Ctrl-Enter)">Send</button>
+      <button type="button" class="ge-ib" data-a="fmt" title="Formatting options">${msI("format_color_text")}</button>
+      <button type="button" class="ge-ib" data-a="attach" title="Attach files">${msI("attach_file")}</button>
+      <button type="button" class="ge-ib" data-a="link" title="Insert link (Ctrl-K)">${msI("link")}</button>
+      <button type="button" class="ge-ib" data-a="jobfiles" title="Attach a file from the job's folder (estimate, agreement, photo report)">${msI("folder_open")}</button>
+      <select class="ge-job" title="The job this email belongs to: adds the Homebase Bcc and lets you attach its files"><option value="">No job</option>${jobs.map((j) => `<option value="${j.jobNumber}" ${Number(o.job) === j.jobNumber ? "selected" : ""}>#${j.jobNumber} ${esc(j.name)}</option>`).join("")}</select>
+      <span class="ge-saved" aria-live="polite"></span><span style="flex:1"></span>
+      <button type="button" class="ge-ib" data-a="discard" title="Discard draft">${msI("delete")}</button>
+      <input type="file" multiple hidden></div></div>`;
+  const q1 = (s) => host.querySelector(s);
+  const bodyEl = q1(".ge-body"), subj = q1(".ge-subj"), jobSel = q1(".ge-job"), attsEl = q1(".ge-atts"), sendBtn = q1(".ge-send"), savedEl = q1(".ge-saved"), fileIn = q1('input[type="file"]');
+  const note = (t) => { savedEl.textContent = t; };
+  const touch = () => { if (st.gone) return; st.dirty = true; note(""); clearTimeout(st.timer); st.timer = setTimeout(() => save(), 2000); };
+
+  // ---- recipients as chips
+  const rows = {};
+  const showRow = (f) => { rows[f].row.hidden = false; const b = q1(`.ge-ccb [data-show="${f}"]`); if (b) b.hidden = true; };
+  for (const f of ["to", "cc", "bcc"]) {
+    const row = q1(`.ge-rcp[data-f="${f}"]`), box = row.querySelector(".ge-chips"), inp = box.querySelector("input");
+    const add = (raw) => {
+      const s = String(raw).trim(); if (!s) return;
+      const a = addrOf(s), n = nameOf(s), ok = /^[\w.+-]+@[\w.-]+\.\w{2,}$/.test(a);
+      if ([...box.querySelectorAll(".ge-chip")].some((c) => addrOf(c.dataset.a).toLowerCase() === a.toLowerCase())) return;
+      const c = document.createElement("span"); c.className = "ge-chip" + (ok ? "" : " bad"); c.dataset.a = s; c.title = ok ? a : `"${s}" isn't an email address`;
+      c.innerHTML = `<span>${esc(ok && n && n.toLowerCase() !== a.toLowerCase() ? n : s)}</span><button type="button" tabindex="-1" aria-label="Remove">×</button>`;
+      box.insertBefore(c, inp);
+    };
+    const commit = () => { const v = inp.value; if (!v.trim()) return; inp.value = ""; splitAddrs(v).forEach(add); touch(); };
+    wireAddr(inp); inp._commit = commit;
+    inp.addEventListener("keydown", (e) => {
+      if (e.defaultPrevented) return;
+      if (e.key === "," || e.key === ";" || e.key === "Enter" || (e.key === "Tab" && inp.value.trim())) { if (e.key !== "Tab") e.preventDefault(); commit(); }
+      else if (e.key === "Backspace" && !inp.value) { const last = [...box.querySelectorAll(".ge-chip")].at(-1); if (last) { last.remove(); touch(); } }
+    });
+    inp.addEventListener("input", () => { if (/[,;]\s*$/.test(inp.value) || (inp.value.includes("@") && /[,;]/.test(inp.value))) commit(); });
+    inp.addEventListener("blur", () => setTimeout(() => { if (addrPop.hidden || addrFor !== inp) commit(); }, 200));
+    box.addEventListener("click", (e) => { const x = e.target.closest(".ge-chip button"); if (x) { x.parentElement.remove(); touch(); } if (!e.target.closest(".ge-chip")) inp.focus(); });
+    rows[f] = { row, inp, add, commit, list: () => [...box.querySelectorAll(".ge-chip")].map((c) => c.dataset.a), value: () => [...box.querySelectorAll(".ge-chip")].map((c) => c.dataset.a).concat(inp.value.trim() ? [inp.value.trim()] : []).join(", "), set: (v) => { box.querySelectorAll(".ge-chip").forEach((c) => c.remove()); splitAddrs(v).forEach(add); } };
+  }
+  const OFFICE = /^office\+\d+@forefrontteam\.com$/i;
+  rows.to.set(o.to); rows.cc.set(o.cc);
+  rows.bcc.set(o.bcc ?? (o.job && !st.existed ? `office+${o.job}@forefrontteam.com` : ""));
+  if (rows.cc.list().length) showRow("cc");
+  if (rows.bcc.list().length) showRow("bcc");
+  subj.value = st.subject;
+  bodyEl.innerHTML = o.html !== undefined ? safeHtml(o.html) : textToHtml(o.body);
+  getSig().then((h) => { const s = q1(".ge-sig"); if (h && s) { s.innerHTML = `<div>-- </div>${h}`; s.hidden = false; } });
+  const qb = q1(".ge-qb"), qEl = q1(".ge-quote");
+  const showQuote = (on) => { if (!qEl) return; if (on && !qEl.innerHTML) qEl.innerHTML = safeHtml(st.quoteHtml); qEl.hidden = !on; };
+  if (qb) { qb.onclick = () => showQuote(qEl.hidden); if (o.quoteOpen) showQuote(true); }
+
+  // ---- attachments: what the draft already had, files from the job's folder, files picked or dropped from the PC
+  const drawAtts = () => {
+    attsEl.innerHTML = [...st.keep.map((n, i) => ({ n, k: "keep", i })), ...st.files.map((f, i) => ({ n: f.label, k: "files", i, size: f.size, busy: f.busy }))].map((a) => `<div class="ge-att"><span class="nm">${esc(a.n)}</span>${a.size ? `<small>(${fmtBytes(a.size)})</small>` : ""}${a.busy ? `<small>Uploading…</small>` : `<button type="button" data-rm="${a.k}:${a.i}" aria-label="Remove attachment" title="Remove attachment">×</button>`}</div>`).join("");
+  };
+  attsEl.addEventListener("click", (e) => { const b = e.target.closest("[data-rm]"); if (!b) return; const [k, i] = b.dataset.rm.split(":"); st[k].splice(Number(i), 1); drawAtts(); touch(); });
+  const addLocal = async (list) => {
+    for (const f of [...list]) {
+      if (f.size > 25 * 1024 * 1024) { snack(`${f.name} is over 25 MB, which is more than Gmail takes as an attachment.`); continue; }
+      const entry = { label: f.name, size: f.size, busy: true }; st.files.push(entry); st.busy++; drawAtts();
+      try {
+        const r = await fetch(`/api/mail/upload?name=${encodeURIComponent(f.name)}`, { method: "POST", body: f });
+        const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.statusText);
+        entry.ref = { upload: j.upload }; entry.busy = false; touch();
+      } catch (err) { st.files.splice(st.files.indexOf(entry), 1); snack(`Couldn't attach ${f.name}: ${err.message}`); }
+      st.busy--; drawAtts();
+    }
+  };
+  fileIn.addEventListener("change", () => { addLocal(fileIn.files); fileIn.value = ""; });
+  const ge = q1(".ge");
+  ge.addEventListener("dragover", (e) => { if ([...(e.dataTransfer?.types || [])].includes("Files")) { e.preventDefault(); e.stopPropagation(); ge.classList.add("dropping"); } });
+  ge.addEventListener("dragleave", (e) => { if (!ge.contains(e.relatedTarget)) ge.classList.remove("dropping"); });
+  ge.addEventListener("drop", (e) => { if (!e.dataTransfer?.files?.length) return; e.preventDefault(); e.stopPropagation(); ge.classList.remove("dropping"); addLocal(e.dataTransfer.files); });
+  const jobFiles = async (anchor) => {
+    const n = Number(jobSel.value);
+    if (!n) return gmMenu(anchor, [{ head: "Pick a job first (the box to the right), then its files show here." }]);
+    const v = view && view.homebase.jobNumber === n ? view : await api(`/api/jobs/${n}`).catch(() => null);
+    const list = (v?.files?.estimate || []).filter((f) => !/\.json$/i.test(f.name));
+    gmMenu(anchor, list.length ? [{ head: `From #${n}'s folder` }, ...list.map((f) => ({ icon: /\.pdf$/i.test(f.name) ? "picture_as_pdf" : "draft", label: f.name, disabled: st.files.some((x) => x.ref?.path === "estimate/" + f.name && x.ref?.job === n), run: () => { st.files.push({ label: f.name, size: f.size, ref: { job: n, path: "estimate/" + f.name } }); drawAtts(); touch(); } }))] : [{ head: `No estimate files in #${n}'s folder yet.` }]);
+  };
+  jobSel.addEventListener("change", () => {
+    const keepB = rows.bcc.list().filter((a) => !OFFICE.test(addrOf(a)));
+    if (jobSel.value) keepB.push(`office+${jobSel.value}@forefrontteam.com`);
+    rows.bcc.set(keepB.join(", ")); if (keepB.length) showRow("bcc");
+    touch();
+  });
+
+  // ---- saving and sending
+  const data = () => ({ draftId: st.draftId || undefined, draftMsgId: st.draftMsgId || undefined, header: st.header || undefined, threadId: st.threadId || undefined, inReplyTo: st.inReplyTo || undefined, references: st.references || undefined, inThread: st.inThread || undefined, to: rows.to.value(), cc: rows.cc.value(), bcc: rows.bcc.value(), subject: showSubj ? subj.value : st.subject, html: bodyEl.innerHTML, body: bodyEl.innerText.replace(/\n{3,}/g, "\n\n").trim(), quoteHtml: st.quoteHtml || undefined, jobNumber: jobSel.value ? Number(jobSel.value) : undefined, attachments: st.files.filter((f) => f.ref).map((f) => f.ref), keep: st.keep });
+  const isEmpty = () => !st.existed && !st.draftId && !rows.to.value() && !rows.cc.value() && !(showSubj && subj.value.trim()) && !bodyEl.innerText.trim() && !st.files.length;
+  const save = () => {
+    clearTimeout(st.timer);
+    if (st.dead || !st.dirty || isEmpty()) return st.chain;
+    // What's in the box is read now (the box may be gone by the time an earlier save finishes); the ids are read then.
+    st.dirty = false; const snap = data(); note("Saving…");
+    return (st.chain = st.chain.then(async () => {
+      if (st.dead) return;
+      try {
+        const r = await api("/api/mail/compose/save", { method: "POST", body: { ...snap, draftId: st.draftId || undefined, draftMsgId: st.draftMsgId || undefined, header: st.header || undefined } });
+        st.draftId = r.draftId; st.draftMsgId = r.messageId || st.draftMsgId; st.header = r.header || st.header; st.saved = true;
+        note("Draft saved");
+      } catch (err) { st.dirty = true; note(`Not saved: ${err.message}`); }
+    }));
+  };
+  const done = (why) => { st.gone = true; if (why !== "closed") st.dead = true; clearTimeout(st.timer); editors.delete(ed); ui.onClose?.(why); };
+  const send = async () => {
+    for (const f of ["to", "cc", "bcc"]) rows[f].commit();
+    if (!rows.to.value() && !rows.cc.value() && !rows.bcc.value()) return snack("Please specify at least one recipient.");
+    const bad = host.querySelector(".ge-chip.bad");
+    if (bad) return snack(`The address "${bad.dataset.a}" in the "${bad.closest(".ge-rcp").dataset.f[0].toUpperCase() + bad.closest(".ge-rcp").dataset.f.slice(1)}" field was not recognized. Please make sure that all addresses are properly formed.`);
+    if (st.busy) return snack("An attachment is still uploading. Press Send again in a moment.");
+    if (!(showSubj ? subj.value.trim() : st.subject) && !bodyEl.innerText.trim() && !confirm("Send this message without a subject or text in the body?")) return;
+    clearTimeout(st.timer); sendBtn.disabled = true; note("Sending…"); await st.chain;
+    try { await api("/api/mail/compose/send", { method: "POST", body: data() }); st.dirty = false; done("sent"); }
+    catch (err) { sendBtn.disabled = false; note(""); snack(err.message); }
+  };
+  const discard = async () => {
+    if (st.existed && !confirm("Delete this draft?")) return;
+    const ids = { draftId: st.draftId || undefined, draftMsgId: st.draftMsgId || undefined };
+    st.gone = st.dead = true; clearTimeout(st.timer); await st.chain;
+    ids.draftId = st.draftId || ids.draftId; ids.draftMsgId = st.draftMsgId || ids.draftMsgId;
+    if (ids.draftId || ids.draftMsgId) await api("/api/mail/compose/discard", { method: "POST", body: ids }).catch((err) => log(err.message, "t-err"));
+    snack("Draft discarded."); done("discarded");
+  };
+  /** Closing (the X, Esc, leaving the conversation): what's typed is kept as a draft. */
+  const close = () => { const p = save(); const changed = () => { if (st.saved && mailLoaded && !mailThread) { loadThreads(); loadMailCounts(); } }; done("closed"); p.then(changed); return p; };
+
+  const cmd = (c) => {
+    bodyEl.focus();
+    if (c === "quote") document.execCommand("formatBlock", false, "blockquote");
+    else document.execCommand(c, false, null);
+    touch();
+  };
+  const link = () => { bodyEl.focus(); const url = prompt("Link to what web address?", "https://"); if (!url || url === "https://") return; const sel = getSelection(); if (sel && sel.isCollapsed) document.execCommand("insertHTML", false, `<a href="${esc(url)}">${esc(url)}</a>`); else document.execCommand("createLink", false, url); touch(); };
+  q1(".ge-fmt").addEventListener("mousedown", (e) => e.preventDefault());
+  q1(".ge-fmt").addEventListener("click", (e) => { const b = e.target.closest("[data-cmd]"); if (b) cmd(b.dataset.cmd); });
+  q1(".ge-foot").addEventListener("mousedown", (e) => { if (e.target.closest('[data-a="link"],[data-a="fmt"]')) e.preventDefault(); });
+  q1(".ge-foot").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-a]"); if (!b) return;
+    const a = b.dataset.a;
+    if (a === "fmt") { const f = q1(".ge-fmt"); f.hidden = !f.hidden; store.set("geFmt", !f.hidden); }
+    else if (a === "attach") fileIn.click();
+    else if (a === "link") link();
+    else if (a === "jobfiles") jobFiles(b);
+    else if (a === "discard") discard();
+  });
+  sendBtn.addEventListener("click", send);
+  q1(".ge-ccb").addEventListener("click", (e) => { const b = e.target.closest("[data-show]"); if (b) { showRow(b.dataset.show); rows[b.dataset.show].inp.focus(); } });
+  bodyEl.addEventListener("input", touch);
+  subj.addEventListener("input", () => { touch(); ui.onSubject?.(subj.value); });
+  ge.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); send(); }
+    else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); link(); }
+  });
+  // Pasting from Word or a web page keeps its formatting but never its scripts.
+  bodyEl.addEventListener("paste", () => setTimeout(() => { if (/<(script|style|iframe)|\son\w+=/i.test(bodyEl.innerHTML)) bodyEl.innerHTML = safeHtml(bodyEl.innerHTML); touch(); }, 0));
+  const snapshot = () => ({ to: rows.to.value(), cc: rows.cc.value(), bcc: rows.bcc.value(), subject: showSubj ? subj.value : st.subject, html: bodyEl.innerHTML, quoteHtml: st.quoteHtml, quoteOpen: qEl ? !qEl.hidden : false, threadId: st.threadId, inReplyTo: st.inReplyTo, references: st.references, inThread: st.inThread, job: jobSel.value ? Number(jobSel.value) : undefined, files: st.files.filter((f) => f.ref), keep: st.keep, draftId: st.draftId, draftMsgId: st.draftMsgId, header: st.header, existed: st.existed, dirty: st.dirty, banner: o.banner });
+  q1(".ge-kind")?.addEventListener("click", (e) => gmMenu(e.currentTarget, [{ icon: "reply", label: "Reply", run: () => ui.onKind("reply") }, { icon: "reply_all", label: "Reply to all", run: () => ui.onKind("all") }, { icon: "forward", label: "Forward", run: () => ui.onKind("forward") }, "-", { icon: "open_in_new", label: "Pop out reply", run: () => ui.onPop?.() }]));
+  q1(".ge-pop")?.addEventListener("click", () => ui.onPop?.());
+  drawAtts();
+  const ed = { host, inline, dirty: () => st.dirty, flush: () => { const p = save(); st.gone = true; editors.delete(ed); return p; }, close, snapshot, detach: () => { st.gone = st.dead = true; clearTimeout(st.timer); editors.delete(ed); }, focus: (where) => { const el = where === "to" || (!where && !rows.to.list().length && !inline) ? rows.to.inp : bodyEl; el.focus(); if (el === bodyEl) { const r = document.createRange(); r.selectNodeContents(bodyEl); r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r); } } };
+  editors.add(ed);
+  return ed;
+}
+/** Editors open in the conversation are saved before the page moves on (another email, back to the list). */
+async function flushInline() { const open = [...editors].filter((e) => e.inline); await Promise.all(open.map((e) => e.flush().catch(() => {}))); }
+const readerBusy = () => [...editors].some((e) => e.inline && e.host.isConnected && (e.dirty() || e.host.contains(document.activeElement)));
+
+// ---- the New Message window (bottom right, like Gmail's). One at a time: opening another saves the first as a draft.
+let popEd = null;
 function openCompose(o) {
-  $("#cp-title").textContent = o.reply ? (o.subject || "Reply") : o.subject?.startsWith("Fwd:") ? o.subject : "New Message";
-  $("#composedlg").classList.remove("min");
+  const d = $("#composedlg");
+  if (popEd) { popEd.flush(); popEd = null; }
+  $("#cp-title").textContent = o.title || o.subject?.trim() || "New Message";
+  d.classList.remove("min");
   applyComposeSize();
-  $("#cp-job").innerHTML = `<option value="">(none)</option>` + jobs.map((j) => `<option value="${j.jobNumber}" ${o.job === j.jobNumber ? "selected" : ""}>#${j.jobNumber} ${esc(j.name)}</option>`).join("");
-  $("#cp-to").value = o.to || ""; $("#cp-cc").value = o.cc || ""; $("#cp-subject").value = o.subject || ""; $("#cp-body").value = o.body || "";
-  $("#cp-thread").value = o.threadId || ""; $("#cp-reply").value = o.inReplyTo || "";
-  composeReplace = o.replaceDraft || "";
-  composeRefs = o.references || "";
-  $("#cp-bcc").value = o.job ? `office+${o.job}@forefrontteam.com` : "";
-  composeFiles = [];
-  renderComposeFiles();
-  if (!$("#composedlg").open) $("#composedlg").show();
-  setTimeout(() => { const b = $("#cp-body"); b.focus(); b.setSelectionRange(0, 0); b.scrollTop = 0; }, 50);
+  popEd = mkEditor($("#cp-host"), o, { onClose: () => { popEd = null; if (d.open) d.close(); $("#cp-host").innerHTML = ""; }, onSubject: (s) => { $("#cp-title").textContent = s.trim() || "New Message"; } });
+  if (!d.open) d.show();
+  setTimeout(() => popEd?.focus(o.focus), 50);
 }
-$("#cp-job").addEventListener("change", () => {
-  const n = $("#cp-job").value;
-  const bcc = $("#cp-bcc").value.split(",").map((s) => s.trim()).filter((s) => s && !/^office\+\d+@forefrontteam\.com$/i.test(s));
-  if (n) bcc.push(`office+${n}@forefrontteam.com`);
-  $("#cp-bcc").value = bcc.join(", ");
-  composeFiles = []; renderComposeFiles();
-});
-async function renderComposeFiles() {
-  const n = $("#cp-job").value;
-  if (!n) { $("#cp-files").innerHTML = `<span>Pick a job to attach its files and log the email to it.</span>`; return; }
-  let v = view && view.homebase.jobNumber === Number(n) ? view : await api(`/api/jobs/${n}`).catch(() => null);
-  const list = (v?.files?.estimate || []).map((f) => "estimate/" + f.name);
-  $("#cp-files").innerHTML = list.length ? `<span>Attach:</span> ` + list.map((p) => `<label><input type="checkbox" data-file="${esc(p)}" ${composeFiles.includes(p) ? "checked" : ""}> ${esc(p.split("/").pop())}</label>`).join(" ") : `<span>No estimate files in #${n}'s folder to attach.</span>`;
-  $$("#cp-files [data-file]").forEach((c) => c.addEventListener("change", () => { composeFiles = $$("#cp-files [data-file]:checked").map((x) => x.dataset.file); }));
-}
-$("#composedlg").addEventListener("close", async () => {
-  const how = $("#composedlg").returnValue;
-  if (how !== "send" && how !== "draft") return;
-  const n = $("#cp-job").value ? Number($("#cp-job").value) : undefined;
-  const body = { to: $("#cp-to").value, cc: $("#cp-cc").value, bcc: $("#cp-bcc").value, subject: $("#cp-subject").value, body: $("#cp-body").value, threadId: $("#cp-thread").value || undefined, inReplyTo: $("#cp-reply").value || undefined, references: ($("#cp-reply").value && composeRefs) || undefined, jobNumber: n, attachments: composeFiles.map((p) => ({ job: n, path: p })), replaceDraft: composeReplace || undefined };
-  try {
-    if (how === "send") await api("/api/mail/send", { method: "POST", body });
-    else { await api("/api/mail/draft", { method: "POST", body }); log("Saved as a Gmail draft."); }
-  } catch (e) { log(e.message, "t-err"); $("#composedlg").show(); }
-});
+$("#cp-x").addEventListener("click", () => popEd?.close());
+$("#composedlg").addEventListener("keydown", (e) => { if (e.key === "Escape" && addrPop.hidden && !$("#gm-menu")) { e.preventDefault(); popEd?.close(); } });
 $("#cp-min").addEventListener("click", () => $("#composedlg").classList.toggle("min"));
+$("#composedlg .gc-h").addEventListener("click", (e) => { if (!e.target.closest("button") && $("#composedlg").classList.contains("min")) $("#composedlg").classList.remove("min"); });
 // ---- To / Cc / Bcc: type part of a name and pick the person; their address goes in. Works on the name being typed
 // (after the last comma), so several people can be added one after another.
 const addrPop = document.createElement("div"); addrPop.className = "addr-pop"; addrPop.hidden = true; document.body.appendChild(addrPop);
@@ -2217,6 +2539,7 @@ function addrPick(i) {
   el.value = el.value.slice(0, start) + put + el.value.slice(end).replace(/^[\s,;]+/, "");
   const at = start + put.length; el.focus(); el.setSelectionRange(at, at);
   addrHide();
+  el._commit?.(); // in the compose box the pick becomes a chip
 }
 // Any To / Cc / Bcc box gets the same suggestions as you type: the new-email window, and a draft edited in place.
 function wireAddr(el) {
@@ -2232,7 +2555,6 @@ function wireAddr(el) {
   });
   el.addEventListener("blur", () => setTimeout(() => { if (addrFor === el) addrHide(); }, 150));
 }
-for (const id of ["cp-to", "cp-cc", "cp-bcc"]) wireAddr($("#" + id));
 addrPop.addEventListener("mousedown", (e) => { const b = e.target.closest("[data-addr]"); if (b) { e.preventDefault(); addrPick(Number(b.dataset.addr)); } });
 // ---- the new-email window's size: Expand fills the screen; the top-left corner drags to any size. Both are remembered.
 function applyComposeSize() {
@@ -2241,11 +2563,11 @@ function applyComposeSize() {
   d.classList.toggle("sized", !!sz);
   // (Sizes are layout pixels: the window's size divided by the text-size zoom.)
   d.style.width = sz ? `${Math.min(sz.w, innerWidth / ZOOM() - 24)}px` : "";
-  d.querySelector("form").style.height = sz ? `${Math.min(sz.h, innerHeight / ZOOM() - 16)}px` : "";
-  $("#cp-big").title = big ? "Back to small" : "Make bigger";
+  d.querySelector(".gc-form").style.height = sz ? `${Math.min(sz.h, innerHeight / ZOOM() - 16)}px` : "";
+  $("#cp-big").title = big ? "Exit full screen" : "Full screen";
   $("#cp-big .ms").textContent = big ? "close_fullscreen" : "open_in_full";
 }
-$("#cp-big").addEventListener("click", () => { $("#composedlg").classList.remove("min"); store.set("composeBig", store.get("composeBig", "") === "1" ? "" : "1"); applyComposeSize(); $("#cp-body").focus(); });
+$("#cp-big").addEventListener("click", () => { $("#composedlg").classList.remove("min"); store.set("composeBig", store.get("composeBig", "") === "1" ? "" : "1"); applyComposeSize(); popEd?.focus("body"); });
 $("#cp-grip").addEventListener("pointerdown", (e) => {
   e.preventDefault();
   const d = $("#composedlg"), r = d.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY, g = e.currentTarget;
@@ -3807,7 +4129,7 @@ es.onmessage = (m) => {
   // A task ticked anywhere: the dashboard's task card and the Tasks panel catch up.
   if (e.type === "changed" && e.what === "tasks") { if (store.get("tab", "today") === "today") loadToday(); if (store.get("tab", "today") === "cal" && $("#cal-tasks")) renderTaskPanel().catch(() => {}); return; }
   if (e.type === "changed") {
-    if (e.what === "mail" && mailLoaded) { loadThreads(); if (mailThread) openThread(mailThread); }
+    if (e.what === "mail" && mailLoaded) { loadThreads(); if (mailThread && !readerBusy()) openThread(mailThread); } // not while a reply is being typed there
     if ((e.what === "mail" || (e.what === "job" && !e.job)) && mailMode === "byjob" && store.get("tab", "today") === "mail" && bjJob) openBj(bjJob, true);
     if ((e.what === "job" || e.what === "timeline") && view && (!e.job || e.job === view.homebase.jobNumber)) openJob(view.homebase.jobNumber, true);
     if (e.what === "job" && !e.job) { loadSyncState(); loadJobs(); if (store.get("tab", "today") === "today") loadToday(); }

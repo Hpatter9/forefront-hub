@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { HUB_ROOT } from "../../core/config.js";
-import { buildMime, newMessageId } from "./mime.js";
+import { buildMime, messageHtml, newMessageId } from "./mime.js";
 import type { DraftInput, DraftRef, DraftStatus, Label, MailClient, Message, ThreadSummary } from "./types.js";
 
 interface MockThread {
@@ -41,9 +41,22 @@ export class MockGmail implements MailClient {
     return this.load();
   }
 
+  /** A draft's own attachment, read back from the file it was attached from. */
+  async attachment(messageId: string, attachmentId: string): Promise<Buffer> {
+    const d = this.load().find((x) => x.ref.id === messageId);
+    const file = d?.input.attachments[Number(attachmentId.replace(/^a/, ""))];
+    if (!file || !existsSync(file)) throw new Error("No such attachment in the test mailbox.");
+    return readFileSync(file);
+  }
+
+  async signatureHtml() {
+    return "Hunter Patterson<br>Estimator";
+  }
+
   async createDraft(d: DraftInput): Promise<DraftRef> {
     for (const f of d.attachments) if (!existsSync(f)) throw new Error(`Attachment not found: ${f}`);
-    const ref = { id: `mock-draft-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, messageId: newMessageId() };
+    const id = `mock-draft-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const ref = { id, messageId: newMessageId(), gmailId: id };
     const outbox = path.join(this.stateDir, "outbox");
     mkdirSync(outbox, { recursive: true });
     const eml = path.join(outbox, `${ref.id}.eml`);
@@ -101,7 +114,7 @@ export class MockGmail implements MailClient {
     if (!d) throw new Error(`No mock thread ${id}`);
     return {
       id,
-      messages: [{ id, from: this.from, to: d.input.to, cc: d.input.cc ?? [], bcc: d.input.bcc ?? [], date: d.sentAt ?? "", subject: d.input.subject, body: d.input.body, attachments: [], labelIds: d.sentAt ? ["SENT"] : ["DRAFT"], messageIdHeader: d.ref.messageId }],
+      messages: [{ id, from: this.from, to: d.input.to, cc: d.input.cc ?? [], bcc: d.input.bcc ?? [], date: d.sentAt ?? "", subject: d.input.subject, body: d.input.body, html: d.input.html !== undefined || d.input.quoteHtml ? messageHtml(d.input, "Hunter Patterson<br>Estimator") : undefined, attachments: d.input.attachments.map((f, i) => ({ id: `a${i}`, filename: path.basename(f), mimeType: "application/octet-stream" })), labelIds: d.sentAt ? ["SENT"] : ["DRAFT"], messageIdHeader: d.ref.messageId }],
     };
   }
 

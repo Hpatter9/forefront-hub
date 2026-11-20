@@ -120,7 +120,7 @@ export async function jobConversation(hub: Hub, n: number): Promise<{ items: Con
       if (fromMe && m.to.length > 0 && !m.cc.length && m.to.every((a) => /^office\+\d+@/i.test(addr(a)))) continue;
       const body = stripQuoted(m.body ?? "");
       items.push({
-        kind: "email", id: m.id, threadId: th.id, at: new Date(m.date).toISOString(), fromMe,
+        kind: "email", id: m.id, threadId: th.id, at: (isNaN(Date.parse(m.date)) ? new Date() : new Date(m.date)).toISOString(), fromMe,
         who: fromMe ? `to ${m.to.map(nameOf).slice(0, 3).join(", ") || "?"}` : nameOf(m.from),
         subject: m.subject, from: m.from, to: m.to, cc: m.cc, body: body.slice(0, 4000), full: body.length < (m.body ?? "").trim().length ? (m.body ?? "").slice(0, 20000) : undefined,
         messageIdHeader: m.messageIdHeader, references: m.references, attachments: m.attachments.map((a) => a.filename),

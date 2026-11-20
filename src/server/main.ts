@@ -829,6 +829,51 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": MIME[path.extname(name).toLowerCase()] ?? "application/octet-stream", "Content-Disposition": `inline; filename="${name.replace(/"/g, "")}"` });
       return res.end(buf);
     }
+    // ---- the compose box: its draft lives in Gmail (saved as you type), files from the PC, the signature it shows
+    if (p === "/api/mail/signature") return send(res, 200, { html: (await hub.gmail.signatureHtml?.().catch(() => "")) ?? "" });
+    if (p === "/api/mail/upload" && req.method === "POST") {
+      const { keepUpload } = await import("../workflows/compose.js");
+      const { tmp } = await saveUpload(req, 25 * 1024 ** 2).catch(() => { throw new Error("That file is over 25 MB, which is more than Gmail takes as an attachment."); });
+      return send(res, 200, keepUpload(hub, tmp, q("name") || "file"));
+    }
+    if (p === "/api/mail/compose/save" && req.method === "POST") {
+      const { saveCompose } = await import("../workflows/compose.js");
+      const b = await body(req);
+      // No "mail changed" signal here: the page saves as you type, and a redraw would pull the box out from under you.
+      return send(res, 200, { ok: true, ...(await saveCompose(hub, b)) });
+    }
+    if (p === "/api/mail/compose/discard" && req.method === "POST") {
+      const { discardCompose } = await import("../workflows/compose.js");
+      await discardCompose(hub, await body(req));
+      bus.emit({ type: "changed", what: "mail" });
+      return send(res, 200, { ok: true });
+    }
+    if (p === "/api/mail/compose/send" && req.method === "POST") {
+      const { saveCompose } = await import("../workflows/compose.js");
+      const b = await body(req);
+      if (!hub.gmail.sendDraft) return send(res, 400, { error: "This Gmail connection can't send." });
+      if (hub.gmail.fullAccess && !hub.gmail.fullAccess()) return send(res, 400, { error: "Gmail needs to be reconnected once to send from Keystone: double-click Connect Gmail." });
+      const list = (v: unknown) => String(v ?? "").split(/[,;]/).map((x) => x.trim()).filter(Boolean);
+      const to = list(b.to), cc = list(b.cc), bcc = list(b.bcc);
+      if (!to.length && !cc.length && !bcc.length) return send(res, 400, { error: "Please specify at least one recipient." });
+      // Saved first, so what goes out is exactly what's in the box; if you say no it's still there as a draft.
+      const saved = await saveCompose(hub, b);
+      const job = b.jobNumber ? Number(b.jobNumber) : undefined;
+      const names = [...(b.keep ?? []), ...(b.attachments ?? []).map((a: { path?: string; upload?: string; name?: string }) => path.basename(String(a.name ?? a.path ?? a.upload ?? "")))];
+      task(`Send "${b.subject ?? ""}"`, job, async () => {
+        const lines = [to.length ? `To: ${to.join(", ")}` : "", cc.length ? `Cc: ${cc.join(", ")}` : "", bcc.length ? `Bcc: ${bcc.join(", ")}` : "", `Subject: ${b.subject ?? ""}`, names.length ? `Attached: ${names.join(", ")}` : ""].filter(Boolean);
+        if (!(await approver.confirm("Send this email now?", lines))) { bus.emit({ type: "changed", what: "mail" }); return hub.say("Not sent. It's saved in Drafts."); }
+        await hub.gmail.sendDraft!(saved.draftId);
+        bus.emit({ type: "notice", text: "Message sent." });
+        hub.say(`Sent "${b.subject ?? ""}" to ${[...to, ...cc].join(", ")}.`);
+        bus.emit({ type: "changed", what: "mail" });
+        if (job) {
+          hub.jobs.log(job, `Emailed ${to.join(", ")}: ${b.subject ?? ""}`);
+          await noteAfter(job, "email", `To ${to.join(", ")}${cc.length ? `, cc ${cc.join(", ")}` : ""}\nSubject: ${b.subject ?? ""}\n\n${b.body ?? ""}`);
+        }
+      }, "mail");
+      return send(res, 202, { ok: true, ...saved });
+    }
     if (p === "/api/mail/send" && req.method === "POST") {
       const b = await body(req);
       if (!hub.gmail.send) return send(res, 400, { error: "This Gmail connection can't send." });

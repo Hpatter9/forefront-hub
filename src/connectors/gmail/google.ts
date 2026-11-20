@@ -49,6 +49,10 @@ export class GoogleGmail implements MailClient {
     return this.signature;
   }
 
+  async signatureHtml() {
+    return (await this.sendAs()).html;
+  }
+
   async createDraft(d: DraftInput): Promise<DraftRef> {
     for (const f of d.attachments) if (!existsSync(f)) throw new Error(`Attachment not found: ${f}`);
     const { html, from } = await this.sendAs();
@@ -67,7 +71,7 @@ export class GoogleGmail implements MailClient {
         // A label is a nice-to-have; the draft is made either way.
       }
     }
-    return { id: data.id!, messageId, threadId: data.message?.threadId ?? undefined };
+    return { id: data.id!, messageId, gmailId: data.message?.id ?? undefined, threadId: data.message?.threadId ?? undefined };
   }
 
   async sendDraft(draftId: string) {

@@ -9,6 +9,10 @@ export interface DraftInput {
   subject: string;
   /** Plain text in Hunter's voice; paragraphs separated by blank lines. The Gmail signature is appended. */
   body: string;
+  /** The body as formatted HTML (bold, lists, links) from the compose box; `body` stays its plain-text twin. */
+  html?: string;
+  /** The message being answered or forwarded, as HTML; goes under the signature the way Gmail puts it. */
+  quoteHtml?: string;
   /** Local file paths, attached as-is. */
   attachments: string[];
   /** Put the draft in an existing thread (a reply). */
@@ -23,6 +27,8 @@ export interface DraftInput {
 export interface DraftRef {
   id: string;
   messageId: string; // the RFC 822 Message-ID header we set, used to find the email once it's sent
+  /** Gmail's own id for the draft's message (what a thread lists it under). */
+  gmailId?: string;
   threadId?: string;
 }
 
@@ -108,4 +114,6 @@ export interface MailClient {
   ensureLabel?(name: string): Promise<string>;
   /** False when Gmail was connected before the Mail tab existed (drafts + read only): reconnect to send/archive. */
   fullAccess?(): boolean;
+  /** The signature Gmail adds to what's sent, as HTML ("" when there isn't one). */
+  signatureHtml?(): Promise<string>;
 }

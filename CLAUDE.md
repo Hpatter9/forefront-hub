@@ -64,6 +64,14 @@
   left. With `ANTHROPIC_ADMIN_KEY` the panel also shows Anthropic's own month-to-date cost
   (`src/connectors/anthropicCost`, cost analytics API) and uses the larger figure. Past the Claude budget, the
   Estimator asks before a paid Claude run. Record the cost of any new Claude or Gemini call path the same way.
+- The Gmail tab's compose box (`mkEditor` in `src/server/ui.html`, `src/workflows/compose.ts`) is one editor used three
+  ways, as in Gmail: the New Message window, a reply typed at the bottom of the conversation, and a draft opened again
+  (a draft inside a conversation opens where it sits; a draft on its own opens in the window). Recipients are chips,
+  the body is formatted HTML (`DraftInput.html` / `quoteHtml`; `messageHtml` puts the signature above the quoted
+  original), files come from the job folder or the PC (POST /api/mail/upload). It saves itself as a Gmail draft two
+  seconds after typing stops and on close (POST /api/mail/compose/save, same draft updated each time); Send saves, then
+  asks on a card, then sends that draft (POST /api/mail/compose/send). Saves don't emit "mail changed", and the reader
+  isn't redrawn while a reply is being typed (`readerBusy`).
 - Every Estimator writer can make Gmail drafts (never send): Claude through the hub tools, Gemini (all models) via
   `gmail_create_draft` in `HUB_TOOLS`, the Claude app via `keystone_create_draft` on the bridge.
 - Proposal Submitted status (`src/workflows/statusUpdates.ts`): the "Proposal Submitted Notes" card on a recon job's

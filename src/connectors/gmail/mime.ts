@@ -10,6 +10,12 @@ const MIME_TYPES: Record<string, string> = {
   ".esx": "application/octet-stream",
   ".zip": "application/zip",
   ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".gif": "image/gif",
+  ".heic": "image/heic",
+  ".webp": "image/webp",
+  ".txt": "text/plain",
+  ".csv": "text/csv",
 };
 
 export function encodeHeader(s: string): string {
@@ -27,6 +33,32 @@ export function bodyHtml(body: string, signatureHtml = ""): string {
   return `<div dir="ltr">${paras.join("<div><br></div>")}${sig}</div>`;
 }
 
+/** Takes out anything in HTML that could run or load code: what the compose box sends is formatting only. */
+export function cleanHtml(html: string): string {
+  return html
+    .replace(/<(script|style|iframe|object|embed|form|link|meta)\b[\s\S]*?<\/\1\s*>/gi, "")
+    .replace(/<\/?(script|style|iframe|object|embed|form|link|meta|base)\b[^>]*>/gi, "")
+    .replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/(href|src)\s*=\s*(["']?)\s*javascript:[^"'\s>]*\2/gi, '$1="#"');
+}
+
+/** The HTML that goes out: the typed (or formatted) body, the signature, then the quoted original, as Gmail lays it out. */
+export function messageHtml(d: Pick<DraftInput, "body" | "html" | "quoteHtml">, signatureHtml = ""): string {
+  if (d.html === undefined && !d.quoteHtml) return bodyHtml(d.body, signatureHtml);
+  const sig = signatureHtml ? `<br><div>-- </div><div class="gmail_signature">${signatureHtml}</div>` : "";
+  const main = d.html !== undefined ? cleanHtml(d.html) : bodyHtml(d.body).replace(/^<div dir="ltr">|<\/div>$/g, "");
+  return `<div dir="ltr">${main}${sig}</div>${d.quoteHtml ? `<br>${cleanHtml(d.quoteHtml)}` : ""}`;
+}
+
+/** The plain-text twin of messageHtml. */
+export function messageText(d: Pick<DraftInput, "body" | "html" | "quoteHtml">, signatureHtml = ""): string {
+  const main = d.body.trim() || (d.html ? htmlToText(d.html) : "");
+  // A reply's original is quoted with ">"; a forwarded message goes along as it was.
+  const q = d.quoteHtml ? htmlToText(d.quoteHtml) : "";
+  const quote = !q ? "" : "\n\n" + (/^-{5,} Forwarded message/.test(q) ? q : q.split("\n").map((l) => `> ${l}`).join("\n"));
+  return main + (signatureHtml ? `\n\n-- \n${htmlToText(signatureHtml)}` : "") + quote;
+}
+
 const NAMED: Record<string, string> = { nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", rsquo: "\u2019", lsquo: "\u2018", rdquo: "\u201d", ldquo: "\u201c", ndash: "\u2013", mdash: "\u2014", hellip: "\u2026", bull: "\u2022", middot: "\u00b7", copy: "\u00a9", reg: "\u00ae", trade: "\u2122", deg: "\u00b0", frac12: "\u00bd", frac14: "\u00bc", frac34: "\u00be", times: "\u00d7" };
 /** Turns HTML character codes back into the characters ("don&#39;t" -> "don't", "&amp;" -> "&"). */
 export function decodeEntities(s: string): string {
@@ -42,7 +74,7 @@ export function decodeEntities(s: string): string {
 export function htmlToText(html: string): string {
   return decodeEntities(html
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(div|p|tr|li)>/gi, "\n")
+    .replace(/<\/(div|p|tr|li|blockquote|h[1-6])>/gi, "\n")
     .replace(/<[^>]+>/g, ""))
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -62,10 +94,10 @@ export function replyRefs(references: string | undefined, inReplyTo: string): st
 export function buildMime(d: DraftInput & { from: string; messageId: string; signatureHtml?: string }): string {
   const boundary = `mixed_${Math.random().toString(36).slice(2)}`;
   const alt = `alt_${Math.random().toString(36).slice(2)}`;
-  const text = d.body.trim() + (d.signatureHtml ? `\n\n-- \n${htmlToText(d.signatureHtml)}` : "");
+  const text = messageText(d, d.signatureHtml);
   const headers = [
     `From: ${d.from}`,
-    `To: ${d.to.join(", ")}`,
+    d.to.length ? `To: ${d.to.join(", ")}` : "",
     d.cc?.length ? `Cc: ${d.cc.join(", ")}` : "",
     d.bcc.length ? `Bcc: ${d.bcc.join(", ")}` : "",
     `Subject: ${encodeHeader(d.subject)}`,
@@ -88,7 +120,7 @@ export function buildMime(d: DraftInput & { from: string; messageId: string; sig
     "Content-Type: text/html; charset=UTF-8",
     "Content-Transfer-Encoding: base64",
     "",
-    wrap76(Buffer.from(bodyHtml(d.body, d.signatureHtml), "utf8").toString("base64")),
+    wrap76(Buffer.from(messageHtml(d, d.signatureHtml), "utf8").toString("base64")),
     `--${alt}--`,
   ];
   for (const file of d.attachments) {
