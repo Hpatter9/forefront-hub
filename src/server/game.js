@@ -830,6 +830,7 @@
 
   // ---------------------------------------------------------------- pop-ups
   function toast(icon, xp, text) {
+    if (typeof jobNames === "function") text = jobNames(text); // pop-ups name the job, not its number
     let box = document.querySelector(".gtoasts");
     if (!box) { box = document.createElement("div"); box.className = "gtoasts"; document.body.appendChild(box); }
     const t = document.createElement("div"); t.className = "gtoast";

@@ -87,6 +87,9 @@
   Runs a few minutes after the first start of the day and after the morning brief; also the Dashboard's Update
   Homebase notes button, the `homebase_status_updates` / `homebase_set_status_update` tools and POST
   /api/status-updates. The older field-based path stays only for a Homebase connection without the card.
+- Pop-ups (question cards, the notice at the bottom left, game toasts) name the job, not its number: `jobNames` in
+  `src/server/ui.html` turns "#3212 Gorrell" and a bare "#3212" into "Gorrell" (the number stays only when two jobs
+  share a name or Keystone doesn't know the job). Write messages with `#<number>` as before; the page swaps it.
 - Question cards take a typed answer as well as Yes/No (`#ap-reply`). `confirm` treats a typed answer as no and the
   page sends it to the Ask box as an instruction; callers that can use it call `confirmOrReply` (e.g. the status
   card: "Williams: new text" or "skip Williams").

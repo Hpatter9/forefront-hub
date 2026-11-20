@@ -1982,7 +1982,24 @@ async function moveThreads(ids, target) {
     loadThreads(); loadMailCounts();
   });
 }
+/**
+ * Pop-ups name the job, not its number: "#3212 Gorrell" and a bare "#3212" both read "Gorrell". A number Keystone
+ * has no job for stays as it is, and when two jobs share a name the number stays beside it so they can be told apart.
+ */
+function jobNames(text) {
+  let out = String(text ?? "");
+  for (const num of new Set([...out.matchAll(/(?:^|[^\w&+])#(\d{3,6})\b/g)].map((m) => m[1]))) {
+    const j = jobs.find((x) => x.jobNumber === Number(num));
+    if (!j?.name) continue;
+    const twin = jobs.some((x) => x.jobNumber !== j.jobNumber && (x.name || "").toLowerCase() === j.name.toLowerCase());
+    const name = j.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // The name is often written right after the number already: it isn't said twice.
+    out = out.replace(new RegExp(`(^|[^\\w&+])#${num}\\b(?: +${name}(?![\\w]))?`, "gi"), (all, pre) => `${pre}${j.name}${twin ? ` (#${num})` : ""}`);
+  }
+  return out;
+}
 function snack(text, undo) {
+  text = jobNames(text);
   let el = $("#snack"); if (!el) { el = document.createElement("div"); el.id = "snack"; el.className = "snack"; document.body.appendChild(el); }
   el.innerHTML = `<span>${esc(text)}</span>${undo ? `<button type="button">Undo</button>` : ""}`; el.hidden = false;
   clearTimeout(el._t); el._t = setTimeout(() => (el.hidden = true), Math.max(8000, Math.min(45000, text.length * 90))); // long messages stay up long enough to read
@@ -3342,8 +3359,8 @@ const approvals = [];
 function showApproval() {
   const a = approvals[0], dlg = $("#approve");
   if (!a) { if (dlg.open) dlg.close(); return; }
-  $("#ap-title").textContent = a.action;
-  $("#ap-details").innerHTML = a.details.filter(Boolean).map((d) => `<li>${esc(d)}</li>`).join("");
+  $("#ap-title").textContent = jobNames(a.action);
+  $("#ap-details").innerHTML = a.details.filter(Boolean).map((d) => `<li>${esc(jobNames(d))}</li>`).join("");
   $("#ap-text").hidden = a.text === undefined; $("#ap-text").value = a.text ?? "";
   $("#ap-reply").value = ""; $("#ap-send").hidden = true;
   if (!dlg.open) dlg.showModal();
