@@ -131,6 +131,8 @@ export interface HomebaseClient {
   vocabulary?(): Promise<Record<string, any>>;
   /** Homebase's own API reference (GET /docs), as text: for finding where a field lives. */
   apiDocs?(): Promise<string>;
+  /** A read-only look at an API path (GET only), for working out where something lives: the status and the JSON. */
+  peek?(path: string): Promise<{ status: number; json: unknown }>;
   /** Which jobs an email is probably about, from its addresses, job numbers, streets and claim numbers. */
   suggestJobs?(clues: { addresses?: string[]; numbers?: string[]; streets?: string[]; claims?: string[] }): Promise<JobSummary[]>;
   close?(): Promise<void>;

@@ -1938,6 +1938,7 @@ function editDraftInline(i) {
   </div>`;
   acts.innerHTML = `<button class="gm-pill" type="button" data-dsave="${i}" data-how="save">${msI("save")}Save draft</button><button class="gm-pill send" type="button" data-dsave="${i}" data-how="send">${msI("send")}Save &amp; send…</button><button class="gm-pill" type="button" data-dcancel="1">Cancel</button>`;
   const ta = box.querySelector("textarea"); const fit = () => { ta.style.height = "auto"; ta.style.height = Math.max(180, ta.scrollHeight + 4) + "px"; }; ta.addEventListener("input", fit); fit(); ta.focus();
+  for (const f of ["to", "cc", "bcc"]) wireAddr(box.querySelector(`[data-f="${f}"]`));
 }
 async function saveDraftInline(i, thenSend) {
   const m = threadView.messages[i], card = $(`#reader .gm-msg[data-mi="${i}"]`);
@@ -2217,8 +2218,10 @@ function addrPick(i) {
   const at = start + put.length; el.focus(); el.setSelectionRange(at, at);
   addrHide();
 }
-for (const id of ["cp-to", "cp-cc", "cp-bcc"]) {
-  const el = $("#" + id);
+// Any To / Cc / Bcc box gets the same suggestions as you type: the new-email window, and a draft edited in place.
+function wireAddr(el) {
+  if (!el || el.dataset.addrWired) return;
+  el.dataset.addrWired = "1"; el.setAttribute("autocomplete", "off");
   let timer;
   el.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => addrSearch(el), 120); });
   el.addEventListener("keydown", (e) => {
@@ -2229,6 +2232,7 @@ for (const id of ["cp-to", "cp-cc", "cp-bcc"]) {
   });
   el.addEventListener("blur", () => setTimeout(() => { if (addrFor === el) addrHide(); }, 150));
 }
+for (const id of ["cp-to", "cp-cc", "cp-bcc"]) wireAddr($("#" + id));
 addrPop.addEventListener("mousedown", (e) => { const b = e.target.closest("[data-addr]"); if (b) { e.preventDefault(); addrPick(Number(b.dataset.addr)); } });
 // ---- the new-email window's size: Expand fills the screen; the top-left corner drags to any size. Both are remembered.
 function applyComposeSize() {

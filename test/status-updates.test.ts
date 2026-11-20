@@ -71,16 +71,24 @@ describe("the Proposal Submitted status line in Homebase", () => {
 describe("when Homebase doesn't hand over a notes field", () => {
   it("saves a help file with field names only and the API reference's matching lines", async () => {
     const { hub } = await setup();
-    hub.homebase.rawJob = async () => ({ jobNumber: "9002", brief: { customerNotes: "Dana prefers texts", productionNotes: null }, stages: [{ name: "Proposal Submitted", note: "secret" }] });
+    hub.homebase.rawJob = async () => ({ id: "abc-123", jobNumber: "9002", brief: { customerNotes: "Dana prefers texts", productionNotes: null }, stages: [{ name: "Proposal Submitted", note: "secret" }] });
     hub.homebase.apiDocs = async () => "## Projects\nGET /projects/:id\n### Stage notes\nPATCH /projects/:id/stage-notes {stage, note}: the dashboard's per-stage notes\nunrelated line\nmore\nmore";
+    const { MockDrive } = await import("../src/connectors/drive/index.js");
+    const { mkdirSync, existsSync } = await import("node:fs");
+    const droot = `${hub.cfg.stateDir}/drive`;
+    hub.drive = new MockDrive(droot); mkdirSync(`${droot}/Keystone hand-off`, { recursive: true });
+    hub.homebase.peek = async (p: string) => p.endsWith("/stage-notes") ? { status: 200, json: { notes: [{ id: "n1", stage: "Proposal Submitted", body: "secret text", pinned: false }] } } : { status: 404, json: null };
     const r = await updateProposalJobs(hub);
     expect(r.written).toBe(0);
-    expect(r.problem).toMatch(/didn't hand Keystone a Proposal Submitted Notes field on job #9002.*homebase-notes-help\.txt/);
+    expect(r.problem).toMatch(/didn't hand Keystone a Proposal Submitted Notes field on job #9002.*homebase-notes-help\.txt.*Drive/);
+    expect(existsSync(`${droot}/Keystone hand-off/_keystone/homebase-notes-help.txt`)).toBe(true);
     const { readFileSync } = await import("node:fs");
     const help = readFileSync(`${hub.cfg.stateDir}/homebase-notes-help.txt`, "utf8");
     expect(help).toContain("brief.customerNotes: string");
     expect(help).toContain("stages[].note: string");
     expect(help).toContain("PATCH /projects/:id/stage-notes");
+    expect(help).toMatch(/GET \/projects\/:id\/stage-notes -> 200\n\s+notes: list of 1\n\s+notes\[\]\.id: string\n\s+notes\[\]\.stage: string = "Proposal Submitted"/);
+    expect(help).toContain("GET /projects/:id/notes -> 404");
     expect(help).not.toContain("Dana"); expect(help).not.toContain("secret");
   });
 

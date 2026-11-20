@@ -73,14 +73,62 @@ export function docLines(docs: string, max = 220): string[] {
  * When the notes field can't be found: writes a small help file (field names and kinds only, no job details, plus
  * the matching lines of Homebase's API reference) so the right field can be worked out. Returns the file's path.
  */
+/** Like fieldMap, but keeps the values of short label-like fields (kind, type, stage, section...), which say what a note is. */
+export function shapeOf(raw: unknown, at = "", depth = 0, out: string[] = []): string[] {
+  if (depth > 6 || out.length > 300) return out;
+  if (Array.isArray(raw)) {
+    out.push(`${at}: list of ${raw.length}`);
+    for (const x of raw.slice(0, 3)) if (x && typeof x === "object") shapeOf(x, `${at}[]`, depth + 1, out);
+  } else if (raw && typeof raw === "object") {
+    for (const [k, v] of Object.entries(raw)) {
+      const p = at ? `${at}.${k}` : k;
+      if (v && typeof v === "object") shapeOf(v, p, depth + 1, out);
+      else out.push(`${p}: ${v === null ? "empty" : typeof v}${typeof v === "string" && /^(kind|type|stage|section|category|scope|topic|tag|label|prefix|code)$/i.test(k) ? ` = "${v.slice(0, 60)}"` : typeof v === "boolean" ? ` = ${v}` : ""}`);
+    }
+  }
+  return out;
+}
+
+/** Places the Proposal Submitted Notes might live in Homebase's API: looked at read-only (GET), never written. */
+const PEEKS = (id: string) => [
+  `/projects/${id}/notes`, `/projects/${id}/stage-notes`, `/projects/${id}/stage_notes`, `/projects/${id}/stageNotes`,
+  `/projects/${id}/proposal-notes`, `/projects/${id}/proposal-submitted-notes`, `/projects/${id}/status-notes`, `/projects/${id}/status`,
+  `/projects/${id}/notes?stage=Proposal%20Submitted`, `/projects/${id}/notes?kind=proposal_submitted`, `/projects/${id}/dashboard`, `/projects/${id}/updates`,
+];
+
+/**
+ * When the notes field can't be found: writes a help file so the right place can be worked out, and puts a copy in
+ * the Drive hand-off folder so Claude can read it without Hunter sending anything. It holds field names and kinds
+ * (never values, except short labels like a note's "kind"), what a read-only look at the likely API paths returned,
+ * and Homebase's own API reference. No customer details.
+ */
 export async function writeFieldHelp(hub: Hub, n: number, raw: Record<string, any>): Promise<string> {
   const file = path.join(hub.cfg.stateDir, "homebase-notes-help.txt");
-  let docs: string[] = [];
-  let docsNote = "";
-  try { docs = docLines((await hub.homebase.apiDocs?.()) ?? ""); if (!docs.length) docsNote = "(nothing about notes found in the API reference, or this connection has none)"; }
+  let docs = "", docsNote = "";
+  try { docs = (await hub.homebase.apiDocs?.()) ?? ""; if (!docs) docsNote = "(this connection has no API reference)"; }
   catch (e) { docsNote = `(couldn't read the API reference: ${(e as Error).message})`; }
+  const peeks: string[] = [];
+  const id = String(raw.id ?? "");
+  if (hub.homebase.peek && id) {
+    for (const p of PEEKS(id)) {
+      try {
+        const r = await hub.homebase.peek(p);
+        peeks.push(`GET ${p.replace(id, ":id")} -> ${r.status}`, ...(r.status < 300 ? shapeOf(r.json).slice(0, 60).map((l) => `    ${l}`) : []));
+      } catch (e) { peeks.push(`GET ${p.replace(id, ":id")} -> failed (${(e as Error).message.slice(0, 80)})`); }
+    }
+  }
+  let pretty = docs;
+  try { pretty = JSON.stringify(JSON.parse(docs), null, 1); } catch { /* not JSON */ }
   mkdirSync(hub.cfg.stateDir, { recursive: true });
-  writeFileSync(file, [`Keystone couldn't find the Proposal Submitted Notes field. Made ${new Date().toISOString()} from job #${n}.`, "No customer details are in this file: field names and kinds only.", "", "== Every field on the job ==", ...fieldMap(raw), "", "== Homebase API reference: lines about notes, proposals, the dashboard ==", docsNote, ...docs].join("\n"));
+  writeFileSync(file, [`Keystone couldn't find the Proposal Submitted Notes. Made ${new Date().toISOString()} from job #${n}.`, "No customer details are in this file: names of fields, kinds, and Homebase's API reference.", "",
+    "== Every field on the job ==", ...fieldMap(raw), "", "== A read-only look at likely places ==", ...(peeks.length ? peeks : ["(this connection can't look)"]), "",
+    "== Homebase API reference: lines about notes, proposals, the dashboard ==", docsNote, ...docLines(docs), "", "== Homebase API reference, whole ==", pretty.slice(0, 400_000)].join("\n"));
+  // A copy where Claude can read it (the Drive hand-off folder), when Drive is connected.
+  try {
+    const d = hub.drive;
+    const root = d?.connected() ? await d.findFolder("Keystone hand-off") : null;
+    if (d && root) await d.upload((await d.ensureFolder("_keystone", root.id)).id, file);
+  } catch { /* the local file is still there */ }
   return file;
 }
 
@@ -157,7 +205,7 @@ export async function updateProposalJobs(hub: Hub, o: { force?: boolean } = {}):
       const pick = findUpdateField(raw, override);
       if ("candidates" in pick) {
         const help = await writeFieldHelp(hub, j.jobNumber, raw).catch(() => "");
-        return { written: 0, skipped: jobs.length, problem: `Homebase didn't hand Keystone a Proposal Submitted Notes field on job #${j.jobNumber} (the closest it has: ${pick.candidates.join(", ") || "none"}).${help ? ` Keystone saved what it found in ${help}: send that file to Claude so the right field can be set.` : ""}` };
+        return { written: 0, skipped: jobs.length, problem: `Homebase didn't hand Keystone a Proposal Submitted Notes field on job #${j.jobNumber} (the closest it has: ${pick.candidates.join(", ") || "none"}).${help ? ` Keystone saved what it found (${help}) and put a copy in the Google Drive hand-off folder: tell Claude "the Homebase help file is in Drive" and it can finish the hookup.` : ""}` };
       }
       const d = await draftUpdate(hub, j.jobNumber, { current: pick.current, force: o.force });
       if (!d || d.text === pick.current.trim()) { skipped++; continue; }

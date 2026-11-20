@@ -234,6 +234,14 @@ export class ApiHomebase implements HomebaseClient {
     return res.text();
   }
 
+  async peek(pathname: string): Promise<{ status: number; json: unknown }> {
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (this.opts.token) headers.Authorization = `Bearer ${this.opts.token}`;
+    if (this.opts.actingEmail) headers["X-Acting-User-Email"] = this.opts.actingEmail;
+    const res = await (this.opts.fetch ?? fetch)(`${this.opts.url}/api/v1${pathname}`, { headers });
+    return { status: res.status, json: await res.json().catch(() => null) };
+  }
+
   async vocabulary() {
     this.vocab ??= await this.call<Record<string, any>>("GET", "/vocabulary");
     return this.vocab;
