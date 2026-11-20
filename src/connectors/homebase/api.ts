@@ -1,4 +1,4 @@
-import type { ActivityRow, Contact, DocumentKind, FieldResult, FiledEmail, HbNote, HbPerson, HomebaseClient, HomebaseDocument, JobDetail, JobSummary } from "./types.js";
+import type { ActivityRow, Contact, DocumentKind, FieldResult, FiledEmail, HbNote, HbPerson, HoldNote, HomebaseClient, HomebaseDocument, JobDetail, JobSummary } from "./types.js";
 
 /**
  * Homebase over its real JSON API (https://homebase.forefrontteam.com/api/v1, reference at /api/v1/docs).
@@ -234,6 +234,16 @@ export class ApiHomebase implements HomebaseClient {
     return res.text();
   }
 
+  async holdNotes(jobNumber: number): Promise<HoldNote[]> {
+    const id = await this.projectId(jobNumber);
+    return ((await this.call<{ holdNotes: any[] }>("GET", `/projects/${id}/hold-notes`)).holdNotes ?? []).map(toHold);
+  }
+
+  async addHoldNote(jobNumber: number, body: string): Promise<HoldNote> {
+    const id = await this.projectId(jobNumber);
+    return toHold((await this.call<{ holdNote: any }>("POST", `/projects/${id}/hold-notes`, { body })).holdNote);
+  }
+
   async peek(pathname: string): Promise<{ status: number; json: unknown }> {
     const headers: Record<string, string> = { Accept: "application/json" };
     if (this.opts.token) headers.Authorization = `Bearer ${this.opts.token}`;
@@ -342,6 +352,9 @@ async function pool<T, R>(items: T[], n: number, fn: (t: T) => Promise<R>): Prom
   return out;
 }
 
+function toHold(n: any): HoldNote {
+  return { id: String(n?.id ?? ""), body: String(n?.body ?? ""), stage: String(n?.stage ?? ""), author: String(n?.author ?? ""), createdAt: String(n?.createdAt ?? "") };
+}
 function toNote(n: any): HbNote {
   return { id: String(n.id), body: String(n.body ?? ""), author: String(n.author ?? ""), authorId: n.authorId ?? null, postedAt: String(n.postedAt ?? ""), replies: (n.replies ?? []).map(toNote) };
 }

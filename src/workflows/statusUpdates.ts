@@ -15,6 +15,9 @@ import { timeline } from "./timeline.js";
  * "update" (preferring one that also says proposal/submitted/stage). If none is found, Keystone says so and lists
  * the job's field names, so the right one can be set.
  */
+// Where it goes: the "Proposal Submitted Notes" card on the job's Dashboard (Homebase's hold-notes: its own list,
+// not job notes, so no bell and no mail). Keystone ADDS a note there; older notes are left alone. The field-based
+// path further down is only for a Homebase connection without that card.
 export const UPDATE_STAGE = "Proposal Submitted";
 const KNOWN_NOT = new Set(["customerNotes", "pmNotes", "toolAccess", "accessNotes", "updatedAt", "updatedBy", "lastUpdated"]);
 
@@ -152,12 +155,12 @@ export async function draftUpdate(hub: Hub, n: number, o: { current?: string; fo
   const r = await complete<{ update: string; nothingNew: boolean }>(hub, {
     system: "You write the one-line status update on a reconstruction job's page in Forefront's job system, for coworkers who get asked where a job stands. Plain words, no greeting, no names of tools.",
     prompt: `Job #${n} ${job?.name ?? ""}, stage ${UPDATE_STAGE}${job?.proposalAmount ? `, proposal $${job.proposalAmount}` : ""}.
-Its Proposal Submitted Notes now (this gets replaced, not added to): ${o.current?.trim() ? `"${o.current.trim()}"` : "(blank)"}
+The newest Proposal Submitted Note on the job now: ${o.current?.trim() ? `"${o.current.trim()}"` : "(blank)"}
 
 Recent activity, newest first:
 ${recent}
 
-Write the job's current status, to replace the old one: one or two short sentences, under 200 characters, starting with today's date "${shortDate()}: ". Only where it stands now and what's next or who we're waiting on; no history of earlier steps (e.g. "${shortDate()}: Adjuster agreed to the supplement except carpet; revised estimate going to Liberty Mutual this week."). Use only what the activity shows; no guesses. If nothing in the activity changes the current status, set nothingNew true.`,
+Write the job's current status as a new note: one or two short sentences, under 200 characters, starting with today's date "${shortDate()}: ". Only where it stands now and what's next or who we're waiting on; no history of earlier steps (e.g. "${shortDate()}: Adjuster agreed to the supplement except carpet; revised estimate going to Liberty Mutual this week."). Use only what the activity shows; no guesses. If nothing in the activity changes the current status, set nothingNew true.`,
     schema: SCHEMA,
     fast: true,
   });
@@ -194,29 +197,37 @@ export function applyReply<T extends { n: number; name: string; text: string }>(
  */
 export async function updateProposalJobs(hub: Hub, o: { force?: boolean } = {}): Promise<{ written: number; skipped: number; problem?: string }> {
   if (aiProvider(hub) !== "gemini") return { written: 0, skipped: 0, problem: "Status updates are written by the free AI (Gemini), which is off on this machine." };
-  if (!hub.homebase.rawJob || !hub.homebase.updateFields) return { written: 0, skipped: 0, problem: "This Homebase connection can't write job fields." };
+  const card = !!(hub.homebase.holdNotes && hub.homebase.addHoldNote);
+  if (!card && (!hub.homebase.rawJob || !hub.homebase.updateFields)) return { written: 0, skipped: 0, problem: "This Homebase connection can't write the Proposal Submitted Notes." };
   const jobs = (await hub.homebase.listJobs({ openOnly: true, mine: hub.cfg.homebase.me })).filter((j) => j.stage === UPDATE_STAGE);
   const override = hub.cfg.homebase.updateField ?? "";
   const plan: { n: number; name: string; key: string; text: string; basedOn: string }[] = [];
   let skipped = 0;
   for (const j of jobs) {
     try {
-      const raw = await hub.homebase.rawJob(j.jobNumber);
-      const pick = findUpdateField(raw, override);
-      if ("candidates" in pick) {
-        const help = await writeFieldHelp(hub, j.jobNumber, raw).catch(() => "");
-        return { written: 0, skipped: jobs.length, problem: `Homebase didn't hand Keystone a Proposal Submitted Notes field on job #${j.jobNumber} (the closest it has: ${pick.candidates.join(", ") || "none"}).${help ? ` Keystone saved what it found (${help}) and put a copy in the Google Drive hand-off folder: tell Claude "the Homebase help file is in Drive" and it can finish the hookup.` : ""}` };
+      let key = "", current = "";
+      if (card) {
+        // The newest note on the card is "where it stands now" for the writer.
+        current = (await hub.homebase.holdNotes!(j.jobNumber))[0]?.body ?? "";
+      } else {
+        const raw = await hub.homebase.rawJob!(j.jobNumber);
+        const pick = findUpdateField(raw, override);
+        if ("candidates" in pick) {
+          const help = await writeFieldHelp(hub, j.jobNumber, raw).catch(() => "");
+          return { written: 0, skipped: jobs.length, problem: `Homebase didn't hand Keystone a Proposal Submitted Notes field on job #${j.jobNumber} (the closest it has: ${pick.candidates.join(", ") || "none"}).${help ? ` Keystone saved what it found (${help}).` : ""}` };
+        }
+        key = pick.key; current = pick.current;
       }
-      const d = await draftUpdate(hub, j.jobNumber, { current: pick.current, force: o.force });
-      if (!d || d.text === pick.current.trim()) { skipped++; continue; }
-      plan.push({ n: j.jobNumber, name: j.name, key: pick.key, ...d });
+      const d = await draftUpdate(hub, j.jobNumber, { current, force: o.force });
+      if (!d || d.text === current.trim()) { skipped++; continue; }
+      plan.push({ n: j.jobNumber, name: j.name, key, ...d });
     } catch (e) {
       hub.say(`#${j.jobNumber}: couldn't write its update (${(e as Error).message.slice(0, 120)}).`);
       skipped++;
     }
   }
   if (!plan.length) return { written: 0, skipped };
-  const answer = await confirmOrReply(hub.approver, `Replace the Proposal Submitted Notes on ${plan.length} Homebase job${plan.length === 1 ? "" : "s"} with the current status?`, [...plan.map((p) => `#${p.n} ${p.name}: ${p.text}`), "", "To change one, type it below and press Send my answer, e.g. \"Williams: waiting on the adjuster's carpet pricing\" (or \"skip Williams\"). The rest go in as shown."]);
+  const answer = await confirmOrReply(hub.approver, card ? `Add a Proposal Submitted Note on ${plan.length} Homebase job${plan.length === 1 ? "" : "s"}?` : `Replace the Proposal Submitted Notes on ${plan.length} Homebase job${plan.length === 1 ? "" : "s"} with the current status?`, [...plan.map((p) => `#${p.n} ${p.name}: ${p.text}`), "", "To change one, type it below and press Send my answer, e.g. \"Williams: waiting on the adjuster's carpet pricing\" (or \"skip Williams\"). The rest go in as shown."]);
   if (answer.reply) {
     const r = applyReply(plan, answer.reply);
     if (!r.matched) { hub.say(`Your answer didn't name one of the jobs (${plan.map((p) => p.name).join(", ")}), so no updates were written. Ask again with the job's name first, e.g. "Williams: ...".`); return { written: 0, skipped: skipped + plan.length }; }
@@ -225,29 +236,43 @@ export async function updateProposalJobs(hub: Hub, o: { force?: boolean } = {}):
   const s = load(hub);
   let written = 0;
   for (const p of plan) {
-    const r = await hub.homebase.updateFields(p.n, { [p.key]: p.text }).catch((e) => ({ [p.key]: { ok: false, message: (e as Error).message } }) as Record<string, { ok: boolean; message?: string }>);
-    if (r[p.key] && r[p.key].ok === false) { hub.say(`#${p.n}: Homebase refused the update (${(r[p.key] as { message?: string }).message ?? ""}).`); continue; }
+    if (card) {
+      try { await hub.homebase.addHoldNote!(p.n, p.text); }
+      catch (e) { hub.say(`#${p.n}: Homebase didn't take the note (${(e as Error).message.slice(0, 160)}).`); continue; }
+    } else {
+      const r = await hub.homebase.updateFields!(p.n, { [p.key]: p.text }).catch((e) => ({ [p.key]: { ok: false, message: (e as Error).message } }) as Record<string, { ok: boolean; message?: string }>);
+      if (r[p.key] && r[p.key].ok === false) { hub.say(`#${p.n}: Homebase refused the update (${(r[p.key] as { message?: string }).message ?? ""}).`); continue; }
+    }
     s[p.n] = { text: p.text, at: new Date().toISOString(), basedOn: p.basedOn };
     if (hub.jobs.exists(p.n)) hub.jobs.log(p.n, `Homebase status update: ${p.text}`);
     written++;
   }
   save(hub, s);
-  hub.say(`Updated the status on ${written} Proposal Submitted job${written === 1 ? "" : "s"} in Homebase.`);
+  hub.say(card ? `Added a Proposal Submitted Note on ${written} job${written === 1 ? "" : "s"} in Homebase.` : `Updated the status on ${written} Proposal Submitted job${written === 1 ? "" : "s"} in Homebase.`);
   return { written, skipped };
 }
 
 /** One job's line, as Hunter (or the AI on his word) wrote it. Asks first. */
 export async function setStatusUpdate(hub: Hub, n: number, text: string): Promise<string> {
-  if (!hub.homebase.rawJob || !hub.homebase.updateFields) throw new Error("This Homebase connection can't write job fields.");
+  const line = /^\d{1,2}\/\d{1,2}:/.test(text.trim()) ? text.trim() : `${shortDate()}: ${text.trim()}`;
+  const remember = () => {
+    const s = load(hub);
+    s[n] = { text: line, at: new Date().toISOString(), basedOn: new Date().toISOString() };
+    save(hub, s);
+    if (hub.jobs.exists(n)) hub.jobs.log(n, `Homebase status update: ${line}`);
+  };
+  if (hub.homebase.holdNotes && hub.homebase.addHoldNote) {
+    if (!(await hub.approver.confirm(`Add this Proposal Submitted Note on Homebase #${n}?`, [line]))) return "Not added.";
+    await hub.homebase.addHoldNote(n, line);
+    remember();
+    return `Added on Homebase #${n}: ${line}`;
+  }
+  if (!hub.homebase.rawJob || !hub.homebase.updateFields) throw new Error("This Homebase connection can't write the Proposal Submitted Notes.");
   const pick = findUpdateField(await hub.homebase.rawJob(n), hub.cfg.homebase.updateField ?? "");
   if ("candidates" in pick) throw new Error(`Couldn't find the Proposal Submitted update field on #${n}. Fields that might be it: ${pick.candidates.join(", ") || "(none)"}. Set HOMEBASE_UPDATE_FIELD in .env.`);
-  const line = /^\d{1,2}\/\d{1,2}:/.test(text.trim()) ? text.trim() : `${shortDate()}: ${text.trim()}`;
   if (!(await hub.approver.confirm(`Replace the Proposal Submitted Notes on Homebase #${n}?`, [`Now: ${pick.current || "(blank)"}`, `New: ${line}`]))) return "Not changed.";
   const r = await hub.homebase.updateFields(n, { [pick.key]: line });
   if (r[pick.key]?.ok === false) throw new Error(`Homebase refused it: ${r[pick.key].message ?? r[pick.key].code ?? ""}`);
-  const s = load(hub);
-  s[n] = { text: line, at: new Date().toISOString(), basedOn: new Date().toISOString() };
-  save(hub, s);
-  if (hub.jobs.exists(n)) hub.jobs.log(n, `Homebase status update: ${line}`);
+  remember();
   return `Saved on Homebase #${n}: ${line}`;
 }

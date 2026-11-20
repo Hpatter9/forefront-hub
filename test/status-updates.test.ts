@@ -34,11 +34,13 @@ describe("the Proposal Submitted status line in Homebase", () => {
   it("writes every job's new line after one OK, and doesn't rewrite when nothing new happened", async () => {
     const { hub, asked } = await setup();
     expect((await timeline(hub, 9002)).length).toBeGreaterThan(0);
+    await hub.homebase.addHoldNote!(9002, "10/23: Kristi's earlier note"); // someone's older note on the card
     const r = await updateProposalJobs(hub);
     expect(r.written).toBe(1);
-    expect((await hub.homebase.rawJob!(9002)).proposalSubmittedUpdate).toBe("11/18: Adjuster agreed to O&P and door R&R; waiting on carpet.");
+    // A new note is added to the Proposal Submitted Notes card; the older one stays.
+    expect((await hub.homebase.holdNotes!(9002)).map((x) => x.body)).toEqual(["11/18: Adjuster agreed to O&P and door R&R; waiting on carpet.", "10/23: Kristi's earlier note"]);
     const card = (hub.approver as FixedApprover).asked.at(-1)!;
-    expect(card.action).toMatch(/Replace the Proposal Submitted Notes on 1 Homebase job/);
+    expect(card.action).toMatch(/Add a Proposal Submitted Note on 1 Homebase job/);
     expect(card.details[0]).toMatch(/^#9002 Example: 11\/18/);
     const before = asked();
     expect((await updateProposalJobs(hub)).written).toBe(0); // nothing new since
@@ -48,11 +50,11 @@ describe("the Proposal Submitted status line in Homebase", () => {
   it("writes nothing when Hunter says no, and takes his typed changes when he types them", async () => {
     const no = await setup(false);
     expect((await updateProposalJobs(no.hub)).written).toBe(0);
-    expect((await no.hub.homebase.rawJob!(9002)).proposalSubmittedUpdate).toBe("");
+    expect(await no.hub.homebase.holdNotes!(9002)).toEqual([]);
     const typed = await setup(true);
     (typed.hub.approver as FixedApprover).reply = "Example: waiting on Liberty Mutual's carpet pricing";
     expect((await updateProposalJobs(typed.hub)).written).toBe(1);
-    expect((await typed.hub.homebase.rawJob!(9002)).proposalSubmittedUpdate).toMatch(/^\d{1,2}\/\d{1,2}: waiting on Liberty Mutual's carpet pricing$/);
+    expect((await typed.hub.homebase.holdNotes!(9002))[0].body).toMatch(/^\d{1,2}\/\d{1,2}: waiting on Liberty Mutual's carpet pricing$/);
   });
 
   it("reads typed changes by job name or number, and skips", () => {
@@ -64,7 +66,7 @@ describe("the Proposal Submitted status line in Homebase", () => {
 
   it("sets one job's line on request, dated, after asking", async () => {
     const { hub } = await setup();
-    expect(await setStatusUpdate(hub, 9002, "Signed agreement expected Friday")).toMatch(/Saved on Homebase #9002: \d{1,2}\/\d{1,2}: Signed agreement expected Friday/);
+    expect(await setStatusUpdate(hub, 9002, "Signed agreement expected Friday")).toMatch(/Added on Homebase #9002: \d{1,2}\/\d{1,2}: Signed agreement expected Friday/);
   });
 });
 
@@ -72,6 +74,7 @@ describe("when Homebase doesn't hand over a notes field", () => {
   it("saves a help file with field names only and the API reference's matching lines", async () => {
     const { hub } = await setup();
     hub.homebase.rawJob = async () => ({ id: "abc-123", jobNumber: "9002", brief: { customerNotes: "Dana prefers texts", productionNotes: null }, stages: [{ name: "Proposal Submitted", note: "secret" }] });
+    hub.homebase.holdNotes = undefined; // a Homebase connection without the notes card: the older, field-based path
     hub.homebase.apiDocs = async () => "## Projects\nGET /projects/:id\n### Stage notes\nPATCH /projects/:id/stage-notes {stage, note}: the dashboard's per-stage notes\nunrelated line\nmore\nmore";
     const { MockDrive } = await import("../src/connectors/drive/index.js");
     const { mkdirSync, existsSync } = await import("node:fs");
@@ -80,7 +83,7 @@ describe("when Homebase doesn't hand over a notes field", () => {
     hub.homebase.peek = async (p: string) => p.endsWith("/stage-notes") ? { status: 200, json: { notes: [{ id: "n1", stage: "Proposal Submitted", body: "secret text", pinned: false }] } } : { status: 404, json: null };
     const r = await updateProposalJobs(hub);
     expect(r.written).toBe(0);
-    expect(r.problem).toMatch(/didn't hand Keystone a Proposal Submitted Notes field on job #9002.*homebase-notes-help\.txt.*Drive/);
+    expect(r.problem).toMatch(/didn't hand Keystone a Proposal Submitted Notes field on job #9002.*homebase-notes-help\.txt/);
     expect(existsSync(`${droot}/Keystone hand-off/_keystone/homebase-notes-help.txt`)).toBe(true);
     const { readFileSync } = await import("node:fs");
     const help = readFileSync(`${hub.cfg.stateDir}/homebase-notes-help.txt`, "utf8");

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { google, type gmail_v1 } from "googleapis";
 import { GoogleAuth, openBrowser, SCOPES, type GoogleOpts } from "../google/auth.js";
-import { buildMime, htmlToText, newMessageId } from "./mime.js";
+import { buildMime, decodeEntities, htmlToText, newMessageId } from "./mime.js";
 import type { DraftInput, DraftRef, DraftStatus, Label, MailClient, Message, ThreadSummary } from "./types.js";
 
 // modify = read, label (archive / mark read / star / trash) and send; compose = drafts. Claude and the workflows only
@@ -161,7 +161,7 @@ export class GoogleGmail implements MailClient {
       cc: h(last, "Cc"),
       from: h(last, "From"),
       date: last?.internalDate ? new Date(Number(last.internalDate)).toISOString() : h(last, "Date"),
-      snippet: last?.snippet ?? "",
+      snippet: decodeEntities(last?.snippet ?? ""),
       messageCount: msgs.length,
       unread: labels.has("UNREAD"),
       starred: labels.has("STARRED"),
@@ -218,7 +218,7 @@ export class GoogleGmail implements MailClient {
       const th = await this.gmail().users.threads.get({ userId: "me", id: t.id!, format: "metadata", metadataHeaders: ["Subject", "From", "Date", "To", "Cc"] });
       const last = th.data.messages?.at(-1);
       const h = (n: string) => last?.payload?.headers?.find((x) => x.name === n)?.value ?? "";
-      out.push({ id: t.id!, subject: h("Subject"), from: h("From"), date: h("Date"), to: h("To"), cc: h("Cc"), snippet: last?.snippet ?? "", messageCount: th.data.messages?.length ?? 0 });
+      out.push({ id: t.id!, subject: h("Subject"), from: h("From"), date: h("Date"), to: h("To"), cc: h("Cc"), snippet: decodeEntities(last?.snippet ?? ""), messageCount: th.data.messages?.length ?? 0 });
     }
     return out;
   }

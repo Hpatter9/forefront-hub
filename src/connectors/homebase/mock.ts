@@ -2,12 +2,12 @@ import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { HUB_ROOT } from "../../core/config.js";
-import type { DocumentKind, HbNote, HbPerson, HomebaseClient, HomebaseDocument, JobDetail } from "./types.js";
+import type { DocumentKind, HbNote, HbPerson, HoldNote, HomebaseClient, HomebaseDocument, JobDetail } from "./types.js";
 
 export interface MockWrite {
   at: string;
   jobNumber: number;
-  op: "setProposal" | "setContractAmount" | "setStage" | "addNote" | "uploadDocument" | "updateFields" | "createContact" | "updateContact" | "replyNote";
+  op: "setProposal" | "setContractAmount" | "setStage" | "addNote" | "uploadDocument" | "updateFields" | "createContact" | "updateContact" | "replyNote" | "addHoldNote";
   args: unknown;
 }
 
@@ -70,6 +70,20 @@ export class MockHomebase implements HomebaseClient {
     return this.jobs.flatMap((j) => j.contacts).filter((c) => k.length >= 3 && `${c.name} ${c.email}`.toLowerCase().includes(k)).map((c, i) => ({ id: `mock-c-${i}-${c.email || c.name}`, name: c.name, email: c.email || undefined, phones: c.phone ? [{ number: c.phone }] : [], title: c.role === "adjuster" ? "Adjuster" : undefined }));
   }
 
+  /** The Proposal Submitted Notes card, per job (newest first). */
+  holds = new Map<number, HoldNote[]>();
+  async holdNotes(jobNumber: number) {
+    this.find(jobNumber);
+    return structuredClone(this.holds.get(jobNumber) ?? []);
+  }
+  async addHoldNote(jobNumber: number, body: string) {
+    const j = this.find(jobNumber);
+    if (j.stage !== "Proposal Submitted") throw new Error("Homebase POST hold-notes: 409 not_at_proposal_submitted");
+    const note: HoldNote = { id: `hold-${(this.holds.get(jobNumber)?.length ?? 0) + 1}-${Math.random().toString(36).slice(2, 6)}`, body, stage: j.stage, author: "Hunter Patterson", createdAt: new Date().toISOString() };
+    this.holds.set(jobNumber, [note, ...(this.holds.get(jobNumber) ?? [])]);
+    this.record(jobNumber, "addHoldNote", { body });
+    return structuredClone(note);
+  }
   async noteFeed(jobNumber: number): Promise<HbNote[]> {
     return structuredClone(this.find(jobNumber).noteFeed ?? []);
   }

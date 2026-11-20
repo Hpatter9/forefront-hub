@@ -27,15 +27,23 @@ export function bodyHtml(body: string, signatureHtml = ""): string {
   return `<div dir="ltr">${paras.join("<div><br></div>")}${sig}</div>`;
 }
 
+const NAMED: Record<string, string> = { nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", rsquo: "\u2019", lsquo: "\u2018", rdquo: "\u201d", ldquo: "\u201c", ndash: "\u2013", mdash: "\u2014", hellip: "\u2026", bull: "\u2022", middot: "\u00b7", copy: "\u00a9", reg: "\u00ae", trade: "\u2122", deg: "\u00b0", frac12: "\u00bd", frac14: "\u00bc", frac34: "\u00be", times: "\u00d7" };
+/** Turns HTML character codes back into the characters ("don&#39;t" -> "don't", "&amp;" -> "&"). */
+export function decodeEntities(s: string): string {
+  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]+);/gi, (all, code: string) => {
+    if (code[0] === "#") {
+      const n = /^#x/i.test(code) ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
+      return Number.isFinite(n) && n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : all;
+    }
+    return NAMED[code.toLowerCase()] ?? all;
+  });
+}
+
 export function htmlToText(html: string): string {
-  return html
+  return decodeEntities(html
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/(div|p|tr|li)>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
+    .replace(/<[^>]+>/g, ""))
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }

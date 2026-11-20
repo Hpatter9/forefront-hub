@@ -79,6 +79,16 @@ export function noteAuthor(author: string): { person: string; via: string } {
 }
 
 /** A person in Homebase's contacts. */
+/** An entry on a recon job's "Proposal Submitted Notes" card (Homebase's hold-notes): what is holding the proposal up. */
+export interface HoldNote {
+  id: string;
+  body: string;
+  /** The stage the job was at when it was written. */
+  stage: string;
+  author: string;
+  createdAt: string;
+}
+
 export interface HbPerson {
   id: string;
   name: string;
@@ -129,6 +139,11 @@ export interface HomebaseClient {
   searchContacts?(q: string): Promise<HbPerson[]>;
   searchAccounts?(q: string, kind?: string): Promise<{ id: string; name: string; kind: string }[]>;
   vocabulary?(): Promise<Record<string, any>>;
+  // ---- the Proposal Submitted Notes card on a recon job's Dashboard (not job notes: no bell, no mail)
+  /** Every entry, newest first. */
+  holdNotes?(jobNumber: number): Promise<HoldNote[]>;
+  /** Adds an entry (only on a Reconstruction job at Proposal Submitted; Homebase stamps the author and time). */
+  addHoldNote?(jobNumber: number, body: string): Promise<HoldNote>;
   /** Homebase's own API reference (GET /docs), as text: for finding where a field lives. */
   apiDocs?(): Promise<string>;
   /** A read-only look at an API path (GET only), for working out where something lives: the status and the JSON. */

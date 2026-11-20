@@ -36,3 +36,11 @@ describe("one-line email summaries", () => {
     expect(summariesFor(hub, [{ id: "old", historyId: "1" }, { id: "fresh", historyId: "1" }, { id: "none", historyId: "1" }])).toEqual({ fresh: "Gorrell - Adjuster wants photos", none: "Vendor newsletter" });
   });
 });
+
+describe("reading email text", () => {
+  it("turns HTML character codes back into characters, so apostrophes read as apostrophes", async () => {
+    const { decodeEntities, htmlToText } = await import("../src/connectors/gmail/mime.js");
+    expect(htmlToText("<div>I&#39;ll send it &amp; the photos. It&rsquo;s &quot;ready&quot;&nbsp;now.</div><div>Thanks,</div>")).toBe("I'll send it & the photos. It’s \"ready\" now.\nThanks,");
+    expect(decodeEntities("Don&#x27;t forget &mdash; 3&frac12; days &unknown; &#0;")).toBe("Don't forget — 3½ days &unknown; &#0;");
+  });
+});

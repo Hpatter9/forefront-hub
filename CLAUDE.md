@@ -66,11 +66,14 @@
   Estimator asks before a paid Claude run. Record the cost of any new Claude or Gemini call path the same way.
 - Every Estimator writer can make Gmail drafts (never send): Claude through the hub tools, Gemini (all models) via
   `gmail_create_draft` in `HUB_TOOLS`, the Claude app via `keystone_create_draft` on the bridge.
-- Proposal Submitted status line (`src/workflows/statusUpdates.ts`): Homebase's "Proposal Submitted Notes" field (on the
-  recon dashboard), replaced (never appended) with a dated one- or two-sentence current status, for coworkers. Gemini writes it from the job's timeline,
-  only when something new happened; one card OKs every job's line. Runs a few minutes after the first start of the
-  day and after the morning brief; also the `homebase_status_updates` / `homebase_set_status_update` tools and
-  POST /api/status-updates. The field is found by name (proposal/submitted + notes/update/status, else "update"), or HOMEBASE_UPDATE_FIELD.
+- Proposal Submitted status (`src/workflows/statusUpdates.ts`): the "Proposal Submitted Notes" card on a recon job's
+  Dashboard is Homebase's hold-notes (`GET/POST /projects/:id/hold-notes`; its own list, not job notes; POST only on a
+  Reconstruction job at Proposal Submitted). Keystone ADDS a dated one- or two-sentence current status there for
+  coworkers and never deletes or edits older notes (Hunter's call). Gemini writes it from the job's timeline, only when
+  something new happened; one card OKs every job's note ("Williams: new text" / "skip Williams" in the reply box).
+  Runs a few minutes after the first start of the day and after the morning brief; also the Dashboard's Update
+  Homebase notes button, the `homebase_status_updates` / `homebase_set_status_update` tools and POST
+  /api/status-updates. The older field-based path stays only for a Homebase connection without the card.
 - Question cards take a typed answer as well as Yes/No (`#ap-reply`). `confirm` treats a typed answer as no and the
   page sends it to the Ask box as an instruction; callers that can use it call `confirmOrReply` (e.g. the status
   card: "Williams: new text" or "skip Williams").
