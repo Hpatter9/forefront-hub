@@ -7,8 +7,13 @@
   live in the `forefront-estimate` skill in the Hpatter9/estimator repo (`skill/forefront-estimate`). Keystone runs
   its scripts or lets the agent load the skill.
 - Keystone never sends email; Gmail is drafts-only. Homebase writes and estimate overwrites go through
-  `hub.approver.confirm`. Homebase's proposal amount and date are written together, and only by `sync` after a
-  draft has been sent (or by an explicit, confirmed request).
+  `hub.approver.confirm`. Homebase's proposal amount and date are written together, and only after an estimate has
+  actually been sent: by `sync` for send-off drafts, by `src/workflows/proposalSent.ts` for any other way it went out
+  (or by an explicit, confirmed request). `proposalSent` looks through Sent mail (after every send from Keystone and
+  with each inbox check) for an email from Hunter to someone outside Forefront, on one job, with an estimate /
+  proposal / agreement PDF; it asks once per email on a card (a typed amount replaces the estimate's total), then
+  writes amount + date and moves the job to Proposal Submitted. At Proposal Submitted it only refreshes the amount;
+  past it, nothing. Handled emails are remembered in `.hub/proposals-sent.json`.
 - Test data is fictional (fixtures/). Don't commit real customer data, Homebase snapshots, `.env` or `auth/`.
 - Tests expect the estimator repo at `../estimator` (or `ESTIMATOR_DIR`) and `python3` with reportlab, pdfplumber
   and Pillow.

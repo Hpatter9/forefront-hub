@@ -640,6 +640,7 @@ const server = http.createServer(async (req, res) => {
           return send(res, 202, task(`Check sent emails for #${n}`, n, async () => {
             const before = hub.jobs.get(n).sendoff.homebaseLoggedAt;
             const r = await sync(hub, n);
+            await runProposalCheck(n); // and any estimate sent another way (Gmail, the compose box, an AI draft)
             hub.say(r.length ? r.map((x) => `#${x.jobNumber}: ${x.sent.length ? `sent ${x.sent.join(", ")}; ` : ""}${x.logged ? "logged in Homebase" : "not logged yet"}${x.note ? ` (${x.note})` : ""}`).join("\n") : "No send-off drafts on this job yet.");
             const after = hub.jobs.get(n);
             if (!before && after.sendoff.homebaseLoggedAt) {
@@ -817,6 +818,7 @@ const server = http.createServer(async (req, res) => {
         const lines = m ? [`To: ${m.to.join(", ")}`, m.cc.length ? `Cc: ${m.cc.join(", ")}` : "", `Subject: ${m.subject}`, m.attachments.length ? `Attached: ${m.attachments.map((a) => a.filename).join(", ")}` : ""].filter(Boolean) : [];
         if (!(await approver.confirm("Send this draft now?", lines))) return hub.say("Not sent. It's still a draft.");
         await hub.gmail.sendDraft!(draftId);
+        proposalCheckSoon();
         hub.say(`Sent "${m?.subject ?? "the draft"}"${m ? ` to ${m.to.join(", ")}` : ""}.`);
         bus.emit({ type: "changed", what: "mail" });
       }, "mail"));
@@ -864,6 +866,7 @@ const server = http.createServer(async (req, res) => {
         const lines = [to.length ? `To: ${to.join(", ")}` : "", cc.length ? `Cc: ${cc.join(", ")}` : "", bcc.length ? `Bcc: ${bcc.join(", ")}` : "", `Subject: ${b.subject ?? ""}`, names.length ? `Attached: ${names.join(", ")}` : ""].filter(Boolean);
         if (!(await approver.confirm("Send this email now?", lines))) { bus.emit({ type: "changed", what: "mail" }); return hub.say("Not sent. It's saved in Drafts."); }
         await hub.gmail.sendDraft!(saved.draftId);
+        proposalCheckSoon();
         bus.emit({ type: "notice", text: "Message sent." });
         hub.say(`Sent "${b.subject ?? ""}" to ${[...to, ...cc].join(", ")}.`);
         bus.emit({ type: "changed", what: "mail" });
@@ -886,6 +889,7 @@ const server = http.createServer(async (req, res) => {
         const lines = [`To: ${d.to.join(", ")}`, d.cc.length ? `Cc: ${d.cc.join(", ")}` : "", d.bcc.length ? `Bcc: ${d.bcc.join(", ")}` : "", `Subject: ${d.subject}`, d.attachments.length ? `Attached: ${d.attachments.map((f) => path.basename(f)).join(", ")}` : ""].filter(Boolean);
         if (!(await approver.confirm("Send this email now?", lines))) return hub.say("Not sent. It's still in the compose box.");
         await hub.gmail.send!(d);
+        proposalCheckSoon();
         if (b.replaceDraft) await replaceDraft(String(b.replaceDraft));
         hub.say(`Sent "${d.subject}" to ${d.to.join(", ")}.`);
         bus.emit({ type: "changed", what: "mail" });
@@ -1244,6 +1248,7 @@ async function runInbox() {
   } finally {
     filing = false;
   }
+  void runProposalCheck();
 }
 const INBOX_MINUTES = Number(process.env.HUB_INBOX_MINUTES || 5);
 if (INBOX_MINUTES > 0 && hub.gmail.kind === "google") {
@@ -1498,6 +1503,21 @@ async function myCalendars(): Promise<Set<string>> {
   const cals = await hub.calendar.calendars().catch(() => []);
   return new Set(["primary", ...cals.filter((c) => c.primary).map((c) => c.id)]);
 }
+
+/**
+ * An estimate went out (from here, from Gmail, from the phone): ask to put the proposal amount and date in Homebase
+ * and move the job to Proposal Submitted. Runs after every send from Keystone and with each inbox check.
+ */
+async function runProposalCheck(only?: number) {
+  try {
+    const { checkProposalsSent } = await import("../workflows/proposalSent.js");
+    for (const r of await checkProposalsSent(hub, only)) if (r.result === "updated") bus.emit({ type: "changed", job: r.jobNumber, what: "job" });
+  } catch (e) {
+    console.error("proposal check:", e);
+  }
+}
+/** Gmail takes a few seconds to list a just-sent email under Sent. */
+const proposalCheckSoon = () => void setTimeout(() => void runProposalCheck(), hub.gmail.kind === "google" ? 20_000 : 500);
 
 /** After an edited draft is sent or saved again, the old version is removed so it isn't left behind. */
 async function replaceDraft(messageId: string) {

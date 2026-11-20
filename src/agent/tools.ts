@@ -193,7 +193,7 @@ export function hubToolDefs(hub: Hub) {
       "hub_sync",
       "Check which send-off drafts Hunter has sent; for those, update Homebase (proposal amount + real send date, stage -> Proposal Submitted), asking first.",
       { jobNumber: jobNumber.optional() },
-      wrap(async ({ jobNumber: n }) => sync(hub, n)),
+      wrap(async ({ jobNumber: n }) => ({ sendoff: await sync(hub, n), sentEstimates: await (await import("../workflows/proposalSent.js")).checkProposalsSent(hub, n) })),
     ),
 
     // ---------------------------------------------------------------- what needs Hunter, and a job's history
