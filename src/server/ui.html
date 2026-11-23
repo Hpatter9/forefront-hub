@@ -1822,14 +1822,20 @@ $("#labels").addEventListener("click", (e) => {
   $("#mq").value = ""; $("#mq-clear").hidden = true; mailPages = [null]; mailPage = 0; showList(); loadThreads();
 });
 let mqTimer;
+/** Run the search box against all of Gmail and show the results (also from an open email, also from By job). */
+function runMailSearch() {
+  clearTimeout(mqTimer);
+  if (mailMode === "byjob" && $("#mq").value.trim()) { mailMode = "inbox"; applyMailMode(); } // results are a mail list; By job comes back with its button
+  mailPages = [null]; mailPage = 0; mailRows = []; showList(); loadThreads();
+}
 $("#mq").addEventListener("input", () => {
   $("#mq-clear").hidden = !$("#mq").value; clearTimeout(mqTimer);
-  // By job: the box narrows the jobs and the open conversation as you type. Inbox: it searches Gmail.
+  // By job: the box narrows the jobs and the open conversation as you type (Enter searches all mail). Otherwise it searches Gmail.
   if ($("#gm").classList.contains("byjob")) { bjSearch($("#mq").value.trim()); return; }
-  mqTimer = setTimeout(() => { mailPages = [null]; mailPage = 0; showList(); loadThreads(); }, 400);
+  mqTimer = setTimeout(runMailSearch, 400);
 });
-$("#mq").addEventListener("keydown", (e) => { if (e.key === "Enter" && $("#gm").classList.contains("byjob") && $("#mq").value.trim()) { e.preventDefault(); bjAllMail(); } });
-function bjAllMail() { mailMode = "inbox"; applyMailMode(); mailPages = [null]; mailPage = 0; showList(); loadThreads(); snack("Searching all mail. Press By job to go back."); }
+$("#mq").addEventListener("keydown", (e) => { if (e.key === "Enter" && $("#mq").value.trim()) { e.preventDefault(); if ($("#gm").classList.contains("byjob")) bjAllMail(); else runMailSearch(); } });
+function bjAllMail() { mailMode = "inbox"; applyMailMode(); mailPages = [null]; mailPage = 0; mailRows = []; showList(); loadThreads(); snack("Searching all mail. Press By job to go back."); }
 $("#mq-clear").addEventListener("click", () => { $("#mq").value = ""; $("#mq-clear").hidden = true; if ($("#gm").classList.contains("byjob")) { bjSearch(""); return; } mailPages = [null]; mailPage = 0; loadThreads(); });
 
 function showList() { flushInline(); $("#gm-listview").style.display = "flex"; $("#reader").hidden = true; mailThread = null; if (mailMode === "byjob") applyMailMode(); }
@@ -1864,12 +1870,14 @@ $("#gm-bar").addEventListener("click", async (e) => {
   loadThreads(); loadMailCounts();
 });
 async function loadMailCounts() { const labels = await api("/api/mail/labels").catch(() => []); const inbox = labels.find((l) => l.id === "INBOX"); $("#mailcount").textContent = inbox?.unread || ""; $("#mailcount").hidden = !inbox?.unread; const b = $('#labels [data-label="INBOX"] b'); if (b) b.textContent = inbox?.unread || ""; const gen = await api("/api/mail/generated").catch(() => null); if (gen) { genCount = gen.count; const lab = $('#labels [data-label="HUB_DRAFTS"]'); if (lab) { lab.querySelector("b")?.remove(); if (genCount) lab.insertAdjacentHTML("beforeend", `<b class="gc">${genCount}</b>`); } } }
+let threadsSeq = 0;
 async function loadThreads() {
   const q = $("#mq").value.trim();
   const inboxTabs = !q && mailLabel === "INBOX";
   $("#gm-cats").innerHTML = inboxTabs ? GCATS.map(([k, nm, ic]) => `<button class="gm-cat ${k === mailCat ? "on" : ""}" data-cat="${k}" type="button">${msI(ic, k === mailCat)}${nm}</button>`).join("") : "";
   $("#gm-cats").style.display = inboxTabs ? "flex" : "none";
-  if (!mailRows.length) $("#threads").innerHTML = `<div class="gm-empty">Loading…</div>`;
+  const my = ++threadsSeq;
+  if (!mailRows.length) $("#threads").innerHTML = `<div class="gm-empty">${q ? `Searching all mail for “${esc(q)}”…` : "Loading…"}</div>`;
   // Primary is "everything in the inbox that isn't in another tab": "category:primary" finds nothing on accounts
   // whose inbox doesn't sort into tabs (common on Google Workspace), even when the inbox is full.
   const catQ = mailCat === "primary" ? "-category:promotions -category:social -category:updates -category:forums" : `category:${mailCat}`;
@@ -1877,7 +1885,8 @@ async function loadThreads() {
   const tok = mailPages[mailPage];
   const genView = mailLabel === "HUB_DRAFTS" && !q;
   let r;
-  try { r = genView ? await api("/api/mail/generated") : await api(`/api/mail/threads?${new URLSearchParams({ ...params, ...(tok ? { page: tok } : {}) })}`); if (genView) { genCount = r.count; } } catch (e) { $("#threads").innerHTML = `<div class="gm-empty">${esc(e.message)}</div>`; return; }
+  try { r = genView ? await api("/api/mail/generated") : await api(`/api/mail/threads?${new URLSearchParams({ ...params, ...(tok ? { page: tok } : {}) })}`); if (genView) { genCount = r.count; } } catch (e) { if (my === threadsSeq) $("#threads").innerHTML = `<div class="gm-empty">${q ? `The search didn't go through: ${esc(e.message)}` : esc(e.message)}</div>`; return; }
+  if (my !== threadsSeq) return; // a newer search or folder was asked for while this one was on its way
   mailRows = r.threads; mailNext = r.nextPageToken || null;
   if (inboxTabs) { const n = mailRows.filter((t) => t.unread).length, on = $("#gm-cats .gm-cat.on"); if (on && n) on.insertAdjacentHTML("beforeend", `<span class="newc">${n} new</span>`); }
   mailSel = new Set([...mailSel].filter((id) => mailRows.some((t) => t.id === id)));
