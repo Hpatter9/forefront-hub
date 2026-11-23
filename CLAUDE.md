@@ -96,6 +96,10 @@
 - Calendar event Location autofill (`src/workflows/places.ts`, GET /api/places, the drop-down under `#ev-loc`):
   job addresses first (found by street, job name or number), then locations used on recent events, then map
   addresses from Photon (`TravelClient.suggest`; Nominatim forbids type-ahead use). No key, no AI.
+- The calendar is worked by hand like Google Calendar (pointer handlers on `#cal-body` in `src/server/ui.html`):
+  drag across empty time to make an event that long, drag an event to another time or day, drag its bottom edge to
+  resize, drag a chip to another day in Month; 15-minute steps. A move saves at once (PATCH) with Undo in the notice;
+  a plain click still opens the event. Events on calendars that aren't writable don't drag.
 - Pop-ups (question cards, the notice at the bottom left, game toasts) name the job, not its number: `jobNames` in
   `src/server/ui.html` turns "#3212 Gorrell" and a bare "#3212" into "Gorrell" (the number stays only when two jobs
   share a name or Keystone doesn't know the job). Write messages with `#<number>` as before; the page swaps it.

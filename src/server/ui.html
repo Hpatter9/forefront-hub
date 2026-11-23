@@ -383,6 +383,13 @@
   .wk .col .hr { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); opacity: .55; }
   .wk .col .now { position: absolute; left: 0; right: 0; border-top: 2px solid var(--bad); z-index: 2; }
   .ev { position: absolute; border-radius: 5px; padding: 2px 6px; font-size: 12px; line-height: 1.3; overflow: hidden; cursor: pointer; color: #0e1526; border: 1px solid var(--bg); z-index: 1; }
+  .wk, .mo { user-select: none; -webkit-user-select: none; }
+  .wk .col .ev { cursor: grab; touch-action: none; } .ev.chip[data-ev] { cursor: grab; }
+  .ev.moving { opacity: .85; z-index: 4; box-shadow: 0 6px 18px rgba(0,0,0,.45); cursor: grabbing !important; pointer-events: none; }
+  .ev.sel { left: 2px; width: calc(100% - 4px); background: color-mix(in srgb, var(--accent) 55%, transparent); border: 1px solid var(--accent); z-index: 4; pointer-events: none; }
+  .calbody.dragging { user-select: none; cursor: grabbing; } .calbody.dragging .col { cursor: inherit; }
+  .calbody .dropday { outline: 2px solid var(--accent); outline-offset: -2px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .caltip { position: fixed; z-index: 80; background: #303134; color: #e8eaed; border-radius: 4px; padding: 3px 8px; font: 12px var(--sans); pointer-events: none; white-space: nowrap; }
   .ev b { font-weight: 600; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ev.chip { position: static; white-space: nowrap; text-overflow: ellipsis; }
   .mo { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
@@ -2789,9 +2796,11 @@ function renderWeek(start, days) {
       ${placed.map(({ e, l }) => { const g = calLegs[e.id]; if (!g) return ""; const top = Math.max(0, pos(g.leaveBy)), bot = pos(e.start); return bot - top < 6 ? "" : `<div class="drive ${g.late ? "late" : ""}" data-ev="${esc(e.id)}" data-cal="${esc(e.calendarId)}" style="top:${top}px;height:${bot - top - 1}px;left:calc(${(l / n) * 100}% + 2px);width:calc(${100 / n}% - 4px)" title="Leave by ${hm(g.leaveBy)}: ${g.minutes} min from ${esc(g.fromLabel)}"><span>🚗 ${g.late ? `${g.late} min short` : `leave ${hm(g.leaveBy)} · ${g.minutes} min`}</span></div>`; }).join("")}
       ${placed.map(({ e, l }) => { const top = Math.max(0, pos(e.start)); const h = Math.max(20, pos(e.end) - top - 2); return `<div class="ev" data-ev="${esc(e.id)}" data-cal="${esc(e.calendarId)}" style="top:${top}px;height:${h}px;left:calc(${(l / n) * 100}% + 2px);width:calc(${100 / n}% - 4px);background:${esc(e.color || "#7aa7ff")}"><b>${esc(e.title)}</b>${hm(e.start)}${e.location ? ` · ${esc(e.location.split(",")[0])}` : ""}</div>`; }).join("")}</div>`;
   }
+  // Redrawn after a change (an event moved, added, saved): the view stays where it was scrolled to.
+  const keep = $("#cal-body .wk") ? $("#cal-body").scrollTop : null;
   $("#cal-body").innerHTML = html + "</div>";
   const nowTop = (Math.max(H0, Math.min(H1 - 2, new Date().getHours() - 1)) - H0) * HOUR_H;
-  $("#cal-body").scrollTop = nowTop;
+  $("#cal-body").scrollTop = keep ?? nowTop;
 }
 function renderMonth(start) {
   const today = new Date();
@@ -2811,7 +2820,110 @@ const shift = (dir) => { const d = new Date(calDate); if (calView === "day") d.s
 $("#cal-prev").addEventListener("click", () => shift(-1));
 $("#cal-next").addEventListener("click", () => shift(1));
 $("#cal-new").addEventListener("click", () => { const s = new Date(); s.setMinutes(s.getMinutes() < 30 ? 30 : 60, 0, 0); openEvent({ start: s.toISOString(), end: new Date(s.getTime() + 3600e3).toISOString() }); });
+// ---- the calendar works by hand, like Google Calendar: drag across empty time to make an event that long, drag an
+// event to another time or day to move it, drag its bottom edge to make it longer or shorter. Moves save at once
+// (with Undo); a plain click still opens the event, or a new one-hour event.
+let calDragged = false;
+const SNAP = 15;
+const calCanEdit = (calId) => { const c = cals.find((x) => x.id === calId); return !c || c.writable !== false; };
+const colMins = (col, clientY) => { const r = col.getBoundingClientRect(); return H0 * 60 + (((clientY - r.top) / ZOOM()) / HOUR_H) * 60; };
+const snapM = (m) => Math.round(m / SNAP) * SNAP;
+const atMins = (day, mins) => { const d = new Date(`${day}T00:00`); d.setMinutes(mins); return d; };
+const topOf = (mins) => ((mins / 60) - H0) * HOUR_H;
+const tm = (d) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).replace(":00", "");
+async function calMove(x, start, end, allDay) {
+  const before = { start: x.start, end: x.end, allDay: x.allDay };
+  if (before.start === start && before.end === end) { renderCal(); return; }
+  const put = (b) => api(`/api/cal/events/${encodeURIComponent(x.calendarId)}/${encodeURIComponent(x.id)}`, { method: "PATCH", body: b });
+  try {
+    await put({ start, end, allDay });
+    Object.assign(x, { start, end });
+    renderCal();
+    const day = (d) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    const whenTxt = allDay ? day(new Date(`${start}T12:00`)) : `${day(new Date(start))}, ${tm(new Date(start))} – ${tm(new Date(end))}`;
+    snack(`“${x.title}” moved to ${whenTxt}.`, async () => { await put(before).catch((e) => log(e.message, "t-err")); renderCal(); });
+  } catch (e) { log(`Couldn't move “${x.title}”: ${e.message}`, "t-err"); snack(`Couldn't move “${x.title}”: ${e.message}`); renderCal(); }
+}
+$("#cal-body").addEventListener("pointerdown", (e) => {
+  if (e.button !== 0 || e.target.closest("[data-task], .drive, a, button")) return;
+  const body = $("#cal-body");
+  const evEl = e.target.closest(".ev[data-ev]");
+  const x = evEl && calEvents.find((y) => y.id === evEl.dataset.ev && y.calendarId === evEl.dataset.cal);
+  const col0 = e.target.closest(".wk .col[data-day]");
+  if (evEl && (!x || !calCanEdit(x.calendarId))) return;
+  if (!evEl && !col0) return;
+  const chip = evEl?.classList.contains("chip");
+  const r0 = evEl?.getBoundingClientRect();
+  const mode = !evEl ? "new" : chip ? "day" : e.clientY > r0.bottom - 7 * ZOOM() ? "size" : "move";
+  const x0 = e.clientX, y0 = e.clientY;
+  let live = false, ghost = null, result = null, tip = null, lastX = x0, lastY = y0;
+  const startM = x && !x.allDay ? new Date(x.start).getHours() * 60 + new Date(x.start).getMinutes() : 0;
+  const grab = mode === "move" ? colMins(col0, y0) - startM : 0;
+  const dur = x && !x.allDay ? (Date.parse(x.end) - Date.parse(x.start)) / 60000 : 60;
+  const anchor = mode === "new" ? Math.floor(colMins(col0, y0) / SNAP) * SNAP : 0;
+  const colAt = (ev) => document.elementFromPoint(ev.clientX, ev.clientY)?.closest(".wk .col[data-day]") || null;
+  const label = (s, en) => {
+    if (!tip) { tip = document.createElement("div"); tip.className = "caltip"; document.body.appendChild(tip); }
+    tip.textContent = `${tm(s)} – ${tm(en)}`;
+    const z = ZOOM(); tip.style.left = `${lastX / z + 14}px`; tip.style.top = `${lastY / z + 14}px`;
+  };
+  const move = (ev) => {
+    lastX = ev.clientX; lastY = ev.clientY;
+    if (!live) {
+      if (Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) < 5) return;
+      live = true; calDragged = true; body.classList.add("dragging"); getSelection()?.removeAllRanges();
+      if (mode === "new") { ghost = document.createElement("div"); ghost.className = "ev sel"; col0.appendChild(ghost); }
+      else { ghost = evEl; ghost.classList.add("moving"); if (mode === "move") { ghost.style.left = "2px"; ghost.style.width = "calc(100% - 4px)"; } }
+    }
+    ev.preventDefault();
+    if (mode === "day") {
+      $$("#cal-body .dropday").forEach((c) => c.classList.remove("dropday"));
+      const cell = document.elementFromPoint(ev.clientX, ev.clientY)?.closest("#cal-body [data-day]");
+      result = cell ? cell.dataset.day : null; cell?.classList.add("dropday");
+      return;
+    }
+    const col = mode === "move" ? colAt(ev) || ghost.parentElement : col0;
+    const lo = H0 * 60, hi = H1 * 60;
+    let s, en;
+    if (mode === "new") { const cur = snapM(colMins(col0, ev.clientY)); s = Math.max(lo, Math.min(anchor, cur)); en = Math.min(hi, Math.max(anchor + SNAP, cur)); }
+    else if (mode === "size") { s = startM; en = Math.min(hi, Math.max(s + SNAP, snapM(colMins(col0, ev.clientY)))); }
+    else { s = Math.max(lo, Math.min(hi - Math.min(dur, hi - lo), snapM(colMins(col, ev.clientY) - grab))); en = s + dur; if (ghost.parentElement !== col) col.appendChild(ghost); }
+    ghost.style.top = `${topOf(s)}px`; ghost.style.height = `${Math.max(14, topOf(en) - topOf(s) - 2)}px`;
+    result = { day: col.dataset.day, s, en };
+    label(atMins(result.day, s), atMins(result.day, en));
+    // Near the top or bottom edge the grid scrolls along, as Google's does.
+    const br = body.getBoundingClientRect();
+    if (ev.clientY > br.bottom - 30) body.scrollTop += 14; else if (ev.clientY < br.top + 60) body.scrollTop -= 14;
+  };
+  const finish = () => {
+    document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", finish); document.removeEventListener("keydown", cancel, true);
+    if (tip) tip.parentNode.removeChild(tip);
+    body.classList.remove("dragging"); $$("#cal-body .dropday").forEach((c) => c.classList.remove("dropday"));
+    if (!live) return;
+    setTimeout(() => { calDragged = false; }, 0);
+    if (mode === "new" && ghost) ghost.parentNode.removeChild(ghost);
+    if (!result) { renderCal(); return; }
+    if (mode === "new") { openEvent({ start: atMins(result.day, result.s).toISOString(), end: atMins(result.day, result.en).toISOString() }); return; }
+    if (mode === "day") {
+      if (x.allDay) {
+        const days = Math.round((Date.parse(`${result}T12:00`) - Date.parse(`${x.start.slice(0, 10)}T12:00`)) / 864e5);
+        const sh = (d) => ymd(new Date(Date.parse(`${d.slice(0, 10)}T12:00`) + days * 864e5));
+        calMove(x, sh(x.start), sh(x.end), true);
+      } else {
+        const s = new Date(x.start), n = new Date(`${result}T00:00`); n.setHours(s.getHours(), s.getMinutes(), 0, 0);
+        calMove(x, n.toISOString(), new Date(n.getTime() + dur * 60000).toISOString(), false);
+      }
+      return;
+    }
+    calMove(x, atMins(result.day, result.s).toISOString(), atMins(result.day, result.en).toISOString(), false);
+  };
+  const cancel = (ev) => { if (ev.key !== "Escape") return; ev.preventDefault(); ev.stopPropagation(); result = null; finish(); };
+  document.addEventListener("pointermove", move); document.addEventListener("pointerup", finish); document.addEventListener("keydown", cancel, true);
+});
+// The bottom edge of an event shows it can be stretched.
+$("#cal-body").addEventListener("mousemove", (e) => { const el = e.target.closest(".wk .col .ev[data-ev]"); if (!el) return; el.style.cursor = e.clientY > el.getBoundingClientRect().bottom - 7 * ZOOM() ? "ns-resize" : ""; });
 $("#cal-body").addEventListener("click", async (e) => {
+  if (calDragged) return; // that was a drag, not a click
   const tk = e.target.closest("[data-task]");
   if (tk) { const k = calTasks.find((x) => x.id === tk.dataset.task) || openTasks.find((x) => x.id === tk.dataset.task); if (!k) return; if (e.target.closest("[data-check]")) { await toggleTask(k); } else openTask(k); return; }
   const ev = e.target.closest("[data-ev]");
