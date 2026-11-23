@@ -909,6 +909,7 @@ const server = http.createServer(async (req, res) => {
       const rows = list.filter((g) => !qq || `${g.subject} ${g.to.join(" ")} ${g.snippet} ${g.jobNumber ?? ""}`.toLowerCase().includes(qq));
       return send(res, 200, { threads: rows.map((g) => ({ id: g.threadId ?? g.draftId, draftId: g.draftId, from: `To: ${g.to.join(", ")}`, to: g.to, subject: g.subject, snippet: g.snippet, date: g.createdAt, unread: false, starred: false, messageCount: 1, labelIds: ["DRAFT"], hasAttachments: g.attachments > 0, generated: { source: g.source, jobNumber: g.jobNumber } })), count: list.length });
     }
+    if (p === "/api/places") return send(res, 200, { places: await (await import("../workflows/places.js")).suggestPlaces(hub, q("q")) });
     if (p === "/api/travel/drive") {
       // A drive time on request, for any address: from the office unless another start is given.
       const to = q("to"), from = q("from") || cfg.travel.start;

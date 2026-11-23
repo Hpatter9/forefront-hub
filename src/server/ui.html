@@ -735,6 +735,13 @@
   .gm-details { display: inline-block; border: 1px solid #dadce0; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,.15); padding: 10px 14px; margin: 0 0 10px; font-size: 13px; color: #1f1f1f; max-width: 100%; } .gm-details[hidden] { display: none; }
   .gm-details th { text-align: right; color: #5f6368; font-weight: 400; padding: 2px 10px 2px 0; vertical-align: top; white-space: nowrap; } .gm-details td { padding: 2px 0; } .gm-details .achip { font-size: 13px; }
   .gm-atts { border-top: 1px solid #e8eaed; padding-top: 12px; margin-top: 14px; } .gm-attn { flex-basis: 100%; font-weight: 700; font-size: 13px; color: #1f1f1f; } .gm-att small { color: #5f6368; flex: none; }
+  .locwrap { position: relative; }
+  .loc-pop { position: absolute; left: 0; right: 0; top: 100%; z-index: 5; margin-top: 2px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.45); padding: 4px; max-height: 300px; overflow-y: auto; }
+  .loc-pop[hidden] { display: none; }
+  .loc-pop button { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: transparent; border: 0; color: var(--ink); padding: 7px 10px; border-radius: 7px; cursor: pointer; font: 14px var(--sans); }
+  .loc-pop button.on, .loc-pop button:hover { background: var(--soft); }
+  .loc-pop button .ms { color: var(--muted); font-size: 19px; flex: none; }
+  .loc-pop button span:last-child { min-width: 0; display: grid; } .loc-pop b { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .loc-pop small { color: var(--muted); font-size: 12px; }
   /* ---- dragging emails onto labels */
   .gr[draggable="true"] { cursor: grab; }
   .gr.dragging { opacity: .45; }
@@ -1151,7 +1158,7 @@
     <label style="align-self:end"><span class="row"><input type="checkbox" id="ev-allday" style="width:auto"> All day</span></label>
     <label>Job<select id="ev-job"><option value="">(none)</option></select></label>
     <label>Calendar<select id="ev-cal"></select></label>
-    <label class="wide">Location<input type="text" id="ev-loc"><span class="small evtravel" id="ev-travel" hidden></span></label>
+    <label class="wide locwrap">Location<input type="text" id="ev-loc" autocomplete="off" placeholder="Start typing an address, a job name or a place"><div class="loc-pop" id="ev-loc-pop" hidden></div><span class="small evtravel" id="ev-travel" hidden></span></label>
     <label class="wide">Notes<textarea id="ev-desc" rows="3"></textarea></label>
     <label>Invite (emails, comma-separated)<input type="text" id="ev-att"></label>
     <label>Reminder<select id="ev-rem"><option value="">Calendar default</option><option value="10">10 min before</option><option value="30">30 min before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></label>
@@ -2851,6 +2858,31 @@ function openEvent(o) {
   });
   $("#evdlg").showModal();
 }
+// ---- Location fills itself in: type part of an address, a job's name or a place and pick from the list
+// (your jobs first, then places you've used on the calendar, then the map).
+(() => {
+  const inp = $("#ev-loc"), pop = $("#ev-loc-pop");
+  let hits = [], at = 0, seq = 0, timer;
+  const hide = () => { pop.hidden = true; hits = []; };
+  const draw = () => { pop.innerHTML = hits.map((h, i) => `<button type="button" data-loc="${i}" class="${i === at ? "on" : ""}">${msI(h.kind === "job" ? "work" : h.kind === "past" ? "history" : "location_on")}<span><b>${esc(h.label)}</b><small>${esc(jobNames(h.sub))}</small></span></button>`).join(""); pop.hidden = !hits.length; };
+  const pick = (i) => { const h = hits[i]; if (!h) return; inp.value = h.label; hide(); inp.focus(); inp.dispatchEvent(new Event("change")); };
+  const look = async () => {
+    const q = inp.value.trim(), my = ++seq;
+    if (q.length < 2) return hide();
+    const r = await api(`/api/places?q=${encodeURIComponent(q)}`).catch(() => ({ places: [] }));
+    if (my !== seq || document.activeElement !== inp) return;
+    hits = (r.places || []).filter((h) => h.label.toLowerCase() !== q.toLowerCase()); at = 0; draw();
+  };
+  inp.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(look, 250); });
+  inp.addEventListener("keydown", (e) => {
+    if (pop.hidden) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); at = (at + (e.key === "ArrowDown" ? 1 : hits.length - 1)) % hits.length; draw(); }
+    else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pick(at); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); hide(); }
+  });
+  inp.addEventListener("blur", () => setTimeout(hide, 180));
+  pop.addEventListener("mousedown", (e) => { const b = e.target.closest("[data-loc]"); if (b) { e.preventDefault(); pick(Number(b.dataset.loc)); } });
+})();
 $("#ev-job").addEventListener("change", () => {
   const j = jobs.find((x) => x.jobNumber === Number($("#ev-job").value)); if (!j) return;
   if (!$("#ev-title").value.includes(`#${j.jobNumber}`)) $("#ev-title").value = `${$("#ev-title").value || "Scope walk"} #${j.jobNumber} ${j.name}`.trim();

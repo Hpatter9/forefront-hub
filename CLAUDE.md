@@ -93,6 +93,9 @@
   HANDOFF_PM_NAME / HANDOFF_PM_EMAIL, HANDOFF_EMAIL=off). The wording is his own, fixed (`handoffBody`), no AI. It's an
   AI draft, never sent. Skipped for an "updated" agreement and when a Project Handoff already went (or is drafted) to
   that address; handled confirmations are remembered in `.hub/contract-signed.json`.
+- Calendar event Location autofill (`src/workflows/places.ts`, GET /api/places, the drop-down under `#ev-loc`):
+  job addresses first (found by street, job name or number), then locations used on recent events, then map
+  addresses from Photon (`TravelClient.suggest`; Nominatim forbids type-ahead use). No key, no AI.
 - Pop-ups (question cards, the notice at the bottom left, game toasts) name the job, not its number: `jobNames` in
   `src/server/ui.html` turns "#3212 Gorrell" and a bare "#3212" into "Gorrell" (the number stays only when two jobs
   share a name or Keystone doesn't know the job). Write messages with `#<number>` as before; the page swaps it.

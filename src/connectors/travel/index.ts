@@ -19,6 +19,18 @@ export interface TravelClient {
   readonly kind: "osm" | "mock";
   /** Driving time from one address to another, leaving around `departAt`. Null when either address can't be found. */
   drive(from: string, to: string, departAt?: Date): Promise<Drive | null>;
+  /** Addresses and places that start the way `q` does, nearest the Front Range first (for a Location box). */
+  suggest?(q: string): Promise<string[]>;
+}
+
+/** One line for a place from Photon (OpenStreetMap's type-ahead search): "2830 S Vine St, Denver, CO 80210". */
+export function placeLabel(p: { name?: string; housenumber?: string; street?: string; city?: string; town?: string; village?: string; county?: string; state?: string; postcode?: string }): string {
+  const STATES: Record<string, string> = { Colorado: "CO", Wyoming: "WY", Kansas: "KS", Nebraska: "NE", "New Mexico": "NM", Utah: "UT" };
+  const street = [p.housenumber, p.street].filter(Boolean).join(" ");
+  const city = p.city || p.town || p.village || "";
+  const state = [STATES[p.state ?? ""] ?? p.state, p.postcode].filter(Boolean).join(" ");
+  const named = p.name && p.name !== p.street && p.name !== city ? p.name : "";
+  return [named, street, city || (street ? "" : p.county), state].filter(Boolean).join(", ");
 }
 
 /** OSRM's times assume empty roads. Metro driving runs about 20% longer, and about 45% at rush hour. */
@@ -114,6 +126,15 @@ export class OsmTravel extends Cached implements TravelClient {
     return hit ? [Number(hit.lon), Number(hit.lat)] : null;
   }
 
+  /** Photon is built for search-as-you-type (Nominatim isn't, and asks not to be used that way). */
+  async suggest(q: string): Promise<string[]> {
+    const u = `https://photon.komoot.io/api/?${new URLSearchParams({ q, limit: "6", lang: "en", lat: "39.65", lon: "-104.95", bbox: "-109.1,36.9,-102.0,41.1" })}`;
+    const r = await fetch(u, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: AbortSignal.timeout(4000) });
+    if (!r.ok) return [];
+    const j = (await r.json()) as { features?: { properties?: Parameters<typeof placeLabel>[0] & { countrycode?: string } }[] };
+    return [...new Set((j.features ?? []).filter((f) => !f.properties?.countrycode || f.properties.countrycode === "US").map((f) => placeLabel(f.properties ?? {})).filter((x) => x.length > 4))];
+  }
+
   async drive(from: string, to: string, departAt?: Date): Promise<Drive | null> {
     const key = `${norm(from)}|${norm(to)}`;
     const hit = this.cache.route[key];
@@ -136,6 +157,9 @@ export class OsmTravel extends Cached implements TravelClient {
 export class MockTravel implements TravelClient {
   readonly kind = "mock" as const;
   calls: { from: string; to: string }[] = [];
+  async suggest(q: string): Promise<string[]> {
+    return /nowhere/i.test(q) ? [] : [`${q.trim()} Example St, Denver, CO 80202`];
+  }
   async drive(from: string, to: string): Promise<Drive | null> {
     this.calls.push({ from, to });
     if (/nowhere/i.test(to)) return null;
