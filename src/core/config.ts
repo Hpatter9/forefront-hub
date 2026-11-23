@@ -33,6 +33,8 @@ export interface Config {
   /** Walk recordings: the folder on this PC they arrive in (from the phone, via Google Drive), and when it was set up. */
   walks: { dir: string; since: string };
   /** iPhone texts, read from the phone's backup on this PC (off until Connect iPhone texts turns it on). */
+  /** The hand-off email drafted when a homeowner signs: who takes the job over (HANDOFF_EMAIL=off turns it off). */
+  handoff: { on: boolean; pmName: string; pmEmail: string };
   texts: { enabled: boolean; backupDir: string; /** The iPhone backup password, when the backup is encrypted. */ password: string; /** Start a backup when the phone is plugged in and the backup is old. */ autoBackup: boolean };
   spotify: { clientId: string };
   /** Drive times for calendar events: where the day's driving starts. */
@@ -132,6 +134,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
     companycam: { driver: live && ccToken ? "rest" : "mock", token: ccToken },
     spotify: { clientId: e("SPOTIFY_CLIENT_ID") },
     travel: { start: e("HUB_DAY_START_ADDRESS", officeAddress(skillDir)) },
+    handoff: { on: !/^(off|0|false|no)$/i.test(e("HANDOFF_EMAIL")), pmName: e("HANDOFF_PM_NAME", "Shannon Hoag"), pmEmail: e("HANDOFF_PM_EMAIL", "shannon@forefrontteam.com") },
     texts: { enabled: /^(on|1|true|yes)$/i.test(e("IPHONE_TEXTS")), autoBackup: !/^(off|0|false|no)$/i.test(e("IPHONE_AUTO_BACKUP")), backupDir: e("IPHONE_BACKUP_DIR"), password: e("IPHONE_BACKUP_PASSWORD_B64") ? Buffer.from(e("IPHONE_BACKUP_PASSWORD_B64"), "base64").toString("utf8") : e("IPHONE_BACKUP_PASSWORD") },
     walks: { dir: e("WALK_RECORDINGS_DIR"), since: e("WALK_RECORDINGS_SINCE") },
     docusketch: { downloadsDir: e("DOWNLOADS_DIR", path.join(env.USERPROFILE || env.HOME || root, "Downloads")) },

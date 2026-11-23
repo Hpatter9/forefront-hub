@@ -87,6 +87,12 @@
   Runs a few minutes after the first start of the day and after the morning brief; also the Dashboard's Update
   Homebase notes button, the `homebase_status_updates` / `homebase_set_status_update` tools and POST
   /api/status-updates. The older field-based path stays only for a Homebase connection without the card.
+- Project hand-off (`src/workflows/contractSigned.ts`, with each inbox check): when Homebase's "Signed and on file"
+  confirmation arrives (from office@, subject "Your signed ... reconstruction agreement — <address>", Hunter copied),
+  Keystone drafts Hunter's "Project Handoff" email to the signer with the project manager copied (Shannon Hoag;
+  HANDOFF_PM_NAME / HANDOFF_PM_EMAIL, HANDOFF_EMAIL=off). The wording is his own, fixed (`handoffBody`), no AI. It's an
+  AI draft, never sent. Skipped for an "updated" agreement and when a Project Handoff already went (or is drafted) to
+  that address; handled confirmations are remembered in `.hub/contract-signed.json`.
 - Pop-ups (question cards, the notice at the bottom left, game toasts) name the job, not its number: `jobNames` in
   `src/server/ui.html` turns "#3212 Gorrell" and a bare "#3212" into "Gorrell" (the number stays only when two jobs
   share a name or Keystone doesn't know the job). Write messages with `#<number>` as before; the page swaps it.

@@ -1249,6 +1249,15 @@ async function runInbox() {
     filing = false;
   }
   void runProposalCheck();
+  // A homeowner signed the agreement: the hand-off email introducing the project manager is drafted for Hunter.
+  try {
+    const { checkContractsSigned } = await import("../workflows/contractSigned.js");
+    const made = (await checkContractsSigned(hub)).filter((r) => r.result !== "already");
+    for (const r of made) bus.emit({ type: "notice", text: `${r.name || r.to} signed the agreement${r.jobNumber ? ` (#${r.jobNumber})` : ""}. The hand-off email is in AI drafts for you to send.` });
+    if (made.length) bus.emit({ type: "changed", what: "mail" });
+  } catch (e) {
+    console.error("contract signed:", e);
+  }
 }
 const INBOX_MINUTES = Number(process.env.HUB_INBOX_MINUTES || 5);
 if (INBOX_MINUTES > 0 && hub.gmail.kind === "google") {
