@@ -973,9 +973,23 @@ const server = http.createServer(async (req, res) => {
       const b = await body(req);
       const w = await import("../workflows/walks.js");
       const filed = w.refileWalk(hub, String(b.id), Number(b.job));
+      const trimmed = w.trimWalkAudio(hub, filed.id);
+      if (trimmed) hub.say(`${filed.name}: ${trimmed}`);
       bus.emit({ type: "changed", what: "job" });
       w.offerWalkFollowups(hub, filed).catch((e) => hub.say(`Walk follow-ups: ${(e as Error).message}`));
       return send(res, 200, filed);
+    }
+    if (p === "/api/walks/remove" && req.method === "POST") {
+      // A recording that came through but isn't a walk (or shouldn't be on the job): out of the job and off the list.
+      const b = await body(req);
+      (await import("../workflows/walks.js")).removeWalk(hub, String(b.id ?? b.name ?? ""));
+      bus.emit({ type: "changed", what: "job" });
+      return send(res, 200, { ok: true });
+    }
+    if (p === "/api/walks/trim" && req.method === "POST") {
+      const b = await body(req);
+      const said = (await import("../workflows/walks.js")).trimWalkAudio(hub, String(b.id ?? ""));
+      return send(res, 200, { said: said || "Nothing to trim." });
     }
     if (p === "/api/walks/dismiss" && req.method === "POST") {
       const b = await body(req);

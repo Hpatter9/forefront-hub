@@ -1,4 +1,5 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { aiProvider, BUSY_RX, complete } from "../agent/llm.js";
 import { confirmText } from "../core/approval.js";
@@ -24,22 +25,34 @@ export interface WalkNotes {
   names?: string[];
   /** Stretches left out because they weren't the walk (recorder left running: a drive, a call, the radio), described, never transcribed. */
   leftOut?: string[];
+  /** Where those stretches are in the recording, in seconds, so they can be cut out of the job's copy. */
+  cuts?: [number, number][];
 }
 
-/** Takes the "[Left out: ...]" markers out of a transcript and returns them separately. */
-export function splitLeftOut(raw: string): { transcript: string; leftOut: string[] } {
+/** "12:30" or "1:02:30" -> seconds. */
+const secs = (t: string) => t.split(":").reduce((a, x) => a * 60 + Number(x), 0);
+
+/**
+ * Takes the "[Left out 12:30-18:45: ...]" markers out of a transcript and returns them separately, with where each
+ * one is (the time is optional: older transcripts have "[Left out: ...]").
+ */
+export function splitLeftOut(raw: string): { transcript: string; leftOut: string[]; cuts: [number, number][] } {
   const leftOut: string[] = [];
+  const cuts: [number, number][] = [];
   const transcript = raw
     .split("\n")
     .filter((line) => {
-      const m = line.trim().match(/^\[\s*left out:?\s*(.*?)\]?$/i);
-      if (m) leftOut.push(m[1].trim() || "something that wasn't the walk");
+      const m = line.trim().match(/^\[\s*left out\s*(?:(\d{1,2}(?::\d{2}){1,2})\s*[-–]\s*(\d{1,2}(?::\d{2}){1,2}))?\s*:?\s*(.*?)\]?$/i);
+      if (m) {
+        leftOut.push(m[3].trim() || "something that wasn't the walk");
+        if (m[1] && m[2] && secs(m[2]) > secs(m[1])) cuts.push([secs(m[1]), secs(m[2])]);
+      }
       return !m;
     })
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-  return { transcript, leftOut };
+  return { transcript, leftOut, cuts };
 }
 
 export interface Walk {
@@ -54,6 +67,9 @@ export interface Walk {
   summary?: string;
   promises?: { what: string; due?: string }[];
   notesFile?: string; // relative to the job folder once filed, else the holding copy
+  /** Stretches cut out of the job's copy of the audio (seconds), and whether it was trimmed. */
+  cuts?: [number, number][];
+  trimmed?: string;
   error?: string;
   processedAt: string;
 }
@@ -113,13 +129,14 @@ export async function transcribe(hub: Hub, file: string): Promise<WalkNotes> {
   if (aiProvider(hub) !== "gemini" || !hub.gemini) throw new Error("Transcribing recordings needs Gemini (double-click Connect Gemini).");
   const ext = path.extname(file).slice(1).toLowerCase();
   const up = await hub.gemini.uploadFile(file, MIME[ext] ?? "audio/mp4");
-  const { transcript, leftOut } = splitLeftOut(
+  const { transcript, leftOut, cuts } = splitLeftOut(
     await complete<string>(hub, {
       system: "You transcribe site-walk recordings for a reconstruction estimator (water, fire and mold repairs). Write down only what is actually said during the walk, all of it, in order. Unclear words: [unclear].",
       prompt: `This is a recording from Hunter's scope walk at a customer's property: his own spoken notes and his conversation with the customer. Transcribe the walk as plain text, one speaker turn per line. Start a line with "Hunter:" for the estimator, "Customer:" (or the person's name) for others when you can tell, and "Note:" when Hunter is talking to himself.
 
-Hunter sometimes forgets to stop the recorder, or starts it early. Transcribe ONLY the walk itself: time at the property looking at the damage, and talk about this property's damage, repairs, measurements, schedule or price (including a phone call about this same job). Do NOT transcribe anything else, wherever it falls in the recording: an audiobook, podcast, radio, music or TV; a phone call about something else; talk with a coworker or anyone else about other jobs or personal things; driving, errands, or background voices that aren't part of the walk. In place of each such stretch write exactly one line, with no words from it:
-[Left out: <what kind of thing it was, e.g. "audiobook playing while driving" or "phone call not about this job">, about <N> minutes]
+Hunter sometimes forgets to stop the recorder, or starts it early. Transcribe ONLY the walk itself: time at the property looking at the damage, and talk about this property's damage, repairs, measurements, schedule or price (including a phone call about this same job). Do NOT transcribe anything else, wherever it falls in the recording: an audiobook, podcast, radio, music or TV; a phone call about something else; talk with a coworker or anyone else about other jobs or personal things; driving, errands, or background voices that aren't part of the walk. In place of each such stretch write exactly one line, with no words from it, giving where it starts and ends in the recording (minutes:seconds):
+[Left out <start>-<end>: <what kind of thing it was, e.g. "audiobook playing while driving" or "phone call not about this job">, about <N> minutes]
+For example: [Left out 12:30-18:45: phone call not about this job, about 6 minutes]
 When unsure whether a stretch is about this property, keep it.
 
 No headings, no summary, nothing but the transcript and those lines.`,
@@ -134,7 +151,7 @@ No headings, no summary, nothing but the transcript and those lines.`,
     schema: SCHEMA,
   });
   const n = (notes ?? {}) as Partial<WalkNotes>;
-  return { summary: n.summary ?? "", rooms: n.rooms ?? [], measurements: n.measurements ?? [], customerWants: n.customerWants ?? [], promises: n.promises ?? [], address: n.address, names: n.names, transcript, leftOut: leftOut.length ? leftOut : undefined };
+  return { summary: n.summary ?? "", rooms: n.rooms ?? [], measurements: n.measurements ?? [], customerWants: n.customerWants ?? [], promises: n.promises ?? [], address: n.address, names: n.names, transcript, leftOut: leftOut.length ? leftOut : undefined, cuts: cuts.length ? cuts : undefined };
 }
 
 /** Which job a recording belongs to: the calendar visit at that time, else the address or names said in it. */
@@ -244,7 +261,7 @@ export async function scanWalks(hub: Hub, opts: { now?: Date; transcriber?: (fil
       notes.transcript = notes.transcript.replace(/([.?!\]])\s+(?=(?:Hunter|Customer|Note|Adjuster|[A-Z][a-z]+):\s)/g, "$1\n");
       const md = walkMarkdown(w, notes);
       const m = old?.jobNumber && hub.jobs.exists(old.jobNumber) ? { jobNumber: old.jobNumber, why: old.why ?? "kept on its job", candidates: [] } : await matchWalk(hub, at, notes);
-      w = { ...w, summary: notes.summary, promises: notes.promises, jobNumber: m.jobNumber, why: m.why, candidates: m.candidates };
+      w = { ...w, summary: notes.summary, promises: notes.promises, jobNumber: m.jobNumber, why: m.why, candidates: m.candidates, cuts: notes.cuts };
       if (m.jobNumber) {
         w = fileToJob(hub, w, md);
         hub.say(`Walk recording filed to #${m.jobNumber} ${hub.jobs.get(m.jobNumber).name} (${m.why}).`);
@@ -271,6 +288,12 @@ export async function scanWalks(hub: Hub, opts: { now?: Date; transcriber?: (fil
     list.push(w);
     fresh.push(w);
     save(hub, list);
+    // The job's copy of the audio, cut down to the walk (silences and what Gemini marked as not the walk).
+    if (w.status === "filed" && !opts.transcriber) {
+      const said = trimWalkAudio(hub, w.id);
+      if (said) hub.say(`${w.name}: ${said}`);
+      Object.assign(w, walks(hub).find((x) => x.id === w.id));
+    }
   }
   return fresh;
 }
@@ -321,7 +344,9 @@ export function refileWalk(hub: Hub, id: string, jobNumber: number): Walk {
   const from = path.join(hub.jobs.folder(w.jobNumber), w.notesFile);
   const md = readFileSync(from, "utf8");
   const moved = fileToJob(hub, { ...w, jobNumber, why: "you picked the job" }, md);
-  for (const f of [from, from.replace(/\.md$/, path.extname(w.file).toLowerCase())]) if (existsSync(f)) rmSync(f);
+  // The notes and every audio copy (the original's format and a trimmed .m4a) leave the old job.
+  const oldBase = from.replace(/\.md$/, ""), oldDir = path.dirname(from);
+  for (const f of readdirSync(oldDir)) if (path.join(oldDir, f).startsWith(oldBase + ".")) rmSync(path.join(oldDir, f));
   hub.jobs.log(w.jobNumber, `Walk recording moved to #${jobNumber}`);
   list[i] = moved;
   save(hub, list);
@@ -349,6 +374,90 @@ export function retryWalk(hub: Hub, id: string, forget = false) {
   // Forgotten ones stay in the list (so they aren't picked up again) but out of sight.
   if (forget) save(hub, list.map((x) => (x.id === id ? { ...x, status: "filed" as const, jobNumber: undefined, candidates: undefined, error: undefined, summary: "(dismissed)" } : x)));
   else save(hub, list.filter((x) => x.id !== id));
+}
+
+// ---- cutting the job's copy of a recording down to the walk
+
+let ffmpegFound: string | null | undefined;
+/** ffmpeg (a free audio tool) on this PC: FFMPEG in .env, else one on the PATH. Null when there isn't one. */
+export function ffmpegPath(): string | null {
+  if (ffmpegFound !== undefined) return ffmpegFound;
+  for (const c of [process.env.FFMPEG, "ffmpeg"].filter(Boolean) as string[]) {
+    if (spawnSync(c, ["-hide_banner", "-version"], { timeout: 15_000 }).status === 0) return (ffmpegFound = c);
+  }
+  return (ffmpegFound = null);
+}
+
+/** A recording's length in seconds, from ffmpeg's own report. */
+function duration(ff: string, file: string): number {
+  const out = spawnSync(ff, ["-hide_banner", "-i", file], { encoding: "utf8", timeout: 30_000 }).stderr ?? "";
+  const m = out.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+  return m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : 0;
+}
+
+/**
+ * The audio filter that cuts a recording down to the walk: the stretches Gemini marked as not the walk, then every
+ * silence longer than 4 seconds shortened to a second and a half (so pauses still sound natural).
+ */
+export function trimFilter(cuts: [number, number][] = []): string {
+  const keep = cuts.length ? `aselect='not(${cuts.map(([a, b]) => `between(t,${a},${b})`).join("+")})',asetpts=N/SR/TB,` : "";
+  return `${keep}silenceremove=start_periods=1:start_duration=0.5:start_threshold=-50dB:stop_periods=-1:stop_duration=4:stop_threshold=-50dB:stop_silence=1.5`;
+}
+
+/**
+ * Cuts the job's copy of a filed recording (the original in the recordings folder is never touched). Says what came
+ * out; without ffmpeg on the PC it leaves the copy whole and says so.
+ */
+export function trimWalkAudio(hub: Hub, id: string): string {
+  const list = walks(hub);
+  const w = list.find((x) => x.id === id);
+  if (!w || w.status !== "filed" || !w.jobNumber || !w.notesFile) return "";
+  const ff = ffmpegPath();
+  if (!ff) return "The audio copy wasn't trimmed: ffmpeg isn't on this PC (the notes already leave out what wasn't the walk).";
+  const dir = hub.jobs.folder(w.jobNumber);
+  const base = path.join(dir, w.notesFile.replace(/\.md$/, ""));
+  const src = [path.extname(w.file).toLowerCase(), ".m4a"].map((e) => base + e).find((f) => existsSync(f)) ?? (existsSync(w.file) ? w.file : "");
+  if (!src) return "";
+  const tmp = `${base}.trimming.m4a`, out = `${base}.m4a`;
+  const before = duration(ff, src);
+  const r = spawnSync(ff, ["-y", "-hide_banner", "-loglevel", "error", "-i", src, "-vn", "-af", trimFilter(w.cuts), "-c:a", "aac", "-b:a", "64k", tmp], { encoding: "utf8", timeout: 20 * 60_000 });
+  if (r.status !== 0 || !existsSync(tmp)) { if (existsSync(tmp)) rmSync(tmp); return `The audio copy couldn't be trimmed: ${(r.stderr || r.error?.message || "ffmpeg failed").trim().split("\n").pop()}`; }
+  const after = duration(ff, tmp);
+  // A cut that leaves almost nothing means the silence level was wrong for this recording: keep the whole copy.
+  if (before && after < Math.min(30, before * 0.1)) { rmSync(tmp); return "The audio copy was left whole: trimming would have left almost nothing."; }
+  if (src !== out && src !== w.file && existsSync(src)) rmSync(src);
+  renameSync(tmp, out);
+  const min = (x: number) => Math.round(x / 60);
+  const said = before && after ? `Trimmed the audio from ${min(before)} to ${min(after)} min (${w.cuts?.length ? `${w.cuts.length} stretch${w.cuts.length === 1 ? "" : "es"} that weren't the walk and ` : ""}long silences cut).` : "Trimmed the audio (long silences cut).";
+  save(hub, list.map((x) => (x.id === id ? { ...x, trimmed: said } : x)));
+  return said;
+}
+
+/**
+ * Takes a recording out of Keystone: its notes and audio copy come out of the job (or the holding folder), and it's
+ * kept off the list from then on. The original in the recordings folder stays where it is.
+ */
+export function removeWalk(hub: Hub, idOrName: string): void {
+  const list = walks(hub);
+  let w = list.find((x) => x.id === idOrName);
+  if (!w) {
+    // Not transcribed yet: remember it so it's never picked up.
+    const st = walksStatus(hub);
+    const file = st.on ? readdirSync(st.dir, { recursive: true, withFileTypes: true }).filter((d) => d.isFile() && d.name === idOrName).map((d) => path.join(d.parentPath ?? (d as any).path ?? st.dir, d.name))[0] : undefined;
+    if (!file) throw new Error("That recording isn't in the folder any more.");
+    const s = statSync(file);
+    list.push({ id: `${path.basename(file)}:${s.size}`, file, name: path.basename(file), recordedAt: recordedAt(path.basename(file), s.mtime).toISOString(), status: "filed", summary: "(removed)", processedAt: new Date().toISOString() });
+    save(hub, list);
+    return;
+  }
+  if (w.status === "filed" && w.jobNumber && w.notesFile && hub.jobs.exists(w.jobNumber)) {
+    const base = path.join(hub.jobs.folder(w.jobNumber), w.notesFile.replace(/\.md$/, ""));
+    const dir = path.dirname(base);
+    for (const f of existsSync(dir) ? readdirSync(dir) : []) if (path.join(dir, f).startsWith(base + ".")) rmSync(path.join(dir, f));
+    hub.jobs.log(w.jobNumber, `Walk recording removed: ${w.name}`);
+  } else if (w.notesFile && path.isAbsolute(w.notesFile) && existsSync(w.notesFile)) rmSync(w.notesFile);
+  w = { ...w, status: "filed", jobNumber: undefined, notesFile: undefined, candidates: undefined, error: undefined, summary: "(removed)" };
+  save(hub, list.map((x) => (x.id === w!.id ? w! : x)));
 }
 
 /** A job's walk notes, newest first (for the timeline and the Estimator's inputs). */

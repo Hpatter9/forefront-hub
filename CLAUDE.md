@@ -40,6 +40,12 @@
   `.github/workflows/ios-scan.yml` compiles it on GitHub's Macs on every push; run by hand with the Apple secrets
   (APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8) it signs and uploads to TestFlight. No Swift compiler here:
   check a change by pushing and reading that run (mcp github actions tools).
+- Walk recordings (`src/workflows/walks.ts`, Walks tab): Gemini marks stretches that aren't the walk as
+  "[Left out 12:30-18:45: ...]" (`splitLeftOut` returns the `cuts` in seconds); after filing, `trimWalkAudio` cuts
+  those and every silence over 4 s (kept to 1.5 s) out of the JOB's copy with ffmpeg (FFMPEG in .env or on the PATH;
+  no ffmpeg means the copy stays whole and that's said). The original in the recordings folder is never touched.
+  "Remove this recording" (`removeWalk`, POST /api/walks/remove) takes its notes and audio copies out of the job and
+  keeps it off the list for good (works on untranscribed ones by file name too); "Trim the audio" re-runs the cut.
 - The shop's overstock is the newest `.xlsx` in `inventory/` on the PC (git-ignored: its notes can name customers),
   read by `src/workflows/inventory.ts`. Keystone only reminds (job page card, `shop_stock` tool, a line in the AI's
   instructions); it never puts stock on an estimate itself.

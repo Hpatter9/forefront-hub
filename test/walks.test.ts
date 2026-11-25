@@ -177,3 +177,63 @@ describe("after the initial scope walk", () => {
     expect((await t.hub.homebase.getJob(w.jobNumber!)).stage).toBe("Lead");
   });
 });
+
+describe("cutting and removing recordings", () => {
+  it("reads where each left-out stretch is", async () => {
+    const { splitLeftOut } = await import("../src/workflows/walks.js");
+    const r = splitLeftOut("Hunter: Kitchen floor is cupped.\n[Left out 12:30-18:45: phone call not about this job, about 6 minutes]\n[Left out 1:02:00-1:10:30: radio while driving]\nHunter: Done.");
+    expect(r.leftOut).toEqual(["phone call not about this job, about 6 minutes", "radio while driving"]);
+    expect(r.cuts).toEqual([[750, 1125], [3720, 4230]]);
+    expect(r.transcript).toBe("Hunter: Kitchen floor is cupped.\nHunter: Done.");
+  });
+
+  it("builds a filter that cuts the marked stretches and long silences", async () => {
+    const { trimFilter } = await import("../src/workflows/walks.js");
+    expect(trimFilter([[750, 1125]])).toMatch(/^aselect='not\(between\(t,750,1125\)\)',asetpts=N\/SR\/TB,silenceremove=.*stop_duration=4/);
+    expect(trimFilter()).toMatch(/^silenceremove=/);
+  });
+
+  it("removes a filed recording from its job and doesn't pick it up again", async () => {
+    const t = setup();
+    const at = new Date(); at.setHours(9, 20, 0, 0);
+    t.rec("Voice 009.m4a", at);
+    const [w] = await scanWalks(t.hub, { now: new Date(at.getTime() + 3600e3), transcriber: async () => notes() });
+    expect(jobWalks(t.hub, 9001)).toHaveLength(1);
+    const { removeWalk } = await import("../src/workflows/walks.js");
+    removeWalk(t.hub, w.id);
+    expect(jobWalks(t.hub, 9001)).toHaveLength(0);
+    expect(existsSync(t.hub.jobs.path(9001, "notes", "walks"))).toBe(true);
+    expect(walks(t.hub).find((x) => x.id === w.id)).toMatchObject({ summary: "(removed)" });
+    expect(walks(t.hub).find((x) => x.id === w.id)?.jobNumber).toBeUndefined();
+    expect(await scanWalks(t.hub, { now: new Date(at.getTime() + 7200e3), transcriber: async () => notes() })).toEqual([]);
+    // One never transcribed can be removed by name, so it's never picked up.
+    t.rec("Voice 010.m4a", at);
+    removeWalk(t.hub, "Voice 010.m4a");
+    expect(await scanWalks(t.hub, { now: new Date(at.getTime() + 7200e3), transcriber: async () => notes() })).toEqual([]);
+  });
+
+  it("cuts the job's copy down with ffmpeg and leaves the original alone", async () => {
+    const { ffmpegPath, trimWalkAudio, removeWalk } = await import("../src/workflows/walks.js");
+    const ff = ffmpegPath();
+    if (!ff) return; // ffmpeg isn't on this computer
+    const { spawnSync } = await import("node:child_process");
+    const t = setup();
+    const at = new Date(); at.setHours(9, 20, 0, 0);
+    // 5 s of talking-level tone, 30 s of silence, 5 s of tone, 20 s that Gemini marked as a phone call.
+    const f = path.join(t.dir, "Voice 020.m4a");
+    const r = spawnSync(ff, ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=f=440:d=5", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono:d=30", "-f", "lavfi", "-i", "sine=f=440:d=25",
+      "-filter_complex", "[0][1][2]concat=n=3:v=0:a=1", "-c:a", "aac", f]);
+    expect(r.status).toBe(0);
+    utimesSync(f, at, at);
+    const [w] = await scanWalks(t.hub, { now: new Date(at.getTime() + 3600e3), transcriber: async () => ({ ...notes(), cuts: [[40, 60]] }) });
+    const said = trimWalkAudio(t.hub, w.id);
+    expect(said).toMatch(/Trimmed the audio from 1 to 0 min \(1 stretch that weren't the walk and long silences cut\)/);
+    const copy = t.hub.jobs.path(9001, "notes", "walks", w.notesFile!.split("/").pop()!.replace(/\.md$/, ".m4a"));
+    const len = (file: string) => Number((spawnSync(ff, ["-hide_banner", "-i", file], { encoding: "utf8" }).stderr.match(/Duration: (\d+):(\d+):([\d.]+)/) ?? []).slice(1).reduce((a, x, i) => a + Number(x) * [3600, 60, 1][i], 0));
+    expect(len(copy)).toBeGreaterThan(8);
+    expect(len(copy)).toBeLessThan(20); // 60 s down to the tone and a short pause
+    expect(len(f)).toBeGreaterThan(59); // the original is untouched
+    removeWalk(t.hub, w.id);
+    expect(existsSync(copy)).toBe(false);
+  });
+});
