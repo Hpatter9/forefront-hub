@@ -153,10 +153,18 @@ export class GoogleGmail implements MailClient {
 
   private async summary(id: string): Promise<ThreadSummary> {
     const th = await this.gmail().users.threads.get({ userId: "me", id, format: "metadata", metadataHeaders: ["Subject", "From", "Date", "To", "Cc"] });
-    const msgs = th.data.messages ?? [];
+    const h = (m: gmail_v1.Schema$Message | undefined, n: string) => m?.payload?.headers?.find((x) => x.name === n)?.value ?? "";
+    // A copy forwarded to office+<job#> only so Homebase logs it isn't part of the conversation: the thread is
+    // described by its real emails (a thread of nothing but copies stays one copy, which the lists leave out).
+    const all = th.data.messages ?? [];
+    const isCopy = (m: gmail_v1.Schema$Message) => {
+      const to = h(m, "To").match(/[\w.+-]+@[\w.-]+/g) ?? [];
+      return to.length > 0 && to.every((a) => /^office\+\d+@/i.test(a)) && !h(m, "Cc").trim();
+    };
+    const real = all.filter((m) => !isCopy(m));
+    const msgs = real.length ? real : all.slice(-1);
     const first = msgs[0];
     const last = msgs.at(-1);
-    const h = (m: gmail_v1.Schema$Message | undefined, n: string) => m?.payload?.headers?.find((x) => x.name === n)?.value ?? "";
     const labels = new Set(msgs.flatMap((m) => m.labelIds ?? []));
     return {
       id,

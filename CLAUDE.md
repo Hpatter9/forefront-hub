@@ -106,6 +106,10 @@
   seconds after typing stops and on close (POST /api/mail/compose/save, same draft updated each time); Send saves, then
   asks on a card, then sends that draft (POST /api/mail/compose/send). Saves don't emit "mail changed", and the reader
   isn't redrawn while a reply is being typed (`readerBusy`).
+- Homebase log copies (a message sent only to office+<job#>, no Cc: `isLogCopy` / `isHomebaseLog` in
+  `src/workflows/inbox.ts`) are left out of every Gmail tab list (pages topped up from the next one) unless the search
+  names "office"; inside a conversation the thread is summarised by its real emails (`GoogleGmail.summary`), the Sent
+  list drops threads that are there only because of a copy, and the reader doesn't show the copies.
 - Every Estimator writer can make Gmail drafts (never send): Claude through the hub tools, Gemini via
   `gmail_create_draft` in `HUB_TOOLS`, the Claude app via `keystone_create_draft` on the bridge.
 - Proposal Submitted status (`src/workflows/statusUpdates.ts`): the "Proposal Submitted Notes" card on a recon job's

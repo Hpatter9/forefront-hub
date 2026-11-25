@@ -79,8 +79,13 @@ export async function matchJob(hub: Hub, m: Message): Promise<{ jobNumber?: numb
  * A real email that only BCCs the office address still shows (its To line is a person).
  */
 export function isHomebaseLog(t: { to?: string; cc?: string; messageCount: number }): boolean {
-  const to = (t.to ?? "").match(/[\w.+-]+@[\w.-]+/g) ?? [];
-  return t.messageCount === 1 && to.length > 0 && to.every((a) => /^office\+\d+@/i.test(a)) && !(t.cc ?? "").trim();
+  return t.messageCount === 1 && isLogCopy(t);
+}
+
+/** One message sent only to office+<job#> addresses (no Cc): a copy for Homebase's log, not a real email. */
+export function isLogCopy(m: { to?: string; cc?: string }): boolean {
+  const to = (m.to ?? "").match(/[\w.+-]+@[\w.-]+/g) ?? [];
+  return to.length > 0 && to.every((a) => /^office\+\d+@/i.test(a)) && !(m.cc ?? "").trim();
 }
 
 /** Forwards one message to the job's office+ address with its attachments, and keeps the attachments in the folder. */

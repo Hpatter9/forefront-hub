@@ -203,7 +203,10 @@ async function mailThread(id: string) {
   // Drafts in the thread are marked (and Claude's say what made them), so they can't be mistaken for sent mail.
   const { generatedDrafts } = await import("../workflows/generated.js");
   const gen = generatedDrafts(hub);
-  const messages = t.messages.map((m) => {
+  // Copies forwarded to office+<job#> for Homebase's log aren't shown in the conversation (unless that's all it is).
+  const { isLogCopy } = await import("../workflows/inbox.js");
+  const real = t.messages.filter((m) => m.labelIds?.includes("DRAFT") || !isLogCopy({ to: m.to.join(", "), cc: m.cc.join(", ") }));
+  const messages = (real.length ? real : t.messages).map((m) => {
     if (!m.labelIds?.includes("DRAFT")) return m;
     const g = gen.find((x) => (m.messageIdHeader && x.messageId === m.messageIdHeader) || x.draftId === m.id);
     return { ...m, draft: { generated: !!g, source: g?.source, jobNumber: g?.jobNumber } };
@@ -759,14 +762,24 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === "/api/mail/threads" && req.method === "GET") {
       if (!hub.gmail.listThreads) return send(res, 400, { error: "This Gmail connection can't list mail." });
+      const { isHomebaseLog } = await import("../workflows/inbox.js");
+      // Copies forwarded to office+<job#> just so Homebase logs them are left out of every list (Sent, All mail,
+      // labels, searches). A search that names the office address still finds them. A page that lost most of its
+      // threads to them is topped up from the next one, so the list doesn't come back nearly empty.
+      const wantLogs = /office/i.test(q("q"));
       const list = await hub.gmail.listThreads({ label: q("label") || undefined, q: q("q") || undefined, pageToken: q("page") || undefined });
+      if (!wantLogs) {
+        // In Sent, a conversation that's only there because of the copy (nothing else in it was sent by Hunter) goes too.
+        const keep = (x: (typeof list.threads)[number]) => !isHomebaseLog(x) && !(q("label") === "SENT" && x.labelIds && !x.labelIds.includes("SENT"));
+        list.threads = list.threads.filter(keep);
+        for (let more = 0; more < 3 && list.nextPageToken && list.threads.length < 20; more++) {
+          const next = await hub.gmail.listThreads({ label: q("label") || undefined, q: q("q") || undefined, pageToken: list.nextPageToken });
+          list.threads.push(...next.threads.filter(keep));
+          list.nextPageToken = next.nextPageToken;
+        }
+      }
       const { generatedDrafts } = await import("../workflows/generated.js");
       noteAddresses(hub, list.threads.map((x) => ({ from: x.from, at: x.date })));
-      // Sent: copies forwarded to Homebase just to log them aren't shown (search still finds them).
-      if (q("label") === "SENT" && !q("q")) {
-        const { isHomebaseLog } = await import("../workflows/inbox.js");
-        list.threads = list.threads.filter((x) => !isHomebaseLog(x));
-      }
       const claude = new Set(generatedDrafts(hub).filter((g) => g.state === "draft" && g.threadId).map((g) => g.threadId!));
       return send(res, 200, { ...list, threads: list.threads.map((t) => ({ ...t, hasDraft: !!t.labelIds?.includes("DRAFT"), claudeDraft: claude.has(t.id) })) });
     }

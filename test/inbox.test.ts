@@ -57,3 +57,26 @@ describe("copies forwarded to Homebase stay out of Sent", () => {
     expect(isHomebaseLog({ messageCount: 1 })).toBe(false);
   });
 });
+
+describe("copies forwarded to Homebase inside a conversation", () => {
+  it("describes the thread by its real emails, not the copy at the end", async () => {
+    const { GoogleGmail } = await import("../src/connectors/gmail/google.js");
+    const msg = (id: string, from: string, to: string, labels: string[], snippet: string) => ({ id, internalDate: String(Date.parse("2026-11-20T10:00:00Z") + Number(id) * 1000), labelIds: labels, snippet, payload: { headers: [{ name: "Subject", value: "Kitchen" }, { name: "From", value: from }, { name: "To", value: to }] } });
+    const threads: Record<string, any[]> = {
+      a: [msg("1", "dana@example.com", "hunter@forefrontteam.com", ["INBOX"], "Can you come Tuesday?"), msg("2", "hunter@forefrontteam.com", "office+3184@forefrontteam.com", ["SENT"], "Fwd: Can you come")],
+      b: [msg("3", "hunter@forefrontteam.com", "office+3184@forefrontteam.com", ["SENT"], "Fwd: copy")],
+    };
+    const g = new GoogleGmail({} as any);
+    (g as any).api = { users: { threads: {
+      list: async () => ({ data: { threads: [{ id: "a", historyId: "1" }, { id: "b", historyId: "1" }] } }),
+      get: async ({ id }: { id: string }) => ({ data: { messages: threads[id] } }),
+    } } };
+    const { threads: list } = await g.listThreads({ label: "SENT" });
+    const a = list.find((t) => t.id === "a")!;
+    expect(a).toMatchObject({ from: "dana@example.com", snippet: "Can you come Tuesday?", messageCount: 1 });
+    expect(a.labelIds).not.toContain("SENT"); // only in Sent because of the copy: the Sent list leaves it out
+    const { isHomebaseLog } = await import("../src/workflows/inbox.js");
+    expect(isHomebaseLog(a)).toBe(false);
+    expect(isHomebaseLog(list.find((t) => t.id === "b")!)).toBe(true);
+  });
+});
