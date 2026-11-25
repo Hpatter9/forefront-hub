@@ -144,7 +144,7 @@ export async function jobConversation(hub: Hub, n: number): Promise<{ items: Con
 export function mailJobs(hub: Hub): { jobNumber: number; name: string; stage: string; address: string; waiting: boolean; lastAt: string; last: string; quietDays: number | null; step: string; people: string }[] {
   const rem = reminders(hub);
   return hub.jobs
-    .list()
+    .active()
     .filter((j) => !["Payment Received", "Closed Lost", "Invoiced"].includes(j.stage))
     .map((j) => {
       const lastAt = [j.pulse.lastTouchAt, j.texts.lastAt].filter(Boolean).sort().at(-1) ?? "";

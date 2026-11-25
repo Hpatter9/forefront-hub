@@ -2,6 +2,7 @@ import { syncTexts } from "./texts.js";
 import type { Hub } from "../hub.js";
 import { syncFiles } from "./files.js";
 import { pullJob } from "./pull.js";
+import { retired } from "../core/job.js";
 import { pulse } from "./reminders.js";
 import { sync } from "./sync.js";
 
@@ -27,8 +28,14 @@ export async function syncAll(hub: Hub, opts: { mine?: boolean; concurrency?: nu
   // Hunter is the only estimator, so every open recon job is his (pass mine: true to narrow it).
   const jobs = await hub.homebase.listJobs({ openOnly: true, mine: opts.mine ? hub.cfg.homebase.me : undefined });
   const wanted = new Set(jobs.map((j) => j.jobNumber));
-  // Also keep any job you set up by hand, even if it isn't "mine" in Homebase.
-  for (const j of hub.jobs.list()) wanted.add(j.jobNumber);
+  // Also keep any job you set up by hand, even if it isn't "mine" in Homebase. A local job Homebase no longer lists
+  // as open is stamped closed; 30 days after that it's retired: no more syncing, and it leaves the brief and lists.
+  const now = new Date().toISOString();
+  for (const j of hub.jobs.list()) {
+    if (wanted.has(j.jobNumber)) { if (j.closedSince) hub.jobs.upsert(j.jobNumber, { closedSince: "" }); continue; }
+    if (!j.closedSince) hub.jobs.upsert(j.jobNumber, { closedSince: now });
+    if (!retired(hub.jobs.get(j.jobNumber))) wanted.add(j.jobNumber);
+  }
   out.jobs = wanted.size;
 
   const queue = [...wanted];

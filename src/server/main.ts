@@ -334,7 +334,7 @@ const server = http.createServer(async (req, res) => {
     // ---- the dashboard: everything on one page, from the job folders the sync keeps fresh (no extra Homebase calls)
     if (p === "/api/dashboard") {
       const upload = new Set((lastSync?.needsUpload ?? []).map((x) => x.jobNumber));
-      const all = hub.jobs.list();
+      const all = hub.jobs.active();
       const open = all.filter((j) => !["Payment Received", "Closed Lost"].includes(j.stage));
       const rem = reminders(hub, { needsUpload: upload });
       const byStage = STAGES.map((s) => {
@@ -1287,7 +1287,7 @@ function recentNotes(days: number) {
   const me = cfg.homebase.me.toLowerCase();
   const first = me.split(" ")[0];
   const out: { jobNumber: number; name: string; noteId: string; replyTo?: string; author: string; via: string; body: string; at: string; mine: boolean; mentionsMe: boolean; thread?: string }[] = [];
-  for (const j of hub.jobs.list()) {
+  for (const j of hub.jobs.active()) {
     for (const n of savedNotes(hub, j.jobNumber)) {
       for (const x of [n, ...n.replies]) {
         const t = Date.parse(x.postedAt);

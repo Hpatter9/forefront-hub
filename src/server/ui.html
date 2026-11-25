@@ -1378,6 +1378,7 @@ const ACTIONS = {
   followup: (r) => `<button class="btn small" data-do="claude" data-p="Draft a short follow-up email for job #${r.jobNumber}'s proposal in my voice (Gmail draft only), to whoever is waiting on it.">Draft follow-up</button>`,
   draft: () => `<a class="btn small" href="https://mail.google.com/mail/u/0/#drafts" target="_blank" rel="noopener">Open Gmail drafts</a>`,
   upload: (r) => `<button class="btn small primary" data-do="upload" data-n="${r.jobNumber}">Upload</button>`,
+  fix: (r) => r.toStage ? `<button class="btn small primary" data-do="tostage" data-n="${r.jobNumber}" data-stage="${esc(r.toStage)}">Move to ${esc(r.toStage)}</button>` : `<button class="btn small" data-do="open" data-n="${r.jobNumber}">Open job</button>`,
   stale: (r) => `<button class="btn small" data-do="claude" data-p="Job #${r.jobNumber} hasn't been touched in a week. Look at where it stands and tell me the next step; draft any email that's needed (draft only).">What's next?</button>`,
 };
 function remRow(r) {
@@ -1473,6 +1474,7 @@ document.addEventListener("click", async (e) => {
     if (b.dataset.do === "claude") { await askClaude(b.dataset.p, n || undefined); }
     if (b.dataset.do === "logsent") await api(`/api/jobs/${n}/sync`, { method: "POST" });
     if (b.dataset.do === "upload") await api(`/api/jobs/${n}/files-upload`, { method: "POST", body: {} });
+    if (b.dataset.do === "tostage") await api(`/api/jobs/${n}/stage`, { method: "POST", body: { stage: b.dataset.stage } });
     if (b.dataset.do === "gocal") showTab("cal");
     if (b.dataset.do === "taskdone") { await api(`/api/tasks/${encodeURIComponent(b.dataset.list)}/${encodeURIComponent(b.dataset.task)}`, { method: "PATCH", body: { completed: true } }); b.closest(".row")?.remove(); log("Task done. It's checked off on your phone too."); }
     if (b.dataset.do === "fileto") { await api("/api/inbox/file", { method: "POST", body: { threadId: b.dataset.thread, messageId: b.dataset.msg, jobNumber: n } }); b.closest(".rem")?.remove(); }

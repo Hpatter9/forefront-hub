@@ -26,7 +26,7 @@ export async function suggestPlaces(hub: Hub, q: string, opts: { online?: boolea
   const out: Place[] = [];
   const seen = new Set<string>();
   const add = (p: Place) => { const k = p.label.toLowerCase().replace(/[^a-z0-9]/g, ""); if (k && !seen.has(k)) { seen.add(k); out.push(p); } };
-  for (const j of hub.jobs.list()) if (j.address && hit(`${j.address} ${j.name} ${j.jobNumber} ${j.customer.name}`)) add({ label: j.address, sub: `#${j.jobNumber} ${j.name}`, kind: "job" });
+  for (const j of hub.jobs.active()) if (j.address && hit(`${j.address} ${j.name} ${j.jobNumber} ${j.customer.name}`)) add({ label: j.address, sub: `#${j.jobNumber} ${j.name}`, kind: "job" });
   for (const l of await pastLocations(hub)) if (hit(l)) add({ label: l, sub: "Used on your calendar before", kind: "past" });
   // The map is only asked once there's enough typed to mean something, and only when your own places don't cover it.
   if (opts.online !== false && q.trim().length >= 4 && out.length < 5 && hub.travel.suggest) {

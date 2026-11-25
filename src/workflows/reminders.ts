@@ -8,7 +8,7 @@ import { allSigns, jobMailQuery, summaryBelongs } from "./jobMail.js";
  * The Today screen: what needs Hunter's attention, worked out from each job folder's job.json (kept fresh by the
  * background sync). Nothing here writes anywhere.
  */
-export type ReminderKind = "reply" | "adjuster" | "walk" | "estimate" | "followup" | "stale" | "log" | "upload" | "draft";
+export type ReminderKind = "reply" | "adjuster" | "walk" | "estimate" | "followup" | "stale" | "log" | "upload" | "draft" | "fix";
 
 export interface Reminder {
   kind: ReminderKind;
@@ -24,6 +24,8 @@ export interface Reminder {
   step: string;
   /** When the brief last asked for this job's follow-up (so it comes up about twice a week, not daily). */
   nudgedAt?: string;
+  /** For a "Fix in Homebase" item: the stage the job should be in (the brief offers a one-click move, which asks first). */
+  toStage?: string;
   /** For a reply: why it's on the list, in a sentence (who wrote, when, what they said). */
   why?: string;
 }
@@ -68,6 +70,7 @@ export const stepFor = (stage: string) => STAGE_STEP[stage] ?? "Check on the job
 export const FOLLOWUP_EVERY = Number(process.env.HUB_FOLLOWUP_DAYS || 3);
 
 export const REMINDER_GROUPS: { kind: ReminderKind; label: string; hint: string }[] = [
+  { kind: "fix", label: "Fix in Homebase", hint: "Homebase is missing something or shows the wrong stage (checked every morning against your email)" },
   { kind: "reply", label: "Reply needed", hint: "Someone on the job emailed and there's no answer from you after it" },
   { kind: "adjuster", label: "Check in with the adjuster", hint: "Estimate is with the adjuster and you haven't been in touch for 7+ days" },
   { kind: "log", label: "Sent, log it in Homebase", hint: "Send-offs that went out; log the proposal" },
@@ -85,7 +88,7 @@ const days = (iso: string) => (iso && !Number.isNaN(Date.parse(iso)) ? Math.max(
 
 export function reminders(hub: Hub, extras: { needsUpload?: Set<number> } = {}): Reminder[] {
   const out: Reminder[] = [];
-  for (const j of hub.jobs.list()) {
+  for (const j of hub.jobs.active()) {
     if (DONE.has(j.stage)) continue;
     const base = { jobNumber: j.jobNumber, name: j.name, stage: j.stage, step: stepFor(j.stage), nudgedAt: j.followups?.nudgedAt || undefined };
     const p = j.pulse;
@@ -118,8 +121,33 @@ export function reminders(hub: Hub, extras: { needsUpload?: Set<number> } = {}):
       out.push({ ...base, kind: "stale", title: p.lastTouch ? `Last: ${p.lastTouch}` : "No activity on record", detail: j.stage, days: quiet });
     }
     if (extras.needsUpload?.has(j.jobNumber)) out.push({ ...base, kind: "upload", title: "Estimate files not in Homebase", detail: "", days: 0 });
+    for (const f of homebaseFixes(j)) out.push({ ...base, kind: "fix", title: f.title, detail: f.detail, days: f.days, ...(f.toStage ? { toStage: f.toStage } : {}) });
   }
   return out.sort((a, b) => b.days - a.days);
+}
+
+/**
+ * What Homebase has wrong or missing on a job, judged from what Keystone knows (its emails, the send-offs, the signed
+ * agreement): an insurance job with no adjuster email, a proposal that went out while the stage still says it hasn't,
+ * a signed agreement on a job not yet marked won. Listed in the brief under "Fix in Homebase".
+ */
+export function homebaseFixes(j: Job): { title: string; detail: string; days: number; toStage?: string }[] {
+  const out: { title: string; detail: string; days: number; toStage?: string }[] = [];
+  const claim = j.insurance === "claim" || !!j.claimNumber || !!j.carrier;
+  const guess = j.pulse.adjusterGuess;
+  if (claim && !DONE.has(j.stage) && j.stage !== "Job Won") {
+    if (!j.adjuster.email) out.push({ title: "Adjuster email missing", detail: `${j.carrier || "Insurance"}${j.claimNumber ? ` claim ${j.claimNumber}` : ""}: add the adjuster on the job's contacts`, days: days(j.stageSince) });
+    else if (guess && guess.email.toLowerCase() === j.adjuster.email.toLowerCase()) out.push({ title: "Adjuster isn't in Homebase", detail: `Keystone found ${guess.name || guess.email} <${guess.email}> in the emails (${guess.why}); add them to the job's contacts`, days: days(j.stageSince) });
+  }
+  const sentAt = j.sendoff.sentAt || j.sendoff.drafts.find((d) => d.sentAt)?.sentAt || "";
+  if (PRE_ESTIMATE.has(j.stage) && (sentAt || j.estimate.status === "sent" || j.pulse.proposalAmount)) {
+    out.push({ title: `Stage says ${j.stage}, but the proposal went out`, detail: sentAt ? `sent ${sentAt.slice(0, 10)}: move it to Proposal Submitted` : "Homebase has a proposal amount: move it to Proposal Submitted", days: days(sentAt || j.stageSince), toStage: "Proposal Submitted" });
+  }
+  const signed = [...j.log].reverse().map((l) => l.what.match(/agreement signed (\d{4}-\d{2}-\d{2})/)?.[1]).find(Boolean);
+  if (signed && (PRE_ESTIMATE.has(j.stage) || j.stage === "Proposal Submitted")) {
+    out.push({ title: `Agreement signed, stage still ${j.stage}`, detail: `signed ${signed}: move it to Job Won`, days: days(signed), toStage: "Job Won" });
+  }
+  return out;
 }
 
 /** An email waits on a reply only for this long (HUB_REPLY_DAYS); after that it was dealt with some other way. */
@@ -137,7 +165,7 @@ export function addressedToMe(t: { to?: string; cc?: string }, me: string): bool
 /** Stages where the work is Hunter's (estimating through the proposal and supplements); later stages belong to the PM. */
 const ESTIMATOR_STAGES = new Set([...PRE_ESTIMATE, "Proposal Submitted", "Supplement"]);
 /** How recent each kind of item has to be for the brief (days since its clock started). */
-export const BRIEF_MAX_DAYS: Record<ReminderKind, number> = { reply: REPLY_DAYS, adjuster: 45, followup: 45, stale: 30, walk: 60, estimate: 60, log: 30, draft: 30, upload: 30 };
+export const BRIEF_MAX_DAYS: Record<ReminderKind, number> = { reply: REPLY_DAYS, adjuster: 45, followup: 45, stale: 30, walk: 60, estimate: 60, log: 30, draft: 30, upload: 30, fix: 999 };
 
 /**
  * The reminders that belong in Hunter's brief: his own action items, and recent ones. Leaves out quiet jobs that

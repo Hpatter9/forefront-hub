@@ -63,7 +63,7 @@ export function jobForEvent(e: CalEvent, jobs: Job[]): Job | undefined {
 }
 
 export async function travelFor(hub: Hub, events: CalEvent[], o: { max?: number; calendars?: Set<string>; why?: Record<string, string> } = {}): Promise<Record<string, Leg>> {
-  const jobs = hub.jobs.list();
+  const jobs = hub.jobs.active();
   const why = o.why ?? {};
   const visits = events
     .filter((e) => !e.allDay)

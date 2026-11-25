@@ -99,6 +99,13 @@
   drag across empty time to make an event that long, drag an event to another time or day, drag its bottom edge to
   resize, drag a chip to another day in Month; 15-minute steps. A move saves at once (PATCH) with Undo in the notice;
   a plain click still opens the event. Events on calendars that aren't writable don't drag.
+- Jobs closed in Homebase drop out after `RETIRE_DAYS` (30): the sync stamps `closedSince` on a local job Homebase no
+  longer lists as open (cleared if it reopens); `hub.jobs.active()` (used by the sync, reminders, dashboard, mail By
+  job, places, travel, inbox matching) leaves retired ones out. The folder stays; `jobs.list()` still has them.
+- "Fix in Homebase" (`homebaseFixes` in `src/workflows/reminders.ts`, reminder kind `fix`): an insurance job with no
+  adjuster email (or one only Keystone found in the emails), a proposal sent while the stage is still pre-proposal,
+  a signed agreement on a job not yet Job Won. Wrong-stage items carry `toStage` and the brief offers "Move to ..."
+  (the stage route, which asks first).
 - Pop-ups (question cards, the notice at the bottom left, game toasts) name the job, not its number: `jobNames` in
   `src/server/ui.html` turns "#3212 Gorrell" and a bare "#3212" into "Gorrell" (the number stays only when two jobs
   share a name or Keystone doesn't know the job). Write messages with `#<number>` as before; the page swaps it.

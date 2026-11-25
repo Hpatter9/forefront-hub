@@ -17,7 +17,7 @@ const PROPOSAL_SUBMITTED = "Proposal Submitted";
  */
 export async function sync(hub: Hub, only?: number, opts: { checkOnly?: boolean } = {}): Promise<SyncResult[]> {
   const results: SyncResult[] = [];
-  for (const job of hub.jobs.list()) {
+  for (const job of hub.jobs.active()) {
     if (only !== undefined && job.jobNumber !== only) continue;
     const pending = job.sendoff.drafts.filter((d) => !d.sentAt);
     if (!job.sendoff.drafts.length) continue;

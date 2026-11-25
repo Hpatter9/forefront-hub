@@ -73,6 +73,8 @@ export const JobSchema = z.object({
   log: z.array(z.object({ at: z.string(), what: z.string() })).default([]),
   /** Last background sync with Homebase, and the last CompanyCam/DocuSketch look-up (those run at most daily). */
   syncedAt: z.string().default(""),
+  /** When the sync first found this job no longer open in Homebase ("" while open). 30 days on, it's retired. */
+  closedSince: z.string().default(""),
   lookupsAt: z.string().default(""),
   /** Follow-ups: when Hunter last ticked one off in the brief (counts as contact), and when the brief last asked. */
   followups: z.object({ doneAt: z.string().default(""), nudgedAt: z.string().default("") }).default({ doneAt: "", nudgedAt: "" }),
@@ -117,6 +119,12 @@ export type JobPatch = { [K in keyof Job]?: Job[K] extends object ? Job[K] | { [
 export const SUBDIRS = ["sketch", "photos", "estimate", "email", "notes", "homebase", "files"] as const;
 
 /** One folder per job number under JOBS_ROOT ("3226 Augustine"), holding job.json and the job's files. */
+/** A job closed in Homebase this many days ago drops out of the sync, the brief and the lists (its folder stays). */
+export const RETIRE_DAYS = 30;
+export function retired(j: { closedSince?: string }, now = Date.now()): boolean {
+  return !!j.closedSince && now - Date.parse(j.closedSince) > RETIRE_DAYS * 864e5;
+}
+
 export class JobStore {
   constructor(readonly root: string) {}
 
@@ -132,6 +140,11 @@ export class JobStore {
 
   exists(jobNumber: number): boolean {
     return existsSync(path.join(this.folder(jobNumber), "job.json"));
+  }
+
+  /** Jobs still worth showing and syncing: open ones, and ones closed less than RETIRE_DAYS ago. */
+  active(now = Date.now()): Job[] {
+    return this.list().filter((j) => !retired(j, now));
   }
 
   list(): Job[] {
