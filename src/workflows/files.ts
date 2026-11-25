@@ -65,6 +65,12 @@ export async function syncFiles(hub: Hub, jobNumber: number): Promise<FileSyncRe
     const kind = standardKind(doc.fileName);
     const target = hub.jobs.path(jobNumber, "estimate", doc.fileName);
     if (kind && !existsSync(target)) copyFileSync(path.join(dir, name), target);
+    // Room measurements from Keystone Scan (the iPhone app) go in the job's sketch folder, where the estimators look.
+    if (/^room-scan-.*\.(json|png)$/i.test(doc.fileName || "")) {
+      const sk = hub.jobs.path(jobNumber, "sketch");
+      mkdirSync(sk, { recursive: true });
+      if (!existsSync(path.join(sk, doc.fileName))) copyFileSync(path.join(dir, name), path.join(sk, doc.fileName));
+    }
     // Photos taken with the Keystone phone app also go with the job's photos, so the estimator sees them.
     if (/^field-photo-.*\.jpe?g$/i.test(doc.fileName || "")) {
       const field = hub.jobs.path(jobNumber, "photos", "field");

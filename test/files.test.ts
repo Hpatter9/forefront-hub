@@ -120,3 +120,15 @@ describe("photos from the phone app", () => {
     expect(existsSync(hub.jobs.path(9001, "photos", "field", "field-photo-1795000000000-1.jpg"))).toBe(true);
   });
 });
+
+describe("room scans from the iPhone app", () => {
+  it("go in the job's sketch folder", async () => {
+    const { hub, homebase, root } = testHub(true);
+    const f = path.join(root, "room-scan-9001-20261125-1410.json");
+    writeFileSync(f, "{}");
+    homebase.docs.set(9001, [{ doc: { ...mockDoc(f, "scope"), fileName: "room-scan-9001-20261125-1410.json" }, file: f }]);
+    await pullJob(hub, 9001);
+    await syncFiles(hub, 9001);
+    expect(existsSync(hub.jobs.path(9001, "sketch", "room-scan-9001-20261125-1410.json"))).toBe(true);
+  });
+});

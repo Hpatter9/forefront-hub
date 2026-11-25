@@ -118,7 +118,7 @@ export async function handoffPackage(hub: Hub, n: number): Promise<{ folder: str
   };
   // DocuSketch: its PDFs always (its .ESX is encrypted, so it isn't sent); its loose room images only when there are no contact sheets to show them.
   const sketch = sketchFiles(hub, n);
-  for (const f of sketch.filter((x) => /\.pdf$/i.test(x)).slice(0, 8)) add(f);
+  for (const f of sketch.filter((x) => /\.pdf$/i.test(x) || /(^|\/)room-scan-[^/]*\.(json|png)$/i.test(x)).slice(0, 10)) add(f); // iPhone scans (Keystone Scan) too
   if (!d.photos.sheets?.length) for (const f of sketch.filter((x) => /\.(jpe?g|png)$/i.test(x)).slice(0, 12)) add(f);
   // DocuSketch's floor plans with the measurements on them are what quantities come from:
   // always in (one copy of each; the .jpg when both a .jpg and a .png exist).
