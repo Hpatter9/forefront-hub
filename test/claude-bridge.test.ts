@@ -63,12 +63,13 @@ describe("the helper the Claude app starts", () => {
     const h = createRequire(import.meta.url)("../mcpb/server/index.cjs").handle;
     const init: any = await h({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } });
     expect(init.result).toMatchObject({ protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "keystone" } });
-    expect(init.result.instructions).toMatch(/Keystone isn't open/);
+    // On a PC it says Keystone isn't open; in a cloud Claude Code session (where these tests may run) it says it can't reach the PC.
+    expect(init.result.instructions).toMatch(/Keystone isn't open|runs in the cloud/);
     const list: any = await h({ jsonrpc: "2.0", id: 2, method: "tools/list" });
     expect(list.result.tools.map((t: any) => t.name)).toEqual(["keystone_status"]);
     const call: any = await h({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "keystone_start_estimate", arguments: { jobNumber: 1 } } });
     expect(call.result).toMatchObject({ isError: true });
-    expect(call.result.content[0].text).toMatch(/Start it from the desktop icon/);
+    expect(call.result.content[0].text).toMatch(/Start it from the desktop icon|can't reach Keystone/);
     expect(await h({ jsonrpc: "2.0", method: "notifications/initialized" })).toBeNull();
     expect(((await h({ jsonrpc: "2.0", id: 4, method: "nope" })) as any).error.code).toBe(-32601);
     delete process.env.KEYSTONE_URL;
