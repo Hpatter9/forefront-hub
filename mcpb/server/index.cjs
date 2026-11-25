@@ -23,7 +23,12 @@ function log(line) {
 
 // (Anything that isn't a web address, such as an unfilled setting, falls back to Keystone's usual place.)
 const base = () => (/^https?:\/\//.test(process.env.KEYSTONE_URL || "") ? process.env.KEYSTONE_URL : "http://127.0.0.1:4317").replace(/\/$/, "");
-const NOT_RUNNING = "Keystone isn't open on this computer. Start it from the desktop icon (Start Keystone), wait for it to finish loading, then try again.";
+// A Claude Code session in the cloud (started from claude.ai or the phone) runs on Anthropic's computers, not Hunter's
+// PC, so it can never reach Keystone at 127.0.0.1: say that plainly instead of "Keystone isn't open".
+const CLOUD = process.env.CLAUDE_CODE_REMOTE === "true" || !!process.env.CLAUDE_CODE_REMOTE_SESSION_ID;
+const NOT_RUNNING = CLOUD
+  ? "This Claude session runs in the cloud, not on Hunter's PC, so it can't reach Keystone (Keystone only answers on the PC itself). Nothing is broken. To work with Keystone: use the Claude desktop app on the PC (the Keystone extension), or open a Claude Code session on the PC in the forefront-hub folder, or use the Estimator's \"Send to Claude chat\" hand-off through Google Drive. Do not invent Keystone data."
+  : "Keystone isn't open on this computer. Start it from the desktop icon (Start Keystone), wait for it to finish loading, then try again.";
 
 const send = (m) => process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", ...m })}\n`);
 
