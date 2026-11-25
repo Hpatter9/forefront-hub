@@ -16,6 +16,8 @@
   writes amount + date and moves the job to Proposal Submitted. At Proposal Submitted it only refreshes the amount;
   past it, nothing. Handled emails are remembered in `.hub/proposals-sent.json`.
 - Test data is fictional (fixtures/). Don't commit real customer data, Homebase snapshots, `.env` or `auth/`.
+- DocuSketch's .ESX is encrypted and nothing reads it: Keystone never asks for, attaches or mentions an ESX. Room
+  measurements come from DocuSketch's floor plans (its PDF and measurement images) and the walk transcript.
 - Tests expect the estimator repo at `../estimator` (or `ESTIMATOR_DIR`) and `python3` with reportlab, pdfplumber
   and Pillow.
 - `phone/` is the Android app (a WebView shell in Java plus `assets/index.html` and `assets/app.js`; no Gradle, built

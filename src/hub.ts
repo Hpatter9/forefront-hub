@@ -80,6 +80,6 @@ export function describe(hub: Hub): string[] {
     `calendar    ${hub.calendar.kind}${hub.calendar.kind === "google" && !hub.calendar.connected() ? "  (!) reconnect Google to add Calendar" : ""}`,
     `tasks       ${hub.tasks.kind}${hub.tasks.kind === "google" && !hub.tasks.connected() ? "  (!) reconnect Google to add Tasks" : ""}`,
     `texts       ${hub.texts.kind === "off" ? "off (Connect iPhone texts turns it on)" : hub.texts.status().connected ? `iPhone backup from ${hub.texts.status().backupAt?.slice(0, 16).replace("T", " ")}` : `(!) ${hub.texts.status().problem}`}`,
-    `docusketch  gmail delivery emails + ESX from ${c.docusketch.downloadsDir}`,
+    `docusketch  gmail delivery emails; floor plans from ${c.docusketch.downloadsDir}`,
   ];
 }

@@ -21,7 +21,7 @@ export interface JobDossier {
   folder: string;
   /** Every file under the job folder, by subfolder (path relative to the job folder, size in KB). */
   files: Record<string, { path: string; kb: number }[]>;
-  /** The DocuSketch files wherever they are (an .ESX, its PDFs, room images). There may be no .ESX. */
+  /** The DocuSketch files wherever they are (its PDFs, floor plan and room images). Its .ESX is encrypted and not used. */
   docusketch: string[];
   photos: { inFolder: number; companycam: { linked: boolean; project?: string; total?: number; previews?: string; problem?: string }; howTo: string; /** Numbered contact sheets already made, and a line about each photo (by the free AI). */ sheets?: string[]; notes?: PhotoNotes["photos"] };
   notes: { jobNotes: string; teamNotes: { at: string; author: string; body: string }[]; walks: { file: string; at: string; summary: string }[] };
@@ -92,8 +92,7 @@ export async function jobDossier(hub: Hub, n: number, o: { /** Don't wait for th
   const files = Object.fromEntries((["sketch", "photos", "estimate", "files", "notes", "email"] as const).map((s) => [s, tree(hub.jobs.path(n, s))]));
   const inFolder = files.photos.filter((f) => IMAGE.test(f.path) && !f.path.startsWith("previews/")).length;
   const sketch = sketchFiles(hub, n);
-  if (!sketch.length) missing.push("No DocuSketch files found: no .ESX, floor plan or measurement PDF, or room images.");
-  else if (!sketch.some((f) => /\.esx$/i.test(f))) missing.push(`No DocuSketch .ESX (that's normal for some jobs): measurements come from the other DocuSketch files (${sketch.length}) and the walk transcript.`);
+  if (!sketch.some((f) => !/\.esx$/i.test(f))) missing.push("No DocuSketch floor plans found (no floor plan or measurement PDF, no measurement images): measurements have to come from the walk transcript and photos, or ask Hunter for the DocuSketch files.");
   if (!inFolder && !cc.total) missing.push("No photos at all: none in the job's photos folder and none from CompanyCam.");
 
   // Emails, texts, calls and walks with the job's people.

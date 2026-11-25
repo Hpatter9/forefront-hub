@@ -403,14 +403,15 @@ export function hubToolDefs(hub: Hub) {
     ),
     tool(
       "docusketch_find_sketch",
-      "Find the job's DocuSketch sketch: the delivery email (project id) and the ESX, copied into the job's sketch/ folder from Downloads when it's there.",
+      "Find the job's DocuSketch delivery email (project id). Measurements come from DocuSketch's floor plans and measurement images in the job folder (sketch/, files/, photos/); its .ESX is encrypted and isn't used.",
       { jobNumber },
       wrap(async ({ jobNumber: n }) => {
         const j = hub.jobs.get(n);
         const d = j.docusketchProjectId ? { projectId: j.docusketchProjectId } : await hub.sketches.findDelivery({ name: j.name, address: j.address });
         if (d?.projectId && !j.docusketchProjectId) hub.jobs.upsert(n, { docusketchProjectId: d.projectId });
-        const esx = await hub.sketches.fetchEsx({ projectId: d?.projectId, sketchDir: hub.jobs.path(n, "sketch") });
-        return { delivery: d, esx, next: esx ? undefined : `Ask Hunter to download ${d?.projectId ?? "the"} ESX from https://app.docusketch.com/portal-cc/projects (or drop it in ${hub.jobs.path(n, "sketch")}).` };
+        const { sketchFiles } = await import("../workflows/dossier.js");
+        const plans = sketchFiles(hub, n).filter((f) => !/\.esx$/i.test(f));
+        return { delivery: d, floorPlans: plans, next: plans.length ? undefined : `No DocuSketch floor plans in the job folder yet: ask Hunter to download the floor plan / measurement files for ${d?.projectId ?? "the job"} from DocuSketch (or drop them in ${hub.jobs.path(n, "sketch")}).` };
       }),
     ),
 

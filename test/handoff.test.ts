@@ -8,10 +8,11 @@ describe("estimates in the Claude app", () => {
     const { hub } = testHub();
     hub.jobs.upsert(3226, { name: "Augustine", address: "1071 Acapulco Ct, Colorado Springs, CO 80910", stage: "Estimating", carrier: "Farmers", claimNumber: "5045106171-1", customer: { name: "Jeremy Augustine", email: "j@example.com", phone: "" }, adjuster: { name: "Eileen Brandt", email: "eileen@claims.example", phone: "" }, companycamProjectId: "117697136", market: "CODE8X" });
     writeFileSync(hub.jobs.path(3226, "sketch", "Augustine.ESX"), "x");
+    writeFileSync(hub.jobs.path(3226, "sketch", "Augustine floor plan.pdf"), "%PDF");
     const { prompt, attach } = handoffPrompt(hub, 3226, "estimate");
     expect(prompt.startsWith("Use the forefront-estimate skill.")).toBe(true);
-    for (const s of ["Job #3226 Augustine, 1071 Acapulco Ct", "Farmers, claim 5045106171-1", "Adjuster: Eileen Brandt", "CompanyCam project: 117697136", "Price list market: CODE8X", "Attached: Augustine.ESX", "Ask me the skill's questions"]) expect(prompt).toContain(s);
-    expect(attach).toEqual(["sketch/Augustine.ESX"]);
+    for (const s of ["Job #3226 Augustine, 1071 Acapulco Ct", "Farmers, claim 5045106171-1", "Adjuster: Eileen Brandt", "CompanyCam project: 117697136", "Price list market: CODE8X", "Attached: Augustine floor plan.pdf", "Ask me the skill's questions"]) expect(prompt).toContain(s);
+    expect(attach).toEqual(["sketch/Augustine floor plan.pdf"]); // the encrypted .ESX is never sent
     expect(handoffPrompt(hub, 3226, "revise", "Make the hallway LVP.").prompt).toContain("The change: Make the hallway LVP.");
   });
 });
@@ -41,7 +42,8 @@ describe("getting a job ready for the Claude app (the subscription)", () => {
     const req = handoffPrompt(t.hub, 9001, "estimate");
     expect(req.attach).toContain("for-claude/Job brief.md");
     expect(req.prompt).toMatch(/read "Job brief.md" first/);
-    expect(req.prompt).toMatch(/there may be no \.ESX/);
+    expect(req.prompt).toMatch(/floor plans \(they carry the measurements\)/);
+    expect(req.prompt).not.toMatch(/ESX/);
     // Doing it again replaces the folder rather than piling up copies.
     expect((await handoffPackage(t.hub, 9001)).files).toEqual(r.files);
     expect(existsSync(nodePath.join(r.folder, "Job brief (2).md"))).toBe(false);

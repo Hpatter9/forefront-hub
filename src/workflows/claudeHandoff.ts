@@ -14,7 +14,7 @@ export const HANDOFF_DIR = "for-claude";
  * into Claude with the job's files attached, and drops the PDFs Claude makes back onto the Estimator tab.
  */
 export const HANDOFF_ACTIONS = {
-  estimate: { label: "New estimate", ask: "Write a new reconstruction estimate for this job. Everything Keystone has on it is attached: read \"Job brief.md\" first (the emails, texts and calls boiled down to dated points, a line about every photo, my notes and the team's), then the DocuSketch files (there may be no .ESX; use the PDF or room images for measurements), my scope walk notes, and the photo contact sheets. Use the CompanyCam connector only if you need a photo full size. Tell me what you went through and what's missing. Ask me the skill's questions before you price anything." },
+  estimate: { label: "New estimate", ask: "Write a new reconstruction estimate for this job. Everything Keystone has on it is attached: read \"Job brief.md\" first (the emails, texts and calls boiled down to dated points, a line about every photo, my notes and the team's), then DocuSketch's floor plans (they carry the measurements), my scope walk notes, and the photo contact sheets. Use the CompanyCam connector only if you need a photo full size. Tell me what you went through and what's missing. Ask me the skill's questions before you price anything." },
   convert: { label: "Convert Xactimate PDF", ask: "Convert the attached Xactimate estimate PDF into our Reconstruction Estimate, Reconstruction Agreement and Xactimate documents." },
   agreement: { label: "Agreement + selections", ask: "Build the Reconstruction Agreement with material selections. Ask me what the homeowner picked, and set allowances for anything they still need to choose." },
   selections: { label: "Selections sign-off", ask: "Make the Material Selection Approval sheet for the homeowner to sign." },
@@ -33,7 +33,7 @@ export function handoffPrompt(hub: Hub, n: number, action: HandoffAction, note =
     ? packed
     : j
     ? [
-        ...hub.jobs.files(n, "sketch", /\.esx$/i).slice(0, 2),
+        ...hub.jobs.files(n, "sketch", /\.(pdf|jpe?g|png)$/i).slice(0, 4),
         ...(action === "convert" ? hub.jobs.files(n, "files", /\.pdf$/i).filter((f) => /xactimate|estimate|esx|carrier|insur/i.test(path.basename(f))).slice(0, 3) : []),
         ...(action === "revise" || action === "agreement" || action === "selections" ? hub.jobs.files(n, "estimate", /^estimate\.json$/i).slice(0, 1) : []),
         ...(action === "revise" ? hub.jobs.files(n, "estimate", /\.pdf$/i).slice(0, 3) : []),
@@ -116,11 +116,11 @@ export async function handoffPackage(hub: Hub, n: number): Promise<{ folder: str
     for (let i = 2; existsSync(path.join(dir, name)); i++) name = `${path.basename(as ?? rel, path.extname(rel))} (${i})${path.extname(rel)}`;
     copyFileSync(from, path.join(dir, name));
   };
-  // DocuSketch: the ESX and PDFs always; its loose room images only when there are no contact sheets to show them.
+  // DocuSketch: its PDFs always (its .ESX is encrypted, so it isn't sent); its loose room images only when there are no contact sheets to show them.
   const sketch = sketchFiles(hub, n);
-  for (const f of sketch.filter((x) => /\.(esx|pdf)$/i.test(x)).slice(0, 8)) add(f);
+  for (const f of sketch.filter((x) => /\.pdf$/i.test(x)).slice(0, 8)) add(f);
   if (!d.photos.sheets?.length) for (const f of sketch.filter((x) => /\.(jpe?g|png)$/i.test(x)).slice(0, 12)) add(f);
-  // DocuSketch's floor plans with the measurements on them are what quantities come from when there's no ESX:
+  // DocuSketch's floor plans with the measurements on them are what quantities come from:
   // always in (one copy of each; the .jpg when both a .jpg and a .png exist).
   const plans = sketch.filter((x) => /(^|[\\/])(image_wall_measurements|measurements|common)_[^/]*\.(jpe?g|png)$/i.test(x));
   const stem = (x: string) => path.basename(x).replace(/\.(jpe?g|png)$/i, "").toLowerCase();

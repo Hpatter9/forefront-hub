@@ -29,7 +29,8 @@ describe("writing estimates in a Claude chat through Google Drive", () => {
     expect(r.files).toEqual(expect.arrayContaining(["Sketch measurements_1st floor.jpg", "Sketch image_wall_measurements_B1.png"]));
     expect(r.files).not.toContain("Sketch measurements_1st floor.png");
     expect(r.folder).toBe(`${DRIVE_ROOT}/9001 Sample`);
-    expect(r.files).toEqual(expect.arrayContaining(["Job brief.md", "Request.md", "Sample.ESX"]));
+    expect(r.files).toEqual(expect.arrayContaining(["Job brief.md", "Request.md"]));
+    expect(r.files).not.toContain("Sample.ESX"); // encrypted: never sent
     const dir = path.join(root, DRIVE_ROOT, "9001 Sample", "for-claude");
     expect(readFileSync(path.join(dir, "Request.md"), "utf8")).toMatch(/job #9001 Sample[\s\S]*What Hunter wants:\*\* New estimate[\s\S]*washer and dryer reset[\s\S]*from-claude/);
     expect(readFileSync(path.join(dir, "Job brief.md"), "utf8")).toContain("Lockbox on the side gate.");

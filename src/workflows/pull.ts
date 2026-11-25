@@ -103,10 +103,7 @@ export async function pullJob(hub: Hub, jobNumber: number, opts: { quiet?: boole
       say(`DocuSketch: ${(e as Error).message}`);
     }
   }
-  if (job.docusketchProjectId) {
-    const esx = await hub.sketches.fetchEsx({ projectId: job.docusketchProjectId, sketchDir: hub.jobs.path(jobNumber, "sketch") });
-    say(esx ? `Sketch: ${esx}` : `Sketch: download ${job.docusketchProjectId}*.ESX from https://app.docusketch.com/portal-cc/projects (it's picked up from Downloads)`);
-  }
+  // DocuSketch's .ESX is encrypted and can't be read: measurements come from its floor plans, so it isn't asked for.
 
   if (lookups) hub.jobs.upsert(jobNumber, { lookupsAt: new Date().toISOString() });
   if (!opts.quiet) hub.jobs.log(jobNumber, "Pulled from Homebase");

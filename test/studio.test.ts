@@ -56,11 +56,12 @@ describe("Estimator tab", () => {
     writeFileSync(hub.jobs.path(3226, "estimate", "Augustine - Material Selection Approval.pdf"), "%PDF");
     writeFileSync(hub.jobs.path(3226, "files", "Carrier estimate.pdf"), "%PDF");
     writeFileSync(hub.jobs.path(3226, "sketch", "Augustine.ESX"), "x");
+    writeFileSync(hub.jobs.path(3226, "sketch", "Augustine floor plan.pdf"), "%PDF");
     const f = new Studio(hub, () => {}).files(3226);
     const have = Object.fromEntries(f.docs.map((d) => [d.key, d.file?.path ?? null]));
     expect(have).toEqual({ estimate: "estimate/Augustine - Reconstruction Estimate.pdf", agreement: null, xactimate: null, selections: "estimate/Augustine - Material Selection Approval.pdf", photos: null, subs: null });
     expect(f.otherPdfs.map((x) => x.path)).toEqual(["files/Carrier estimate.pdf"]);
-    expect(f.inputs.sketches[0].name).toBe("Augustine.ESX");
+    expect(f.inputs.sketches.map((s) => s.name)).toEqual(["Augustine floor plan.pdf"]); // the .ESX isn't a sketch Keystone uses
   });
 
   it("doesn't ask to overwrite the estimate when only the selections sheet is rendered", async () => {
