@@ -1,4 +1,14 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createInterface } from "node:readline/promises";
+
+/**
+ * Cards asked from background work (the proposal check, Proposal Submitted Notes, the brief's Homebase steps,
+ * Claude's results from Drive) wait in the "To review" list instead of popping up, so they can be answered in one
+ * sitting. Code run inside asLater() asks that way; everything else (what Hunter just pressed) still pops up.
+ */
+const cardMode = new AsyncLocalStorage<"later">();
+export const asLater = <T>(fn: () => Promise<T>): Promise<T> => cardMode.run("later", fn);
+export const askingLater = () => cardMode.getStore() === "later";
 
 /**
  * Everything irreversible goes through an Approver: Homebase writes (stage, proposal, fields, notes, files), sending

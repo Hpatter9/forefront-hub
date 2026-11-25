@@ -11,6 +11,7 @@ import { pullJob, saveNotes, savedNotes } from "../workflows/pull.js";
 import { noteAuthor, type HbNote } from "../connectors/homebase/types.js";
 import { estimateFiles, sendoff } from "../workflows/sendoff.js";
 import { sync } from "../workflows/sync.js";
+import { asLater } from "../core/approval.js";
 import { syncFiles, uploadToHomebase } from "../workflows/files.js";
 import { syncAll, type SyncAllResult } from "../workflows/background.js";
 import { editContact, editFields, FIELDS, fieldValues, SECTIONS, setAdjuster } from "../workflows/fields.js";
@@ -1397,7 +1398,9 @@ function runStatusUpdates(force = false, asked = false) {
   const tell = (text: string, problem = false) => { hub.say(text); if (asked || problem) bus.emit({ type: "notice", text }); };
   task("Proposal Submitted Notes for Homebase", undefined, async () => {
     try {
-      const r = await (await import("../workflows/statusUpdates.js")).updateProposalJobs(hub, { force });
+      const { updateProposalJobs } = await import("../workflows/statusUpdates.js");
+      // Started on its own: the card waits in To review. From the button: it pops up.
+      const r = await (asked ? updateProposalJobs(hub, { force }) : asLater(() => updateProposalJobs(hub, { force })));
       if (r.problem) tell(`Proposal Submitted Notes: ${r.problem}`, true);
       else if (!r.written && !r.skipped) tell(`Proposal Submitted Notes: Homebase shows no Proposal Submitted jobs with ${cfg.homebase.me} on them.`);
       else if (!r.written) tell(`Proposal Submitted Notes: nothing written (${r.skipped} job${r.skipped === 1 ? "" : "s"} had nothing new, couldn't be read, or you said no). The activity log has the details.`);
@@ -1437,7 +1440,7 @@ let driveBusy = false;
 setInterval(() => {
   if (driveBusy || !hub.drive?.connected() || hub.drive.kind === "mock") return;
   driveBusy = true;
-  checkDriveResults().catch(() => {}).finally(() => { driveBusy = false; });
+  asLater(() => checkDriveResults()).catch(() => {}).finally(() => { driveBusy = false; });
 }, 2 * 60_000);
 
 // ---- iPhone texts: when the phone is plugged in and its backup is old, back it up (workflows/autoBackup.ts).
@@ -1458,7 +1461,7 @@ if (hub.phoneBackup) {
 
 /** The brief's Homebase steps, each on its own Yes/No card (sync and upload ask before they write). */
 function runHomebaseChores(list: { kind: string; jobNumber: number }[]) {
-  return task("Homebase steps from the brief", undefined, async () => {
+  return task("Homebase steps from the brief", undefined, () => asLater(async () => {
     const { uploadToHomebase } = await import("../workflows/files.js");
     for (const c of list) {
       try {
@@ -1468,7 +1471,7 @@ function runHomebaseChores(list: { kind: string; jobNumber: number }[]) {
         hub.say(`#${c.jobNumber}: ${(e as Error).message}`);
       }
     }
-  }, "job");
+  }), "job");
 }
 
 // ---- the morning brief: on its own at 7:00 AM Denver time on weekdays (HUB_BRIEF_TIME=off stops it,
@@ -1529,7 +1532,7 @@ async function myCalendars(): Promise<Set<string>> {
 async function runProposalCheck(only?: number) {
   try {
     const { checkProposalsSent } = await import("../workflows/proposalSent.js");
-    for (const r of await checkProposalsSent(hub, only)) if (r.result === "updated") bus.emit({ type: "changed", job: r.jobNumber, what: "job" });
+    for (const r of await asLater(() => checkProposalsSent(hub, only))) if (r.result === "updated") bus.emit({ type: "changed", job: r.jobNumber, what: "job" });
   } catch (e) {
     console.error("proposal check:", e);
   }

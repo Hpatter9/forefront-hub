@@ -1108,7 +1108,7 @@
 
 <dialog id="approve"><div class="in"><h4 id="ap-title"></h4><ul id="ap-details"></ul><textarea id="ap-text" rows="3" hidden></textarea>
   <textarea id="ap-reply" rows="2" placeholder="Not a yes or no? Type your answer here" style="margin-top:10px;width:100%"></textarea></div>
-  <div class="foot"><button class="btn" id="ap-no">No</button><button class="btn" id="ap-send" hidden>Send my answer</button><button class="btn primary" id="ap-yes">Yes, go ahead</button></div></dialog>
+  <div class="foot"><button class="btn" id="ap-later" hidden title="Keep it in To review and answer it later">Later</button><span style="flex:1"></span><button class="btn" id="ap-no">No</button><button class="btn" id="ap-send" hidden>Send my answer</button><button class="btn primary" id="ap-yes">Yes, go ahead</button></div></dialog>
 
 <dialog id="sendoff"><form method="dialog"><div class="in">
   <h4>Draft the send-off</h4>
@@ -3511,27 +3511,48 @@ $("#prompt").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.sh
 
 // ============================================================= live events + approvals
 const approvals = [];
+// Cards from background work (later: true) wait in "To review" instead of popping up; what Hunter just pressed pops
+// up at once. Opening To review goes through the waiting ones one after another; Later puts the rest back.
+let reviewing = false, apCur = null;
+const nextCard = () => approvals.find((a) => !a.later) || (reviewing ? approvals.find((a) => a.later) : null);
+function showReviewChip() {
+  let el = $("#reviewchip");
+  if (!el) { el = document.createElement("button"); el.id = "reviewchip"; el.type = "button"; el.className = "chip"; el.style.cssText = "cursor:pointer;font:inherit;font-weight:600"; ($("#budgetchip") || $("#verchip") || $("#chips")).before(el); el.addEventListener("click", () => { reviewing = true; showApproval(); }); }
+  const n = approvals.filter((a) => a.later).length;
+  el.hidden = !n; el.textContent = `To review (${n})`;
+  el.title = n ? approvals.filter((a) => a.later).map((a) => `• ${jobNames(a.action)}`).join("\n") + "\n\nThings Keystone found on its own and wants your OK on. Click to go through them." : "";
+  // Once a day, say they're waiting.
+  const today = new Date().toDateString();
+  if (n && store.get("reviewSaid", "") !== today) { store.set("reviewSaid", today); snack(`${n} thing${n === 1 ? "" : "s"} to review: click To review at the top when you have a minute.`); }
+}
 function showApproval() {
-  const a = approvals[0], dlg = $("#approve");
-  if (!a) { if (dlg.open) dlg.close(); return; }
+  showReviewChip();
+  const a = nextCard(), dlg = $("#approve");
+  apCur = a || null;
+  if (!a) { reviewing = false; if (dlg.open) dlg.close(); return; }
+  const left = approvals.filter((x) => x.later).length;
   $("#ap-title").textContent = jobNames(a.action);
   $("#ap-details").innerHTML = a.details.filter(Boolean).map((d) => `<li>${esc(jobNames(d))}</li>`).join("");
   $("#ap-text").hidden = a.text === undefined; $("#ap-text").value = a.text ?? "";
   $("#ap-reply").value = ""; $("#ap-send").hidden = true;
+  $("#ap-later").hidden = !a.later;
+  $("#ap-later").textContent = left > 1 ? `Later (${left - 1} more waiting)` : "Later";
   if (!dlg.open) dlg.showModal();
 }
+const takeCard = () => { const a = apCur; if (!a) return null; const i = approvals.indexOf(a); if (i >= 0) approvals.splice(i, 1); apCur = null; return a; };
 async function answer(yes) {
-  const a = approvals.shift(); if (!a) return;
+  const a = takeCard(); if (!a) return;
   const text = a.text !== undefined ? $("#ap-text").value : undefined;
   showApproval();
   await api(`/api/approvals/${a.id}`, { method: "POST", body: { yes, text } }).catch(() => {});
 }
+function later() { reviewing = false; apCur = null; showApproval(); }
 // A typed answer instead of Yes or No. Cards that take one use it directly; for the rest it goes to Keystone's AI
 // as an instruction about that question (anything it then writes still asks first).
 async function sendReply() {
-  const a = approvals[0], reply = $("#ap-reply").value.trim();
-  if (!a || !reply) return;
-  approvals.shift();
+  const reply = $("#ap-reply").value.trim();
+  if (!apCur || !reply) return;
+  const a = takeCard();
   showApproval();
   await api(`/api/approvals/${a.id}`, { method: "POST", body: { yes: false, reply } }).catch(() => {});
   if (!a.replyAware) {
@@ -3544,7 +3565,9 @@ $("#ap-reply").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.
 $("#ap-send").addEventListener("click", sendReply);
 $("#ap-yes").addEventListener("click", () => answer(true));
 $("#ap-no").addEventListener("click", () => answer(false));
-$("#approve").addEventListener("cancel", (e) => { e.preventDefault(); answer(false); });
+$("#ap-later").addEventListener("click", later);
+// Esc: a card from To review goes back there; one that popped up because of something you pressed is a No.
+$("#approve").addEventListener("cancel", (e) => { e.preventDefault(); if (apCur?.later) later(); else answer(false); });
 
 // ============================================================= Estimator tab: Claude + the forefront-estimate skill, per job
 let estJob = store.get("estjob", null), estData = null, estFiles = [], estStream = "";
@@ -4290,7 +4313,7 @@ es.onmessage = (m) => {
   if (e.type === "subreport") onSubReport(e);
   if (e.type === "answer") onAnswer(e);
   if (e.type === "approval") { if (!approvals.some((a) => a.id === e.id)) approvals.push(e); showApproval(); }
-  if (e.type === "approval-done") { const i = approvals.findIndex((a) => a.id === e.id); if (i >= 0) { approvals.splice(i, 1); showApproval(); } }
+  if (e.type === "approval-done") { const i = approvals.findIndex((a) => a.id === e.id); if (i >= 0) { if (apCur === approvals[i]) apCur = null; approvals.splice(i, 1); showApproval(); } }
   if (e.type === "task") {
     if (e.state === "running") { log(`▶ ${e.label}`, "t-run"); if (e.label.startsWith("Sync jobs")) loadSyncState(); }
     if (e.state === "done") log(`✓ ${e.label}`, "t-ok");

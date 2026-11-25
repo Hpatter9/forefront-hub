@@ -1,12 +1,12 @@
 import type { ServerResponse } from "node:http";
 import type { StudioEvent } from "../agent/studio.js";
-import type { Approver } from "../core/approval.js";
+import { askingLater, type Approver } from "../core/approval.js";
 
 export type HubEvent =
   | { type: "log"; text: string; job?: number }
   /** Shown on screen for a few seconds (the result of something Hunter asked for, or a problem he should see). */
   | { type: "notice"; text: string }
-  | { type: "approval"; id: string; action: string; details: string[]; text?: string; replyAware?: boolean }
+  | { type: "approval"; id: string; action: string; details: string[]; text?: string; replyAware?: boolean; /** Waits in "To review" instead of popping up. */ later?: boolean; at?: string }
   | { type: "approval-done"; id: string; answer: boolean }
   | { type: "task"; id: string; state: "running" | "done" | "error"; label: string; error?: string; job?: number }
   | { type: "changed"; job?: number; what: "timeline" | "mail" | "job" | "calendar" | "plan" | "summaries" | "tasks" }
@@ -41,7 +41,7 @@ export class EventBus {
 /** Asks in the browser: a confirm card appears in every open window; the first answer wins. */
 export class WebApprover implements Approver {
   private pending = new Map<string, (yes: boolean, text?: string, reply?: string) => void>();
-  constructor(private bus: EventBus, private timeoutMs = 15 * 60_000) {}
+  constructor(private bus: EventBus, private timeoutMs = 15 * 60_000, private laterTimeoutMs = 3 * 24 * 3600_000) {}
 
   /**
    * One card. Besides Yes and No, Hunter can type his own answer (`reply`). For a plain confirm the page passes a
@@ -57,9 +57,11 @@ export class WebApprover implements Approver {
         this.bus.emit({ type: "approval-done", id, answer: yes });
         resolve({ yes, text: edited ?? text, reply: reply?.trim() || undefined });
       };
-      const timer = setTimeout(() => done(false), this.timeoutMs);
+      // A card in "To review" waits days, not minutes: it's there for the next sitting.
+      const later = askingLater();
+      const timer = setTimeout(() => done(false), later ? this.laterTimeoutMs : this.timeoutMs);
       this.pending.set(id, done);
-      this.bus.emit({ type: "approval", id, action, details, text, replyAware });
+      this.bus.emit({ type: "approval", id, action, details, text, replyAware, ...(later ? { later: true, at: new Date().toISOString() } : {}) });
     });
   }
 

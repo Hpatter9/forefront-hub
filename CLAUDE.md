@@ -109,6 +109,11 @@
 - Pop-ups (question cards, the notice at the bottom left, game toasts) name the job, not its number: `jobNames` in
   `src/server/ui.html` turns "#3212 Gorrell" and a bare "#3212" into "Gorrell" (the number stays only when two jobs
   share a name or Keystone doesn't know the job). Write messages with `#<number>` as before; the page swaps it.
+- Cards from background work wait in "To review" instead of popping up: code run inside `asLater()`
+  (`src/core/approval.ts`) asks with `later: true` and a 3-day wait instead of 15 minutes. Wrapped: the proposal
+  check, auto-run Proposal Submitted Notes, the brief's Homebase steps, Claude's results from Drive. The page shows a
+  "To review (n)" chip (once a day a notice says so); clicking goes through them, Later (or Esc) puts the rest back.
+  Cards from something Hunter pressed still pop up at once. New background card sources: wrap them in asLater.
 - Question cards take a typed answer as well as Yes/No (`#ap-reply`). `confirm` treats a typed answer as no and the
   page sends it to the Ask box as an instruction; callers that can use it call `confirmOrReply` (e.g. the status
   card: "Williams: new text" or "skip Williams").
