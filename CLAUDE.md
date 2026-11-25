@@ -138,6 +138,9 @@
   estimate.json in ".../from-claude"; Keystone checks every 2 minutes (or "Get what Claude made"), asks before
   replacing an estimate (old one to estimate/revisions) and runs the free check. The root folder lives in Hunter's
   personal Drive and is shared with Keystone's Google account, hence the full `drive` scope (re-run Connect Gmail).
+  When the job folders themselves are in Google Drive (`jobsInDrive`: JOBS_ROOT under "My Drive"/"Shared drives", or
+  JOBS_IN_DRIVE=on), nothing is uploaded: the package and Request.md go in <job>/for-claude, Claude saves in
+  <job>/from-claude, and Keystone picks them up from the synced folder (Tracked.mode "local"; no Drive permission needed).
 - Data in Google Drive (`src/cli/driveData.ts`, `Move data to Google Drive.bat`): Google Drive for desktop syncs a
   "Keystone" folder; JOBS_ROOT points at Keystone/Jobs and HUB_DATA_DIR at Keystone/Data (`cfg.stateDir`). Keys and
   logins (.env, auth/) and machine-only files (`cfg.localDir` = .hub: iphone-tools, update.json) never go to Drive.

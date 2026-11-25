@@ -87,3 +87,33 @@ describe("writing estimates in a Claude chat through Google Drive", () => {
     await expect(sendToDrive(hub, 9001)).rejects.toThrow(/can't see the "Keystone hand-off" folder.*shared with/);
   });
 });
+
+describe("hand-off when the job folders are already in Google Drive", () => {
+  it("uses the job folder itself: the package in for-claude, Claude's files picked up from from-claude", async () => {
+    const { mkdirSync, writeFileSync, existsSync, readFileSync } = await import("node:fs");
+    const { testHub } = await import("./helpers.js");
+    const { pullJob } = await import("../src/workflows/pull.js");
+    const { sendToDrive, pullFromDrive, jobsInDrive, driveLabel } = await import("../src/workflows/driveHandoff.js");
+    const { hub } = testHub();
+    process.env.JOBS_IN_DRIVE = "on";
+    try {
+      await pullJob(hub, 9001);
+      expect(jobsInDrive(hub)).toBe(true);
+      const r = await sendToDrive(hub, 9001, "estimate", "check the vanity");
+      expect(r.files).toContain("Request.md");
+      const req = readFileSync(hub.jobs.path(9001, "for-claude", "Request.md"), "utf8");
+      expect(req).toMatch(/from-claude/);
+      expect(req).toMatch(/check the vanity/);
+      // Claude saves its work in from-claude (it syncs down to the PC).
+      writeFileSync(hub.jobs.path(9001, "from-claude", "Sample - Reconstruction Estimate.pdf"), "pdf");
+      writeFileSync(hub.jobs.path(9001, "from-claude", "estimate.json"), "{}");
+      const got = await pullFromDrive(hub);
+      expect(got).toEqual([{ jobNumber: 9001, files: expect.arrayContaining(["estimate.json", "Sample - Reconstruction Estimate.pdf"]) }]);
+      expect(existsSync(hub.jobs.path(9001, "estimate", "estimate.json"))).toBe(true);
+      expect(await pullFromDrive(hub)).toEqual([]); // nothing new the second time
+      expect(driveLabel("G:\\My Drive\\Keystone\\Jobs\\3212 Gorrell\\for-claude")).toBe("Keystone/Jobs/3212 Gorrell/for-claude");
+    } finally {
+      delete process.env.JOBS_IN_DRIVE;
+    }
+  });
+});

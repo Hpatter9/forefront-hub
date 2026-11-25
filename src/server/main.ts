@@ -1438,7 +1438,9 @@ async function checkDriveResults(n?: number): Promise<number> {
 }
 let driveBusy = false;
 setInterval(() => {
-  if (driveBusy || !hub.drive?.connected() || hub.drive.kind === "mock") return;
+  // Job folders in Google Drive need no Drive permission: Claude's results arrive in the synced folder.
+  const local = hub.cfg.mode === "live" && /[\\/](My Drive|Shared drives)([\\/]|$)/i.test(cfg.jobsRoot);
+  if (driveBusy || (!local && (!hub.drive?.connected() || hub.drive.kind === "mock"))) return;
   driveBusy = true;
   asLater(() => checkDriveResults()).catch(() => {}).finally(() => { driveBusy = false; });
 }, 2 * 60_000);
