@@ -70,11 +70,11 @@ describe("an estimate sent any way moves the job to Proposal Submitted", () => {
     expect(homebase.writes).toEqual([]);
   });
 
-  it("ignores photo reports, internal emails and drafts that weren't sent", async () => {
+  it("ignores photo reports, copies only to the office log, and drafts that weren't sent", async () => {
     const { hub, gmail, approver } = testHub();
     await pullJob(hub, 9001);
     await sendEstimate(hub, gmail, { file: "Sample - Photo Report.pdf" });
-    await sendEstimate(hub, gmail, { to: ["boss@forefrontteam.com"] });
+    await sendEstimate(hub, gmail, { to: ["office@forefrontteam.com"] });
     await hub.gmail.createDraft({ to: ["sam@example.com"], bcc: ["office+9001@forefrontteam.com"], subject: "Not sent", body: "x", attachments: [pdf("Sample - Reconstruction Estimate.pdf")] });
     expect(await checkProposalsSent(hub)).toEqual([]);
     expect(approver.asked).toEqual([]);
@@ -88,5 +88,14 @@ describe("an estimate sent any way moves the job to Proposal Submitted", () => {
     expect(typedAmount("7,188.14")).toBe(7188.14);
     expect(typedAmount("it was $950")).toBe(950);
     expect(typedAmount("no")).toBeUndefined();
+  });
+
+  it("counts an estimate sent to a coworker for their customer, and an Xactimate export by its email's subject", async () => {
+    const { hub, gmail } = testHub();
+    await pullJob(hub, 9001);
+    hub.jobs.upsert(9001, { estimate: { ...hub.jobs.get(9001).estimate, total: 1200 } });
+    const ref = await hub.gmail.createDraft({ to: ["kari@forefrontteam.com"], bcc: ["office+9001@forefrontteam.com"], subject: "Sample – 123 Main St – Reconstruction Estimate", body: "For your customer.", attachments: [pdf("SAMPLE-DENVER-RC.pdf")] });
+    gmail.markSent(ref.id, "2026-11-06T16:00:00Z");
+    expect((await checkProposalsSent(hub)).map((x) => x.result)).toEqual(["updated"]);
   });
 });

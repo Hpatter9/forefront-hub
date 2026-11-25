@@ -142,21 +142,17 @@ export async function connectCompanyCam() {
   console.log("Restart Keystone (close its window, open the desktop icon) to use it.");
 }
 
-/** Gemini as Keystone's AI (free key from Google AI Studio): saves GEMINI_API_KEY and HUB_AI=gemini in .env. */
+/** Gemini as Keystone's AI (a free key from Google AI Studio): saves GEMINI_FREE_API_KEY and HUB_AI=gemini in .env. */
 export async function connectGemini() {
   console.log("Connecting Gemini (Google's AI) to run Keystone's AI features: email summaries, tasks from email,");
   console.log("the daily brief, drafts and Ask. The Estimator tab still needs Claude.");
   step(1, "On the page that opens, sign in with your Google account and click Create API key. Copy the key.");
   console.log("   Free keys work. On the free tier Google may use what Keystone sends (customer emails, job details)");
-  console.log("   to improve its products. Turning on billing for the key's project (pay as you go) stops that.");
+  console.log("   to improve its products.");
   openBrowser("https://aistudio.google.com/apikey");
-  console.log("\n   Keystone can hold two keys at once so you never have to swap them:");
-  console.log("     F = a FREE key: used for all everyday work (no cost, daily limits).");
-  console.log("     P = a PAID key (billing or prepaid credit on its project): used only when the free key can't");
-  console.log("         answer, and for the heavy models you pick by name in the Estimator.");
-  console.log("   Run Connect Gemini once for each key you have.");
-  const kind = (await ask("\n2. Is the key you're adding Free or Paid? Type F or P and press Enter: ")).trim().toLowerCase().startsWith("p") ? "paid" : "free";
-  const key = (await ask(`3. Paste the ${kind} key here and press Enter: `)).trim();
+  console.log("\n   Use a FREE key (a project without billing). Keystone uses only that key, picks the best Gemini model");
+  console.log("   it answers on, and steps down to the next one when a model is at its free limit. Nothing is ever charged.");
+  const key = (await ask("\n2. Paste the free key here and press Enter: ")).trim();
   if (!key) throw new Error("No key; run Connect Gemini again when you have one.");
   const { LiveGemini } = await import("../connectors/gemini/index.js");
   const cfg = loadConfig();
@@ -165,10 +161,8 @@ export async function connectGemini() {
     .catch((e: Error) => {
       throw new Error(/key/i.test(e.message) ? "Google didn't accept that key. Copy it again (all of it) and run Connect Gemini again." : e.message);
     });
-  setEnv({ [kind === "paid" ? "GEMINI_API_KEY" : "GEMINI_FREE_API_KEY"]: key, HUB_AI: "gemini" });
-  const now = loadConfig();
-  console.log(`\nThe ${kind} Gemini key is saved and working (test answer: ${r.text.slice(0, 20) || "OK"}).`);
-  console.log(now.ai.geminiFreeKey && now.ai.geminiPaidKey ? "Keystone now has both keys: everyday work runs on the free one, and the paid one is only used when the free one can't answer or you pick a heavy model." : kind === "free" ? "Keystone has a free key only. Run Connect Gemini again and choose P if you want a paid key behind it." : "Keystone has a paid key only. Run Connect Gemini again and choose F to add a free key for everyday work.");
+  setEnv({ GEMINI_FREE_API_KEY: key, HUB_AI: "gemini" });
+  console.log(`\nThe free Gemini key is saved and working (test answer: ${r.text.slice(0, 20) || "OK"}).`);
   console.log("Restart Keystone (close its black window, then open the Keystone icon) to use it.");
 }
 

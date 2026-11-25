@@ -1,38 +1,71 @@
 import { describe, expect, it } from "vitest";
-import { LiveGemini } from "../src/connectors/gemini/index.js";
-import { FREE_GEMINI, isFreeGemini, loadConfig } from "../src/core/config.js";
+import { FreeGemini, LiveGemini, makeGemini, rankGeminiModels, restFor } from "../src/connectors/gemini/index.js";
+import { loadConfig } from "../src/core/config.js";
 
-describe("everyday work stays on the free Gemini models", () => {
-  it("ignores a heavy model set in .env and always has the free ones to fall back on", () => {
-    const heavy = loadConfig({ HUB_MODE: "mock", GEMINI_API_KEY: "k", GEMINI_MODEL: "gemini-4-argon", GEMINI_FAST_MODEL: "gemini-4-hydrogen", GEMINI_FALLBACK_MODELS: "gemini-3.5-pro, gemini-flash-latest" }, "/tmp/ks-free");
-    expect(heavy.ai.geminiModel).toBe("gemini-3.5-flash");
-    expect(heavy.ai.geminiFastModel).toBe("gemini-flash-lite-latest");
-    expect(heavy.ai.geminiIgnored).toEqual(["gemini-4-argon", "gemini-4-hydrogen"]);
-    expect(heavy.ai.geminiFallbacks).toEqual(["gemini-flash-latest", "gemini-3.5-flash", "gemini-flash-lite-latest"]);
-    const plain = loadConfig({ HUB_MODE: "mock", GEMINI_API_KEY: "k" }, "/tmp/ks-free");
-    expect(plain.ai).toMatchObject({ geminiModel: "gemini-3.5-flash", geminiFastModel: "gemini-flash-lite-latest", geminiIgnored: [], geminiFallbacks: FREE_GEMINI });
-    const own = loadConfig({ HUB_MODE: "mock", GEMINI_API_KEY: "k", GEMINI_MODEL: "gemini-3.8-flash" }, "/tmp/ks-free");
-    expect(own.ai.geminiModel).toBe("gemini-3.8-flash"); // another free Flash model is fine
-    expect([isFreeGemini("gemini-3.5-flash-lite"), isFreeGemini("gemini-3-pro"), isFreeGemini("gemini-3.1-flash-image")]).toEqual([true, false, false]);
+const ok = (text = "ok") => new Response(JSON.stringify({ candidates: [{ content: { role: "model", parts: [{ text }] } }] }), { status: 200 });
+const err = (status: number, message: string, extra: object = {}) => new Response(JSON.stringify({ error: { code: status, message, ...extra } }), { status });
+const ask = (model = "gemini-3.5-flash") => ({ model, system: "s", contents: [{ role: "user" as const, parts: [{ text: "hi" }] }] });
+
+/** A key whose models answer as `answer` says, counting every call. */
+function keyWith(answer: Record<string, () => Response>, list = Object.keys(answer)) {
+  const asked: string[] = [];
+  const fetchFn = (async (url: string) => {
+    if (/models\?pageSize/.test(String(url))) return new Response(JSON.stringify({ models: list.map((n) => ({ name: `models/${n}`, supportedGenerationMethods: ["generateContent"] })) }), { status: 200 });
+    const model = String(url).match(/models\/([^:]+):/)![1];
+    asked.push(model);
+    return (answer[model] ?? (() => err(404, "not found")))();
+  }) as typeof fetch;
+  return { asked, gemini: new FreeGemini(new LiveGemini("free-key", fetchFn)) };
+}
+
+describe("Gemini runs on the free key only, on the best model it answers on", () => {
+  it("uses one key: the free one, else the old GEMINI_API_KEY, and flags that", () => {
+    const both = loadConfig({ HUB_MODE: "mock", GEMINI_FREE_API_KEY: "free", GEMINI_API_KEY: "paid" }, "/tmp/ks-free");
+    expect(both.ai).toMatchObject({ provider: "gemini", geminiKey: "free", geminiKeyNotMarkedFree: false });
+    const old = loadConfig({ HUB_MODE: "mock", GEMINI_API_KEY: "only" }, "/tmp/ks-free");
+    expect(old.ai).toMatchObject({ geminiKey: "only", geminiKeyNotMarkedFree: true });
+    expect(makeGemini(both)).toBeInstanceOf(FreeGemini);
+    expect(makeGemini(loadConfig({ HUB_MODE: "mock" }, "/tmp/ks-free"))).toBeNull();
   });
 
-  it("moves on to the next model when one needs billing or isn't allowed, and stops only for a bad key", async () => {
-    const asked: string[] = [];
-    const fake = (async (url: string) => {
-      const model = String(url).match(/models\/([^:]+):/)![1];
-      asked.push(model);
-      if (model === "paid-model") return new Response(JSON.stringify({ error: { code: 403, message: "Billing must be enabled for this model." } }), { status: 403 });
-      if (model === "odd-model") return new Response(JSON.stringify({ error: { code: 400, message: "This model does not support function calling." } }), { status: 400 });
-      return new Response(JSON.stringify({ candidates: [{ content: { role: "model", parts: [{ text: "ok" }] } }] }), { status: 200 });
-    }) as typeof fetch;
-    const g = new LiveGemini("k", fake);
-    const r = await g.generate({ model: "paid-model", fallbackModels: ["odd-model", "gemini-3.5-flash"], system: "s", contents: [{ role: "user", parts: [{ text: "hi" }] }] });
-    expect(r).toMatchObject({ text: "ok", model: "gemini-3.5-flash" });
-    expect(asked).toEqual(["paid-model", "odd-model", "gemini-3.5-flash"]);
-    const bad = new LiveGemini("k", (async () => new Response(JSON.stringify({ error: { code: 400, message: "API key not valid." } }), { status: 400 })) as typeof fetch);
-    let n = 0;
-    (bad as any).fetchFn = (async (...a: any[]) => { n++; return new Response(JSON.stringify({ error: { code: 400, message: "API key not valid." } }), { status: 400 }); }) as typeof fetch;
-    await expect(bad.generate({ model: "a", fallbackModels: ["b", "c"], system: "s", contents: [] })).rejects.toThrow(/didn't accept the Gemini API key/);
-    expect(n).toBe(1);
+  it("ranks Google's list best first and leaves out speech, image and agent models", () => {
+    const r = rankGeminiModels(["models/gemini-3.5-flash", "models/gemini-4-argon", "models/gemini-3.8-flash", "models/gemini-4-hydrogen", "models/gemini-2.5-pro", "models/gemini-3.1-pro-preview",
+      "models/gemini-flash-latest", "models/gemini-3.5-flash-lite", "models/gemini-3.8-flash-tts", "models/gemini-3-pro-image", "models/deep-research-preview-04-2026", "models/gemma-4-31b-it", "models/gemini-flash-lite-latest"]);
+    expect(r.best).toEqual(["gemini-4-hydrogen", "gemini-4-argon", "gemini-3.8-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-3.1-pro-preview", "gemini-2.5-pro", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"]);
+    expect(r.quick).toEqual(["gemini-3.8-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"]);
+  });
+
+  it("steps down past models over their free limit or busy, then leaves them alone for a while", async () => {
+    const { asked, gemini } = keyWith({
+      "gemini-4-hydrogen": () => err(429, "quota", { details: [{ violations: [{ quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier" }] }] }),
+      "gemini-3.8-flash": () => err(503, "This model is currently experiencing high demand."),
+      "gemini-3.5-flash": () => ok("from 3.5"),
+      "gemini-3.5-flash-lite": () => ok("from lite"),
+    });
+    expect(await gemini.generate(ask())).toMatchObject({ text: "from 3.5", model: "gemini-3.5-flash" });
+    expect(asked).toEqual(["gemini-4-hydrogen", "gemini-3.8-flash", "gemini-3.8-flash", "gemini-3.5-flash"]); // a 503 is retried once
+    asked.length = 0;
+    // The next request goes straight to the model that answered.
+    expect(await gemini.generate(ask())).toMatchObject({ model: "gemini-3.5-flash" });
+    expect(asked).toEqual(["gemini-3.5-flash"]);
+    expect(gemini.status().resting.map((r) => r.model)).toEqual(["gemini-4-hydrogen", "gemini-3.8-flash"]);
+    // A quick job uses the Flash ladder only.
+    asked.length = 0;
+    expect(await gemini.generate(ask("gemini-flash-lite-latest"))).toMatchObject({ model: "gemini-3.5-flash" });
+    expect(asked).toEqual(["gemini-3.5-flash"]);
+  }, 20_000);
+
+  it("stops at once for a bad key", async () => {
+    const { asked, gemini } = keyWith({ "gemini-4-hydrogen": () => err(400, "API key not valid."), "gemini-3.5-flash": () => ok() });
+    await expect(gemini.generate(ask())).rejects.toThrow(/didn't accept the Gemini API key/);
+    expect(asked).toEqual(["gemini-4-hydrogen"]);
+  });
+
+  it("rests a model until the free daily limit resets, a few minutes when it was only busy", () => {
+    const at = new Date("2026-11-25T20:00:00Z"); // noon Pacific
+    expect(Math.round(restFor("Gemini: m hit its daily quota (x)", at) / 3600_000)).toBe(12);
+    expect(restFor("Gemini: m hit its per-minute quota (x)", at)).toBe(120_000);
+    expect(restFor("Gemini: m is busy or unavailable (x)", at)).toBe(300_000);
+    expect(restFor("Gemini: model m not found or no longer available (x)", at)).toBe(86_400_000);
   });
 });

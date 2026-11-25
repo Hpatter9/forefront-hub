@@ -10,8 +10,9 @@ import { toLocalDate } from "./sync.js";
 
 /**
  * "I sent the estimate, so the job is at Proposal Submitted." However the email went out (Keystone's compose box, an
- * AI draft Hunter sent, Gmail itself, his phone), Keystone finds it in Sent mail: an email from him, to someone
- * outside Forefront, on a job, with an estimate / proposal / agreement PDF attached. It then asks once, on a card,
+ * AI draft Hunter sent, Gmail itself, his phone), Keystone finds it in Sent mail: an email from him, to anyone but
+ * the office logging copy (the customer, the adjuster, or a coworker for their customer), on a job, with an estimate
+ * / proposal / agreement PDF attached (or an email about one, with a PDF). It then asks once, on a card,
  * and on Yes writes the proposal amount and date to Homebase (always together) and moves the job to Proposal
  * Submitted if it's earlier in the pipeline. A job already at Proposal Submitted only gets its amount brought up to
  * date (a revised estimate); a job past it is left alone.
@@ -58,7 +59,7 @@ export async function sentProposals(hub: Hub, state = load(hub), only?: number):
   const me = hub.cfg.gmail.address.toLowerCase();
   const domain = me.split("@")[1] ?? "";
   let list: ThreadSummary[] = [];
-  if (hub.gmail.kind === "google") list = await hub.gmail.search("in:sent has:attachment filename:pdf newer_than:14d", 40);
+  if (hub.gmail.kind === "google") list = await hub.gmail.search("in:sent has:attachment filename:pdf newer_than:14d", 60);
   else list = (await hub.gmail.listThreads?.({ label: "SENT" }).catch(() => ({ threads: [] })))?.threads ?? [];
   const all = allSigns(hub);
   const best = new Map<number, SentProposal>();
@@ -86,11 +87,17 @@ export async function sentProposals(hub: Hub, state = load(hub), only?: number):
   return { found: [...best.values()], looked };
 }
 
-function isSentProposal(m: Message, me: string, domain: string): boolean {
+function isSentProposal(m: Message, me: string, _domain: string): boolean {
   if (addr(m.from) !== me || m.labelIds?.includes("DRAFT")) return false;
-  if (!m.attachments.some((a) => isProposalFile(a.filename))) return false;
-  // Sent to (or for) the customer: at least one person outside Forefront gets it.
-  return [...m.to, ...m.cc].map(addr).some((a) => a && !a.endsWith(`@${domain}`));
+  const pdfs = m.attachments.map((a) => a.filename).filter((f) => /\.pdf$/i.test(f));
+  // The PDF is called an estimate / proposal / agreement, or the email is about one and carries a PDF that isn't a
+  // photo report, ITEL report or invoice (Xactimate exports have names like "YOUNG-COSPRINGS-RC.pdf").
+  const named = pdfs.some(isProposalFile);
+  const about = /estimate|proposal|agreement|\bbid\b|\bquote\b/i.test(m.subject) && !/^(fwd?|fw):/i.test(m.subject.trim()) && pdfs.some((f) => !/photo|itel|invoice|work order|report/i.test(f));
+  if (!named && !about) return false;
+  // Sent to (or for) the customer: someone besides the office copy that only logs it in Homebase. A coworker counts
+  // (an estimate sent to Kari or Jen for their customer); the card lets Hunter say no to one that was only a review.
+  return [...m.to, ...m.cc].map(addr).some((a) => a && a !== me && !/^office(\+\d+)?@/i.test(a));
 }
 
 /** What the estimate on file adds up to (the skill's own math), falling back to what the job folder remembers. */

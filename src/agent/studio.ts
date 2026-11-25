@@ -19,10 +19,8 @@ export type StudioRole = "user" | "assistant" | "tool" | "error" | "check" | "co
 /** Who writes: Claude's main model, Claude's cheaper model, or Gemini (free). */
 export type Writer = "claude" | "claude-lite" | "gemini" | "gemini-hydrogen" | "gemini-argon";
 /** Gemini models Hunter can pick by name to try on an estimate (GEMINI_HYDROGEN_MODEL / GEMINI_ARGON_MODEL change the ids). */
-export const GEMINI_CHOICES: Record<string, { model: string; label: string }> = {
-  "gemini-hydrogen": { model: process.env.GEMINI_HYDROGEN_MODEL || "gemini-4-hydrogen", label: "Gemini 4 Hydrogen" },
-  "gemini-argon": { model: process.env.GEMINI_ARGON_MODEL || "gemini-4-argon", label: "Gemini 4 Argon" },
-};
+/** Gemini models picked by name. None any more: Gemini runs on the free key only, on the best model it answers on. */
+export const GEMINI_CHOICES: Record<string, { model: string; label: string }> = {};
 export const isGemini = (w: Writer | undefined | null) => !!w && w.startsWith("gemini");
 /** The cheaper Claude model offered in the Estimator next to the main one. */
 export const LITE_MODEL = "claude-sonnet-5-5";

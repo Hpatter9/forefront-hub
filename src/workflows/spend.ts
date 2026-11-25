@@ -134,7 +134,8 @@ export async function budgetReport(stateDir: string, claudeCost?: ClaudeCost | n
   const prev = Object.keys(l.months).filter((x) => x < k).sort().at(-1);
   return {
     month: k,
-    lines: [line("claude", "Claude (Anthropic)", m.claude, l.budgets.claude, official), line("google", "Gemini (Google)", m.gemini, l.budgets.google)],
+    // Gemini runs on the free key only, so it never costs anything: only Claude is on the budget.
+    lines: [line("claude", "Claude (Anthropic)", m.claude, l.budgets.claude, official)],
     geminiModels: Object.entries(m.geminiTokens).map(([model, t]) => ({ model, in: t.in, out: t.out, rate: rateFor(l, model), custom: !!l.geminiRates[model] })),
     lastMonth: prev ? { claude: round(l.months[prev].claude), google: round(l.months[prev].gemini) } : null,
   };

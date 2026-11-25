@@ -1,7 +1,7 @@
 import { makeDrive, type DriveClient } from "./connectors/drive/index.js";
 import { makePhoneBackup, type PhoneBackup } from "./connectors/iphoneBackup/index.js";
 import { makeClaudeCost, type ClaudeCost } from "./connectors/anthropicCost/index.js";
-import { makeGemini, TieredGemini, type GeminiClient } from "./connectors/gemini/index.js";
+import { FreeGemini, makeGemini, type GeminiClient } from "./connectors/gemini/index.js";
 import { makeTravel, type TravelClient } from "./connectors/travel/index.js";
 import path from "node:path";
 import { CliApprover, type Approver } from "./core/approval.js";
@@ -63,16 +63,6 @@ export function makeHub(cfg: Config = loadConfig(), approver: Approver = new Cli
     approver,
     say: (m) => console.log(m),
   };
-  // Everyday work moving to the paid Gemini key is said once a day, with why (usually the free key's daily limit).
-  if (hub.gemini instanceof TieredGemini) {
-    let saidOn = "";
-    hub.gemini.onPaidFallback = (why) => {
-      const today = new Date().toDateString();
-      if (saidOn === today) return;
-      saidOn = today;
-      hub.say(`The free Gemini key couldn't answer (${why.slice(0, 140)}), so Keystone is using your paid Gemini key for now. It goes back to the free one by itself.`);
-    };
-  }
   return hub;
 }
 
@@ -83,7 +73,7 @@ export function describe(hub: Hub): string[] {
     `jobs        ${c.jobsRoot}`,
     `skill       ${c.skillDir}${hub.skill.check() ? `  (!) ${hub.skill.check()}` : ""}`,
     `python      ${c.python}`,
-    `ai          ${c.ai.provider === "gemini" ? `Gemini (${c.ai.geminiModel}; quick jobs ${c.ai.geminiFastModel}; ${c.ai.geminiFreeKey && c.ai.geminiPaidKey ? `free key first, paid key ${c.ai.geminiPaidFallback === false ? "only for models picked by name" : "when the free one can't answer"}` : c.ai.geminiFreeKey ? "free key" : "one key"})${c.ai.geminiIgnored?.length ? `. Not used for everyday work: ${c.ai.geminiIgnored.join(", ")} (set in .env; only the free Flash models run here)` : ""}` : c.ai.provider === "claude" ? `Claude (${c.model})` : "off: add GEMINI_API_KEY or ANTHROPIC_API_KEY to .env"}`,
+    `ai          ${c.ai.provider === "gemini" ? `Gemini, free key, best model it answers on${hub.gemini instanceof FreeGemini && hub.gemini.lastModel ? ` (now ${hub.gemini.lastModel})` : ""}${c.ai.geminiKeyNotMarkedFree ? "  (!) the key is saved as GEMINI_API_KEY: if its Google project has billing on, run Connect Gemini to save your free key" : ""}` : c.ai.provider === "claude" ? `Claude (${c.model})` : "off"}`,
     `homebase    ${hub.homebase.kind}${hub.homebase.kind === "browser" ? `  login: ${path.relative(c.hubRoot, c.homebase.authFile)}` : ""}`,
     `gmail       ${hub.gmail.kind}${hub.gmail.kind === "mock" ? `  (drafts go to ${path.join(c.stateDir, "outbox")})` : ` ${c.gmail.address}`}`,
     `companycam  ${hub.photos.kind}`,

@@ -22,7 +22,7 @@ export interface Config {
    * GEMINI_API_KEY, else Claude if there's an Anthropic key, else off. The Estimator tab and setting up
    * selections use the Claude-only estimating skill, so they need Claude.
    */
-  ai: { provider: "claude" | "gemini" | "off"; /** Any Gemini key (the free one when there are two). */ geminiKey: string; geminiFreeKey?: string; geminiPaidKey?: string; /** Everyday work may move to the paid key when the free one can't answer. */ geminiPaidFallback?: boolean; geminiModel: string; geminiFastModel: string; geminiFallbacks?: string[]; /** Models named in .env that aren't free Flash models, so everyday work doesn't use them. */ geminiIgnored?: string[] };
+  ai: { provider: "claude" | "gemini" | "off"; /** The one Gemini key: the free one. */ geminiKey: string; /** Not a key marked free (GEMINI_FREE_API_KEY): shown in the status line. */ geminiKeyNotMarkedFree?: boolean; /** Names a caller passes; FreeGemini picks the actual model (best free one answering). A "lite" name means a quick job. */ geminiModel: string; geminiFastModel: string; geminiFallbacks?: string[] };
   model: string;
   /** A fast, cheaper model for small jobs like one-line email summaries. */
   fastModel: string;
@@ -47,7 +47,6 @@ export interface Config {
 export const FREE_GEMINI = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"];
 /** A Flash model (free tier), not a paid or preview heavyweight. */
 export const isFreeGemini = (m: string) => /flash/i.test(m) && !/pro|ultra|hydrogen|argon|image|tts|live/i.test(m);
-const everydayModel = (wanted: string, fallback: string) => (wanted && isFreeGemini(wanted) ? wanted : fallback);
 
 /** Reads .env from the Keystone folder (never committed) and fills in defaults. Mock wherever credentials are missing. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT): Config {
@@ -89,11 +88,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
     anthropicApiKey,
     anthropicAdminKey: e("ANTHROPIC_ADMIN_KEY"),
     ai: (() => {
-      // Two Gemini keys can sit side by side: a free one for everyday work and a paid one behind it (and for the
-      // heavy models). GEMINI_API_KEY alone is "the key" as before.
-      const geminiFreeKey = e("GEMINI_FREE_API_KEY");
-      const geminiPaidKey = e("GEMINI_API_KEY", e("GOOGLE_API_KEY"));
-      const geminiKey = geminiFreeKey || geminiPaidKey;
+      // Gemini runs on one key, the free one (GEMINI_FREE_API_KEY, saved by Connect Gemini). Keystone then picks
+      // the best model that key answers on and steps down when one is over its free limit (FreeGemini). A key under
+      // the old name GEMINI_API_KEY is used only when there's no free one.
+      const free = e("GEMINI_FREE_API_KEY");
+      const geminiKey = free || e("GEMINI_API_KEY", e("GOOGLE_API_KEY"));
       const want = e("HUB_AI").toLowerCase();
       const provider: Config["ai"]["provider"] =
         want === "off" ? "off" : want === "gemini" ? (geminiKey ? "gemini" : "off") : want === "claude" ? (anthropicApiKey ? "claude" : "off") : geminiKey ? "gemini" : "off";
@@ -102,16 +101,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
       return {
         provider,
         geminiKey,
-        geminiFreeKey,
-        geminiPaidKey,
-        geminiPaidFallback: !/^(off|0|false|no)$/i.test(e("GEMINI_PAID_FALLBACK")),
-        // Everyday work only ever runs on Google's free Flash models. A heavier model named in .env (Pro, Hydrogen,
-        // Argon...) is ignored here: those are picked by name in the Estimator's "Written by", nowhere else.
-        geminiModel: everydayModel(e("GEMINI_MODEL"), FREE_GEMINI[0]),
-        geminiFastModel: everydayModel(e("GEMINI_FAST_MODEL"), "gemini-flash-lite-latest"),
-        geminiIgnored: [e("GEMINI_MODEL"), e("GEMINI_FAST_MODEL")].filter((m) => m && !isFreeGemini(m)),
-        // Tried in turn when a model is busy or retired.
-        geminiFallbacks: [...e("GEMINI_FALLBACK_MODELS").split(",").map((x) => x.trim()).filter(isFreeGemini), ...FREE_GEMINI].filter((m, i, a) => a.indexOf(m) === i),
+        geminiKeyNotMarkedFree: !!geminiKey && !free,
+        geminiModel: FREE_GEMINI[0],
+        geminiFastModel: "gemini-flash-lite-latest",
+        geminiFallbacks: FREE_GEMINI,
       };
     })(),
     model: e("HUB_MODEL", "claude-opus-5-5"),

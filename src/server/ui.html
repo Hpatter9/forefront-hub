@@ -1062,7 +1062,7 @@
             <div class="bar">
               <button class="btn" type="button" id="est-attach" title="Add files to the job folder for the estimator">＋ Files</button>
               <input type="file" id="est-pick" multiple hidden>
-              <label class="small muted" style="display:inline-flex;align-items:center;gap:6px">Written by <select id="est-ai" title="Claude's best model is the proven one and costs the most. The lighter Claude model costs a good deal less. Gemini is free and on trial. Keystone checks every estimate for free whichever you pick."><option value="app">Claude app: your subscription (no extra cost)</option><option value="claude">Claude, best (costs most)</option><option value="claude-lite">Claude, lighter (costs less)</option><option value="gemini">Gemini (free, trial)</option><option value="gemini-hydrogen">Gemini 4 Hydrogen (trial)</option><option value="gemini-argon">Gemini 4 Argon (trial)</option></select></label>
+              <label class="small muted" style="display:inline-flex;align-items:center;gap:6px">Written by <select id="est-ai" title="Claude's best model is the proven one and costs the most. The lighter Claude model costs a good deal less. Gemini is free and on trial. Keystone checks every estimate for free whichever you pick."><option value="app">Claude app: your subscription (no extra cost)</option><option value="claude">Claude, best (costs most)</option><option value="claude-lite">Claude, lighter (costs less)</option><option value="gemini">Gemini (free, best free model, trial)</option></select></label>
               <span class="small muted" id="est-state" style="flex:1"></span>
               <button class="btn" type="button" id="est-stop" hidden>Stop</button>
               <button class="btn primary" type="button" id="est-send">Send</button>
@@ -1271,7 +1271,7 @@ function showBudget() {
   if (!budget) { el.hidden = true; return; }
   el.hidden = false;
   const part = (l) => l.budget == null ? `${l.provider === "claude" ? "Claude" : "Google"} ${money(l.spent)}` : `${l.provider === "claude" ? "Claude" : "Google"} ${money(l.left)} left`;
-  el.textContent = `API: ${budget.lines.map(part).join(" · ")}`;
+  el.textContent = `API: ${budget.lines.map(part).join(" · ")} · Gemini free`;
   const worst = budget.lines.some((l) => l.level === "over") ? "var(--bad)" : budget.lines.some((l) => l.level === "low") ? "var(--warn)" : "";
   el.style.borderColor = worst; el.style.color = worst;
   el.title = budget.lines.map((l) => `${l.label}: ${money(l.spent)} spent this month${l.budget != null ? ` of ${money(l.budget)} (${money(l.left)} left)` : " (no budget set)"}`).join("\n") + "\n\nClick to set your monthly budgets.";
@@ -3668,12 +3668,12 @@ function onSubReport(e) {
 // was started with one keeps it selected when you come back.
 /** The name to show for who is doing the work: whoever is actually running, else the one picked under the box. */
 const isGem = (w) => String(w || "").startsWith("gemini");
-const GEM_NAMES = { "gemini-hydrogen": "Gemini 4 Hydrogen", "gemini-argon": "Gemini 4 Argon" };
+const GEM_NAMES = {};
 function estWho() { const w = estData?.running && estData.writer ? estData.writer : estData ? estAi() : "claude"; return GEM_NAMES[w] || (isGem(w) ? "Gemini" : "Claude"); }
-function estAi() { const v = $("#est-ai").value; if (v === "app") return "app"; return isGem(v) && estData?.gemini ? v : !isGem(v) && estData?.claude ? v : estData?.claude ? "claude" : "gemini"; }
+function estAi() { if (/^gemini-/.test($("#est-ai").value) || !$("#est-ai").value) $("#est-ai").value = "gemini"; const v = $("#est-ai").value; if (v === "app") return "app"; return isGem(v) && estData?.gemini ? v : !isGem(v) && estData?.claude ? v : estData?.claude ? "claude" : "gemini"; }
 function showEstAi(d) {
   const sel = $("#est-ai");
-  sel.querySelector('[value="claude"]').disabled = !d.claude; for (const v of ["gemini", "gemini-hydrogen", "gemini-argon"]) { const o = sel.querySelector(`[value="${v}"]`); if (o) o.disabled = !d.gemini; }
+  sel.querySelector('[value="claude"]').disabled = !d.claude; for (const v of ["gemini"]) { const o = sel.querySelector(`[value="${v}"]`); if (o) o.disabled = !d.gemini; }
   for (const c of d.geminiChoices || []) { const o = sel.querySelector(`[value="${c.value}"]`); if (o) o.title = `Google model id: ${c.model}. Used alone, with no stand-in if it's busy.`; }
   // The lighter Claude is offered only when it's a different model from the main one.
   const lite = sel.querySelector('[value="claude-lite"]'); lite.disabled = !d.claude; lite.hidden = d.liteModel === d.mainModel;

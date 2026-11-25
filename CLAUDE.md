@@ -10,8 +10,9 @@
   `hub.approver.confirm`. Homebase's proposal amount and date are written together, and only after an estimate has
   actually been sent: by `sync` for send-off drafts, by `src/workflows/proposalSent.ts` for any other way it went out
   (or by an explicit, confirmed request). `proposalSent` looks through Sent mail (after every send from Keystone and
-  with each inbox check) for an email from Hunter to someone outside Forefront, on one job, with an estimate /
-  proposal / agreement PDF; it asks once per email on a card (a typed amount replaces the estimate's total), then
+  with each inbox check) for an email from Hunter to anyone but the office logging copy (customer, adjuster, or a
+  coworker for their customer), on one job, with an estimate / proposal / agreement PDF (or an estimate email with a
+  PDF, for Xactimate exports named like "YOUNG-COSPRINGS-RC.pdf"); it asks once per email on a card (a typed amount replaces the estimate's total), then
   writes amount + date and moves the job to Proposal Submitted. At Proposal Submitted it only refreshes the amount;
   past it, nothing. Handled emails are remembered in `.hub/proposals-sent.json`.
 - Test data is fictional (fixtures/). Don't commit real customer data, Homebase snapshots, `.env` or `auth/`.
@@ -29,8 +30,6 @@
 - The Estimator can be written by Claude (Agent SDK + the skill) or, as a trial, by Gemini (`src/agent/geminiEstimator.ts`):
   Gemini gets SKILL.md word for word plus narrow tools (read/list/view/write in the job folder, run the skill's own
   scripts). No estimating rules live in Keystone either way; the same overwrite guard applies to both.
-  Written by also offers Gemini 4 Hydrogen and Argon by name (`GEMINI_CHOICES` in `src/agent/studio.ts`; ids overridable
-  with GEMINI_HYDROGEN_MODEL / GEMINI_ARGON_MODEL): a named model runs alone, with no fallback model.
 - The sub work order (`src/workflows/subReport.ts`, laid out by `scripts/sub_report.py`) is written by the everyday
   AI (Gemini) from the estimate with prices stripped, the walk transcripts, notes and photos. It never shows a price,
   and anything the sources don't settle (which walls, color) is printed as NOT SETTLED and returned as a question.
@@ -64,8 +63,8 @@
   estimators are pointed at the skill's "ITEL pricing" rule (in the skill, not here). The free check validates
   `price_source: "itel"` lines against the reports.
 - API budget (`src/workflows/spend.ts`, chip + panel at the top of the page): every Claude run's `total_cost_usd`
-  and every Gemini answer's tokens (`MeteredGemini`, priced at editable per-model rates) are tallied per month in
-  `.hub/spend.json`; Hunter sets a monthly budget per provider and sees what's left. No API reports prepaid credit
+  is tallied per month in `.hub/spend.json` (Gemini is free, so it isn't on the budget any more); Hunter sets a
+  monthly budget and sees what's left. No API reports prepaid credit
   left. With `ANTHROPIC_ADMIN_KEY` the panel also shows Anthropic's own month-to-date cost
   (`src/connectors/anthropicCost`, cost analytics API) and uses the larger figure. Past the Claude budget, the
   Estimator asks before a paid Claude run. Record the cost of any new Claude or Gemini call path the same way.
@@ -77,7 +76,7 @@
   seconds after typing stops and on close (POST /api/mail/compose/save, same draft updated each time); Send saves, then
   asks on a card, then sends that draft (POST /api/mail/compose/send). Saves don't emit "mail changed", and the reader
   isn't redrawn while a reply is being typed (`readerBusy`).
-- Every Estimator writer can make Gmail drafts (never send): Claude through the hub tools, Gemini (all models) via
+- Every Estimator writer can make Gmail drafts (never send): Claude through the hub tools, Gemini via
   `gmail_create_draft` in `HUB_TOOLS`, the Claude app via `keystone_create_draft` on the bridge.
 - Proposal Submitted status (`src/workflows/statusUpdates.ts`): the "Proposal Submitted Notes" card on a recon job's
   Dashboard is Homebase's hold-notes (`GET/POST /projects/:id/hold-notes`; its own list, not job notes; POST only on a
@@ -127,12 +126,10 @@
   estimate.json in ".../from-claude"; Keystone checks every 2 minutes (or "Get what Claude made"), asks before
   replacing an estimate (old one to estimate/revisions) and runs the free check. The root folder lives in Hunter's
   personal Drive and is shared with Keystone's Google account, hence the full `drive` scope (re-run Connect Gmail).
-- Everyday Gemini work only runs on free Flash models (`FREE_GEMINI`, `isFreeGemini` in `src/core/config.ts`): a
-  heavier GEMINI_MODEL / GEMINI_FAST_MODEL in .env is ignored (shown in the status line), fallbacks always end with
-  the free list, and the connector moves to the next model on any failure except a bad key. Heavy models run only
-  when picked by name in the Estimator.
-- Two Gemini keys (`TieredGemini` in `src/connectors/gemini`): GEMINI_FREE_API_KEY runs everyday work; GEMINI_API_KEY
-  (paid) is used only when the free key can't answer (said once a day; GEMINI_PAID_FALLBACK=off stops it) and for
-  models picked by name (`paid: true`). Only the paid key's use is metered as spending. `Connect Gemini` asks F or P
-  and saves the right variable. With one key, everything works as before.
-
+- Gemini runs on ONE key, the free one (GEMINI_FREE_API_KEY; GEMINI_API_KEY only when there's no free one, flagged in
+  the status line). `FreeGemini` (`src/connectors/gemini`) reads Google's model list for the key once a day, ranks it
+  best first (`rankGeminiModels`: Gemini 4 / Pro class, then Flash newest first, then Flash-Lite; no speech, image or
+  agent models) and every request walks down it: a model over its free limit, busy, silent for 60s, retired or not on
+  the free tier is skipped and left resting (`restFor`: until the daily reset at midnight Pacific, minutes when only
+  busy). A request whose model name contains "lite" is a quick job and uses the Flash-only ladder. No paid key, no
+  models picked by name, no Gemini spending (the budget panel is Claude only).
