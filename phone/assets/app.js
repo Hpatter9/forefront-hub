@@ -90,6 +90,16 @@
       await hb("POST", `/projects/${id}/notes`, { body, prefix: NOTE_PREFIX });
     }
     let stagesCache = null;
+    /** Where a photo for job n goes: Homebase's Documents for that job, with this phone's sign-in. */
+    async function photoTarget(n) {
+      const s = setup();
+      if (!s?.homebase?.token) throw new Error("This phone isn't connected to Keystone yet.");
+      const id = await projectId(n);
+      const headers = { Accept: "application/json", Authorization: `Bearer ${s.homebase.token}` };
+      if (s.me?.email) headers["X-Acting-User-Email"] = s.me.email;
+      return { url: `${s.homebase.url}/api/v1/projects/${id}/documents`, headers };
+    }
+
     async function stages() {
       if (!stagesCache) stagesCache = (await hb("GET", "/vocabulary")).stages || [];
       return stagesCache;
@@ -423,7 +433,7 @@ How to answer:
       return { text: "That took more steps than I could finish. Try asking for one thing at a time.", history: trim(contents) };
     }
 
-    return { paired, setup, ask, findJobs, getJob, findContact, addNote, logCall, calendarList, calendarCreate, gmailDraft, tools, fmtPhone, stages, setStage, myJobs, tasks, setTaskDone, emailWaiting, today, dayList, markDone, findStock };
+    return { paired, setup, ask, findJobs, getJob, photoTarget, findContact, addNote, logCall, calendarList, calendarCreate, gmailDraft, tools, fmtPhone, stages, setStage, myJobs, tasks, setTaskDone, emailWaiting, today, dayList, markDone, findStock };
   }
 
   const api = { create, fmtPhone };

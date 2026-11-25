@@ -2,6 +2,13 @@ package com.forefront.keystone;
 
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
+import android.content.ClipData;
+import android.content.ContentValues;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
+import android.media.ExifInterface;
+import android.provider.MediaStore;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
@@ -45,6 +52,10 @@ import javax.crypto.spec.SecretKeySpec;
  */
 public class MainActivity extends Activity {
   private static final int SPEECH = 7;
+  private static final int PHOTOS = 8;
+  /** The photo upload waiting on the picker: where to send them, and the camera's file if one was offered. */
+  private String photoCallback, photoUrl, photoHeaders, photoTitle;
+  private Uri captureUri;
   private WebView web;
   private SharedPreferences prefs;
   private TextToSpeech tts;
@@ -156,6 +167,7 @@ public class MainActivity extends Activity {
   @Override
   protected void onActivityResult(int code, int result, Intent data) {
     super.onActivityResult(code, result, data);
+    if (code == PHOTOS) { photosPicked(result, data); return; }
     if (code != SPEECH || speechCallback == null) return;
     String id = speechCallback;
     speechCallback = null;
@@ -165,6 +177,92 @@ public class MainActivity extends Activity {
     } catch (Exception e) {
       done(id, error(e.getMessage()));
     }
+  }
+
+  /** The photos the person took or picked: each is made smaller, turned upright and sent to Homebase. */
+  private void photosPicked(int result, Intent data) {
+    final String id = photoCallback, url = photoUrl, headers = photoHeaders, title = photoTitle;
+    final Uri camera = captureUri;
+    photoCallback = null; captureUri = null;
+    if (id == null) return;
+    final ArrayList<Uri> uris = new ArrayList<>();
+    if (result == RESULT_OK && data != null) {
+      ClipData clip = data.getClipData();
+      if (clip != null) for (int i = 0; i < clip.getItemCount(); i++) uris.add(clip.getItemAt(i).getUri());
+      else if (data.getData() != null) uris.add(data.getData());
+    }
+    if (uris.isEmpty() && result == RESULT_OK && camera != null) uris.add(camera);
+    else if (camera != null) try { getContentResolver().delete(camera, null, null); } catch (Exception ignored) { }
+    if (uris.isEmpty()) { try { done(id, new JSONObject().put("uploaded", 0).put("failed", 0)); } catch (Exception ignored) { } return; }
+    pool.execute(() -> {
+      int ok = 0, bad = 0;
+      String last = "";
+      for (int i = 0; i < uris.size(); i++) {
+        try {
+          byte[] jpg = shrink(uris.get(i));
+          String name = "field-photo-" + System.currentTimeMillis() + "-" + (i + 1) + ".jpg";
+          JSONObject h = new JSONObject(headers);
+          h.put("Idempotency-Key", "phone-photo:" + name);
+          JSONObject r = upload(url, h, title + (uris.size() > 1 ? " (" + (i + 1) + " of " + uris.size() + ")" : ""), name, jpg);
+          if (r.getInt("status") >= 200 && r.getInt("status") < 300) ok++; else { bad++; last = r.optString("body", ""); }
+        } catch (Exception e) { bad++; last = String.valueOf(e.getMessage()); }
+      }
+      try { done(id, new JSONObject().put("uploaded", ok).put("failed", bad).put("problem", last.length() > 300 ? last.substring(0, 300) : last)); } catch (Exception ignored) { }
+    });
+  }
+
+  /** A phone photo at most 2000 pixels on its long side, upright, as a JPEG (a few hundred KB instead of several MB). */
+  private byte[] shrink(Uri uri) throws Exception {
+    BitmapFactory.Options o = new BitmapFactory.Options();
+    o.inJustDecodeBounds = true;
+    try (InputStream in = getContentResolver().openInputStream(uri)) { BitmapFactory.decodeStream(in, null, o); }
+    int side = Math.max(o.outWidth, o.outHeight), sample = 1;
+    while (side / (sample * 2) >= 2000) sample *= 2;
+    BitmapFactory.Options d = new BitmapFactory.Options();
+    d.inSampleSize = sample;
+    Bitmap b;
+    try (InputStream in = getContentResolver().openInputStream(uri)) { b = BitmapFactory.decodeStream(in, null, d); }
+    if (b == null) throw new Exception("That file isn't a photo.");
+    int turn = 0;
+    try (InputStream in = getContentResolver().openInputStream(uri)) {
+      int or = new ExifInterface(in).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+      turn = or == ExifInterface.ORIENTATION_ROTATE_90 ? 90 : or == ExifInterface.ORIENTATION_ROTATE_180 ? 180 : or == ExifInterface.ORIENTATION_ROTATE_270 ? 270 : 0;
+    } catch (Exception ignored) { }
+    float scale = Math.min(1f, 2000f / Math.max(b.getWidth(), b.getHeight()));
+    Matrix m = new Matrix();
+    if (scale < 1f) m.postScale(scale, scale);
+    if (turn != 0) m.postRotate(turn);
+    if (scale < 1f || turn != 0) b = Bitmap.createBitmap(b, 0, 0, b.getWidth(), b.getHeight(), m, true);
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    b.compress(Bitmap.CompressFormat.JPEG, 85, out);
+    return out.toByteArray();
+  }
+
+  /** One photo to Homebase's Documents tab (multipart, kind "photo"). */
+  private static JSONObject upload(String url, JSONObject headers, String title, String name, byte[] jpg) throws Exception {
+    if (!url.startsWith("https://")) throw new Exception("Only secure (https) addresses are allowed.");
+    String b = "----keystone" + System.nanoTime();
+    ByteArrayOutputStream body = new ByteArrayOutputStream();
+    String fields = "--" + b + "\r\nContent-Disposition: form-data; name=\"kind\"\r\n\r\nphoto\r\n"
+      + "--" + b + "\r\nContent-Disposition: form-data; name=\"title\"\r\n\r\n" + title + "\r\n"
+      + "--" + b + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"" + name + "\"\r\nContent-Type: image/jpeg\r\n\r\n";
+    body.write(fields.getBytes(StandardCharsets.UTF_8));
+    body.write(jpg);
+    body.write(("\r\n--" + b + "--\r\n").getBytes(StandardCharsets.UTF_8));
+    HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+    c.setRequestMethod("POST");
+    c.setConnectTimeout(15000);
+    c.setReadTimeout(120000);
+    c.setInstanceFollowRedirects(false);
+    for (Iterator<String> it = headers.keys(); it.hasNext(); ) { String k = it.next(); if (!"Content-Type".equalsIgnoreCase(k)) c.setRequestProperty(k, headers.getString(k)); }
+    c.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + b);
+    c.setDoOutput(true);
+    c.setFixedLengthStreamingMode(body.size());
+    try (OutputStream o = c.getOutputStream()) { body.writeTo(o); }
+    int status = c.getResponseCode();
+    String text = readAll(status >= 400 ? c.getErrorStream() : c.getInputStream());
+    c.disconnect();
+    return new JSONObject().put("status", status).put("body", text);
   }
 
   private class Bridge {
@@ -242,6 +340,37 @@ public class MainActivity extends Activity {
         } catch (ActivityNotFoundException e) {
           speechCallback = null;
           done(id, error("This phone has no speech-to-text set up. Use the microphone key on the keyboard instead."));
+        }
+      });
+    }
+
+    /** Take a photo or pick some, then send them to the job in Homebase. The count comes back to the page. */
+    @JavascriptInterface
+    public void addPhotos(final String id, final String url, final String headersJson, final String title) {
+      runOnUiThread(() -> {
+        try {
+          photoCallback = id; photoUrl = url; photoHeaders = headersJson; photoTitle = title;
+          Intent pick = new Intent(Intent.ACTION_GET_CONTENT);
+          pick.setType("image/*");
+          pick.addCategory(Intent.CATEGORY_OPENABLE);
+          pick.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+          Intent chooser = Intent.createChooser(pick, "Add photos to the job");
+          try {
+            ContentValues v = new ContentValues();
+            v.put(MediaStore.Images.Media.DISPLAY_NAME, "keystone-" + System.currentTimeMillis() + ".jpg");
+            v.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+            captureUri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
+            Intent cam = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            cam.putExtra(MediaStore.EXTRA_OUTPUT, captureUri);
+            cam.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[] { cam });
+          } catch (Exception noCamera) {
+            captureUri = null;
+          }
+          startActivityForResult(chooser, PHOTOS);
+        } catch (Exception e) {
+          photoCallback = null;
+          done(id, error(e.getMessage()));
         }
       });
     }

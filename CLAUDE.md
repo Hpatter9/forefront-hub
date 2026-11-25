@@ -24,6 +24,10 @@
   first, email is drafts only. `phone/keystone.apk` is the built app. Its signing key is `phone/signing/keystone.jks`,
   kept in the repo at Hunter's request so every update installs over the last one: always build with it, and raise
   `versionCode` in `phone/AndroidManifest.xml` with each release.
+  Field photos (1.3.0): "Add photos" on a job opens the camera or gallery (`Bridge.addPhotos` in MainActivity.java),
+  shrinks each to 2000px JPEG, turns it upright and posts it to Homebase Documents (kind photo, "field-photo-*.jpg");
+  the laptop's file sync also copies those into <job>/photos/field so the estimator's photo digest sees them. Voice
+  notes are "Add a note" (speech to text). Build here with the build-tools and platform zips in /opt/android.
 - The shop's overstock is the newest `.xlsx` in `inventory/` on the PC (git-ignored: its notes can name customers),
   read by `src/workflows/inventory.ts`. Keystone only reminds (job page card, `shop_stock` tool, a line in the AI's
   instructions); it never puts stock on an estimate itself.

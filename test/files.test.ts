@@ -108,3 +108,15 @@ describe("a zip of photos dropped on a job", () => {
     expect(readFileSync(nodePath.join(dir, "kitchen 1.jpg")).length).toBe(5002);
   });
 });
+
+describe("photos from the phone app", () => {
+  it("go with the job's photos as well as the Homebase mirror", async () => {
+    const { hub, homebase, root } = testHub(true);
+    const f = path.join(root, "field-photo-1795000000000-1.jpg");
+    writeFileSync(f, "jpeg");
+    homebase.docs.set(9001, [{ doc: { ...mockDoc(f, "photo"), fileName: "field-photo-1795000000000-1.jpg" }, file: f }]);
+    await pullJob(hub, 9001);
+    await syncFiles(hub, 9001);
+    expect(existsSync(hub.jobs.path(9001, "photos", "field", "field-photo-1795000000000-1.jpg"))).toBe(true);
+  });
+});

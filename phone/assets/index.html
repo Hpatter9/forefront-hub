@@ -396,6 +396,8 @@ async function openJob(n) {
       <button class="big" type="button" data-act="sched">Schedule</button>
       <button class="big" type="button" data-act="stage">Change stage</button>
     </div>
+    <button class="btn line" type="button" data-act="photos" style="flex:none">📷 Add photos (camera or gallery)</button>
+    <p class="note" id="photo-state" hidden></p>
     <details><summary>People <span>${j.contacts.length}</span></summary><div>${j.contacts.map(person).join("") || `<span class="muted">Nobody on this job in Homebase.</span>`}</div></details>
     <details><summary>Latest notes <span>${j.recentNotes.length}</span></summary><div>${j.recentNotes.map((x) => `<div><span class="muted small">${esc(x.author)} · ${x.at ? new Date(x.at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}</span><div>${esc(x.body)}</div></div>`).join("") || `<span class="muted">No team notes yet.</span>`}</div></details>
     <details><summary>Claim and amounts <span>${esc(j.carrier || "")}</span></summary><div><dl>${facts.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("") || `<dt>Nothing filled in</dt><dd></dd>`}</dl></div></details>
@@ -408,7 +410,22 @@ $("#job").addEventListener("click", (e) => {
   if (a === "sched") { startTalk({ label: `Schedule for ${tag}`, prefix: `For job ${j.jobNumber} (${j.name}), put this on my calendar: ` }, true); show("talk"); }
   if (a === "talk") { startTalk({ label: `About ${tag}`, prefix: `About job ${j.jobNumber} (${j.name}): ` }, true); show("talk"); }
   if (a === "stage") pickStage(j);
+  if (a === "photos") addPhotos(j);
 });
+/** Take or pick photos; the phone shrinks them and puts them in the job's Documents in Homebase (Keystone then
+ *  brings them into the job folder on the laptop). */
+async function addPhotos(j) {
+  if (!Native.addPhotos) return alert("This version of the app can't add photos. Install the newest Keystone app from the laptop (Connect phone).");
+  const st = $("#photo-state");
+  let t;
+  try { t = await K.photoTarget(j.jobNumber); } catch (e) { return alert(e.message); }
+  const when = new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  st.hidden = false; st.innerHTML = `<span class="busy"></span>Pick or take the photos…`;
+  const r = await call("addPhotos", t.url, JSON.stringify(t.headers), `Field photo ${when}`);
+  if (r.error) { st.innerHTML = `<span class="err">${esc(r.error)}</span>`; return; }
+  if (!r.uploaded && !r.failed) { st.hidden = true; return; }
+  st.innerHTML = r.failed ? `${r.uploaded} photo${r.uploaded === 1 ? "" : "s"} added; ${r.failed} didn't go: ${esc(r.problem || "")}` : `✓ ${r.uploaded} photo${r.uploaded === 1 ? "" : "s"} added to #${j.jobNumber} ${esc(j.name)} in Homebase.`;
+}
 async function pickStage(j) {
   let stages;
   try { stages = await K.stages(); } catch (e) { return alert(e.message); }

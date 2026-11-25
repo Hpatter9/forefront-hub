@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { DocumentKind, HomebaseDocument } from "../connectors/homebase/types.js";
 import type { Hub } from "../hub.js";
@@ -65,6 +65,12 @@ export async function syncFiles(hub: Hub, jobNumber: number): Promise<FileSyncRe
     const kind = standardKind(doc.fileName);
     const target = hub.jobs.path(jobNumber, "estimate", doc.fileName);
     if (kind && !existsSync(target)) copyFileSync(path.join(dir, name), target);
+    // Photos taken with the Keystone phone app also go with the job's photos, so the estimator sees them.
+    if (/^field-photo-.*\.jpe?g$/i.test(doc.fileName || "")) {
+      const field = hub.jobs.path(jobNumber, "photos", "field");
+      mkdirSync(field, { recursive: true });
+      if (!existsSync(path.join(field, doc.fileName))) copyFileSync(path.join(dir, name), path.join(field, doc.fileName));
+    }
   }
   writeFileSync(indexFile, JSON.stringify(index, null, 2));
   if (downloaded.length) hub.jobs.log(jobNumber, `From Homebase: ${downloaded.join(", ")}`);
