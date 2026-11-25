@@ -1,0 +1,58 @@
+# Builds Keystone Scan (ios/KeystoneScan) on GitHub's Macs. Every push that changes it is compiled to check it;
+# running it by hand ("Run workflow") with the Apple secrets set also signs it and sends it to TestFlight.
+#
+# Secrets (GitHub > Settings > Secrets and variables > Actions):
+#   APPLE_TEAM_ID         the 10-character Team ID (developer.apple.com > Membership)
+#   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8   an App Store Connect API key (Users and Access > Integrations > Keys,
+#                         role Admin), its Issuer ID, and the .p8 file's whole text
+name: Keystone Scan (iPhone)
+on:
+  push:
+    paths: ["ios/**", ".github/workflows/ios-scan.yml"]
+  workflow_dispatch:
+    inputs:
+      testflight:
+        description: "Sign it and send it to TestFlight"
+        type: boolean
+        default: true
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make the Xcode project
+        run: brew install xcodegen && cd ios/KeystoneScan && xcodegen generate
+      - name: Compile (no signing)
+        run: |
+          cd ios/KeystoneScan
+          xcodebuild -project KeystoneScan.xcodeproj -scheme KeystoneScan -configuration Release \
+            -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build | tail -n 60
+          test "${PIPESTATUS[0]}" -eq 0
+      - name: Sign and send to TestFlight
+        if: github.event_name == 'workflow_dispatch' && inputs.testflight
+        env:
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+          KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          set -eo pipefail
+          if [ -z "$TEAM" ] || [ -z "$KEY_ID" ] || [ -z "$ISSUER" ] || [ -z "$KEY_P8" ]; then echo "The Apple secrets aren't set yet."; exit 1; fi
+          cd ios/KeystoneScan
+          KEY="$RUNNER_TEMP/AuthKey.p8"; printf '%s' "$KEY_P8" > "$KEY"
+          AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEY" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER")
+          xcodebuild -project KeystoneScan.xcodeproj -scheme KeystoneScan -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/KeystoneScan.xcarchive" DEVELOPMENT_TEAM="$TEAM" CURRENT_PROJECT_VERSION="${{ github.run_number }}" "${AUTH[@]}" archive | tail -n 40
+          cat > "$RUNNER_TEMP/export.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$TEAM</string>
+            <key>signingStyle</key><string>automatic</string>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/KeystoneScan.xcarchive" -exportOptionsPlist "$RUNNER_TEMP/export.plist" \
+            -exportPath "$RUNNER_TEMP/out" "${AUTH[@]}" | tail -n 40
+          echo "Sent build ${{ github.run_number }} to TestFlight. It shows in the TestFlight app on the iPhone in 10-30 minutes."
