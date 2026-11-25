@@ -848,13 +848,14 @@
   .bmail { border: 1px solid var(--line); background: var(--panel-2); color: var(--link); border-radius: 999px; padding: 1px 10px; font: inherit; font-size: 12.5px; cursor: pointer; margin-left: 6px; text-decoration: none; display: inline-block; text-indent: 0; }
   .bmail:hover { background: var(--soft); }
   .brief li.done .bmail { text-decoration: none; opacity: .7; }
-  .walks { display: grid; grid-template-columns: minmax(300px, 400px) minmax(0, 1fr); gap: 18px; padding: 22px 28px; align-items: start; }
-  .walks-list { display: grid; gap: 6px; max-height: calc(100vh - 220px); overflow: auto; }
+  /* The two panes fill the space between the top bar and the Ask box (whatever its size) and scroll on their own. */
+  .walks { display: grid; grid-template-columns: minmax(300px, 400px) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 18px; padding: 22px 28px; height: 100%; box-sizing: border-box; min-height: 0; }
+  .walks-list { display: grid; gap: 6px; align-content: start; min-height: 0; overflow: auto; padding-bottom: 12px; }
   .walkrow { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; color: var(--ink); font: inherit; cursor: pointer; display: grid; gap: 3px; }
   .walkrow.on { border-color: var(--link); background: var(--panel-2); }
-  .walks-detail { display: grid; gap: 14px; max-height: calc(100vh - 220px); overflow: auto; }
+  .walks-detail { display: grid; gap: 14px; align-content: start; min-height: 0; overflow: auto; padding-bottom: 12px; }
   .walks-detail .btext { white-space: normal; line-height: 1.6; }
-  @media (max-width: 900px) { .walks { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) { .walks { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); } .walks-list { max-height: 35vh; } }
   .bj-toggle { display: flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; margin-right: 10px; }
   .bj-toggle button { background: transparent; border: 0; color: var(--muted); font: inherit; font-size: 14px; padding: 7px 14px; cursor: pointer; }
   .bj-toggle button.on { background: var(--panel-2); color: var(--ink); font-weight: 600; }
