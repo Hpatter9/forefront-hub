@@ -1267,6 +1267,14 @@ if (INBOX_MINUTES > 0 && hub.gmail.kind === "google") {
 }
 
 const port = Number(process.env.HUB_PORT || 4317);
+// Data in Google Drive: say so if another PC is running Keystone on it right now, and keep this PC's stamp fresh.
+if (path.resolve(cfg.stateDir) !== path.resolve(cfg.localDir)) {
+  const { otherPcUsing, stampInUse } = await import("../workflows/inUse.js");
+  const other = otherPcUsing(cfg.stateDir);
+  if (other) setTimeout(() => bus.emit({ type: "notice", text: `Keystone looks open on another PC too (${other.host}, ${new Date(other.at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}). Both use the same Google Drive files: close it there.` }), 8000);
+  stampInUse(cfg.stateDir);
+  setInterval(() => stampInUse(cfg.stateDir), 5 * 60_000);
+}
 const host = process.env.HUB_HOST || "127.0.0.1";
 server.listen(port, host, () => {
   console.log(`Forefront hub running at http://${host === "0.0.0.0" ? "localhost" : host}:${port}`);

@@ -126,6 +126,11 @@
   estimate.json in ".../from-claude"; Keystone checks every 2 minutes (or "Get what Claude made"), asks before
   replacing an estimate (old one to estimate/revisions) and runs the free check. The root folder lives in Hunter's
   personal Drive and is shared with Keystone's Google account, hence the full `drive` scope (re-run Connect Gmail).
+- Data in Google Drive (`src/cli/driveData.ts`, `Move data to Google Drive.bat`): Google Drive for desktop syncs a
+  "Keystone" folder; JOBS_ROOT points at Keystone/Jobs and HUB_DATA_DIR at Keystone/Data (`cfg.stateDir`). Keys and
+  logins (.env, auth/) and machine-only files (`cfg.localDir` = .hub: iphone-tools, update.json) never go to Drive.
+  The move copies without replacing anything already in Drive and deletes nothing. `src/workflows/inUse.ts` stamps
+  keystone-in-use.json so a second PC opening Keystone on the same data gets a warning (one PC at a time).
 - Gemini runs on ONE key, the free one (GEMINI_FREE_API_KEY; GEMINI_API_KEY only when there's no free one, flagged in
   the status line). `FreeGemini` (`src/connectors/gemini`) reads Google's model list for the key once a day, ranks it
   best first (`rankGeminiModels`: Gemini 4 / Pro class, then Flash newest first, then Flash-Lite; no speech, image or

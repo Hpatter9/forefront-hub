@@ -19,7 +19,7 @@ export function makeGuard(hub: Hub): CanUseTool {
 
     if (toolName === "Write" || toolName === "Edit" || toolName === "MultiEdit" || toolName === "NotebookEdit") {
       const file = String(input.file_path ?? input.notebook_path ?? "");
-      if (!inside(file, hub.cfg.jobsRoot) && !inside(file, path.join(hub.cfg.hubRoot, ".hub")) && !inside(file, osTmp())) {
+      if (!inside(file, hub.cfg.jobsRoot) && !inside(file, hub.cfg.stateDir) && !inside(file, hub.cfg.localDir) && !inside(file, osTmp())) {
         return deny(`Writes are limited to the job folders (${hub.cfg.jobsRoot}).`);
       }
       if (inside(file, hub.cfg.skillDir)) return deny("The forefront-estimate skill isn't edited from Keystone.");

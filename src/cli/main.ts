@@ -211,6 +211,7 @@ connect.command("walks").description("Pick up walk recordings (from your watch/p
 connect.command("claude-app").description("Let the Claude desktop app use Keystone, so estimates are written on your Claude subscription instead of the paid API").action(async () => (await import("./connect.js")).connectClaudeApp());
 connect.command("phone").description("Connect the Keystone phone app: shows an address and code, and offers the app's install file").action(async () => (await import("./connect.js")).connectPhone());
 connect.command("companycam").description("Connect CompanyCam with an access token").action(async () => (await import("./connect.js")).connectCompanyCam());
+program.command("move-to-drive").argument("[folder]", "a Google Drive folder (found by itself when left out)").description("Keep the job folders and Keystone's data in Google Drive").action(async (folder?: string) => (await import("./driveData.js")).moveToDrive(folder));
 
 program
   .command("mock-send <job>")

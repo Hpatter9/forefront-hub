@@ -62,13 +62,13 @@ export class LivePhoneBackup implements PhoneBackup {
   private dir: string;
   private py: string;
   constructor(private cfg: Config) {
-    this.dir = path.join(cfg.stateDir, "iphone-tools");
+    this.dir = path.join(cfg.localDir, "iphone-tools"); // a Python install for this computer: never in Google Drive
     this.py = path.join(this.dir, process.platform === "win32" ? "Scripts\\python.exe" : "bin/python");
   }
 
   async ready(): Promise<string | null> {
     if (existsSync(this.py) && (await run(this.py, ["-m", "pymobiledevice3", "version"], 60_000)).code === 0) return null;
-    mkdirSync(this.cfg.stateDir, { recursive: true });
+    mkdirSync(this.cfg.localDir, { recursive: true });
     const [cmd, ...pre] = this.cfg.python.split(" ");
     const venv = await run(cmd, [...pre, "-m", "venv", this.dir], 5 * 60_000);
     if (venv.code !== 0 || !existsSync(this.py)) return `Couldn't set up Python for the iPhone tool (${lastLines(venv.out)}).`;

@@ -9,6 +9,8 @@ export type Mode = "mock" | "live";
 
 export interface Config {
   hubRoot: string;
+  /** This computer's own folder (.hub in Keystone): Python tools, the update record. Never in Google Drive. */
+  localDir: string;
   mode: Mode;
   estimatorDir: string;
   skillDir: string;
@@ -58,7 +60,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
 
   const estimatorDir = e("ESTIMATOR_DIR", isWin ? "C:\\Games\\Estimator" : path.join(root, "..", "estimator"));
   const skillDir = e("SKILL_DIR", path.join(estimatorDir, "skill", "forefront-estimate"));
-  const stateDir = path.join(root, ".hub");
+  // Keystone's own data (contacts, drafts made, caches, the game...). HUB_DATA_DIR puts it in a Google Drive folder
+  // (Move data to Google Drive); things that only make sense on this computer stay in localDir.
+  const localDir = path.join(root, ".hub");
+  const stateDir = e("HUB_DATA_DIR", localDir);
 
   // Claude's key, in this order: Keystone's own .env, the Estimator app's saved key, then a key set on the PC.
   // Only real Anthropic keys (sk-ant-...) count: add-ons that send Claude to ChatGPT set fake ones on the PC.
@@ -80,6 +85,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, root = HUB_ROOT
 
   return {
     hubRoot: root,
+    localDir,
     mode,
     estimatorDir,
     skillDir,
