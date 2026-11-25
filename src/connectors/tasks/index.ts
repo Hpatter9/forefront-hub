@@ -168,7 +168,7 @@ export class MockTasks implements TasksClient {
     return this.load().filter((t) => (o.showCompleted || !t.completed) && (!o.dueMin || !t.due || t.due >= o.dueMin.slice(0, 10)) && (!o.dueMax || !t.due || t.due <= o.dueMax.slice(0, 10)));
   }
   async create(t: TaskInput & { title: string }) {
-    const task: Task = { id: `t${Date.now().toString(36)}`, listId: t.listId || "default", title: t.title, notes: t.notes, due: t.due ?? undefined, completed: !!t.completed, updated: new Date().toISOString(), jobNumber: jobRef(`${t.title} ${t.notes ?? ""}`) };
+    const task: Task = { id: `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, listId: t.listId || "default", title: t.title, notes: t.notes, due: t.due ?? undefined, completed: !!t.completed, updated: new Date().toISOString(), jobNumber: jobRef(`${t.title} ${t.notes ?? ""}`) };
     this.save([...this.load(), task]);
     return task;
   }

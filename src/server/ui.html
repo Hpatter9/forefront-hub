@@ -1476,6 +1476,7 @@ document.addEventListener("click", async (e) => {
     if (b.dataset.do === "logsent") await api(`/api/jobs/${n}/sync`, { method: "POST" });
     if (b.dataset.do === "upload") await api(`/api/jobs/${n}/files-upload`, { method: "POST", body: {} });
     if (b.dataset.do === "tostage") await api(`/api/jobs/${n}/stage`, { method: "POST", body: { stage: b.dataset.stage } });
+    if (b.dataset.do === "checktasks") { await api("/api/tasks/check", { method: "POST" }); snack("Checking your tasks against your jobs… a card comes up if anything should change."); }
     if (b.dataset.do === "gocal") showTab("cal");
     if (b.dataset.do === "taskdone") { await api(`/api/tasks/${encodeURIComponent(b.dataset.list)}/${encodeURIComponent(b.dataset.task)}`, { method: "PATCH", body: { completed: true } }); b.closest(".row")?.remove(); log("Task done. It's checked off on your phone too."); }
     if (b.dataset.do === "fileto") { await api("/api/inbox/file", { method: "POST", body: { threadId: b.dataset.thread, messageId: b.dataset.msg, jobNumber: n } }); b.closest(".rem")?.remove(); }
@@ -3389,7 +3390,7 @@ function tasksCard(d) {
   const today = ymd(new Date());
   const groups = [["Overdue", (k) => k.due && k.due < today], ["Today", (k) => k.due === today], ["Upcoming", (k) => k.due && k.due > today], ["No date", (k) => !k.due]];
   const rows = groups.map(([label, f]) => { const ks = (d.tasksOpen || []).filter(f); return ks.length ? `<div class="small muted" style="margin:8px 0 2px">${label}</div>${ks.map((k) => `<label class="row trow" style="gap:8px;padding:3px 0;align-items:flex-start"><input type="checkbox" data-chk="task" data-list="${esc(k.listId)}" data-task="${esc(k.id)}" style="margin-top:3px"><span style="flex:1;min-width:0">${esc(k.title)}</span>${k.jobNumber ? goButton(k.jobNumber, placeFor(k.title)) : ""}${k.due && label !== "Today" ? `<span class="small ${label === "Overdue" ? "" : "muted"}" style="${label === "Overdue" ? "color:var(--bad)" : ""}">${fmtDate(k.due + "T12:00")}</span>` : ""}</label>`).join("")}` : ""; }).join("");
-  return `<div class="card"><h3>My tasks <span class="muted small">${(d.tasksOpen || []).length} open</span></h3>
+  return `<div class="card"><h3>My tasks <span class="muted small">${(d.tasksOpen || []).length} open</span> <button class="btn small" type="button" data-do="checktasks" style="float:right" title="Goes through every open task against its job and offers to close ones that are done, not yours or outdated, and fix wrong ones. Asks first.">Check my tasks</button></h3>
     <form id="dash-tk-add" class="row" style="gap:6px;margin-bottom:4px"><input type="text" id="dash-tk-title" placeholder="Add a task (it goes to Google Tasks)" style="flex:1;min-width:0"><input type="date" id="dash-tk-due" style="width:140px"><button class="btn small primary">Add</button></form>
     ${rows || `<p class="muted" style="margin:6px 0 0">No open tasks.</p>`}</div>`;
 }

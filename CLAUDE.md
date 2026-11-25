@@ -80,6 +80,14 @@
   Homebase steps as Yes/No cards; the brief lists only what's left, grouped. Task titles are "Job name - what to do"
   (`src/workflows/taskTitle.ts`, job number in the notes). A brief line that is a Google Task takes its ticked state
   from Google, so a tick anywhere shows everywhere.
+- Task check (`src/workflows/taskCheck.ts`): before each brief and from "Check my tasks" (POST /api/tasks/check),
+  every open Google Task is matched to its job (number in notes/title, or the "Name - ..." prefix) and judged:
+  rules for closed/retired jobs and duplicates, then Gemini with each job's facts (stage, PM/estimator from Homebase,
+  estimate sent, last contact, recent log) for done / not_mine (PM's production work once won) / outdated / fix.
+  Changes come as ONE card (To review when automatic; typed "keep Morris" or "keep 2" spares some); closing only ticks
+  the task off with the reason in its notes, never deletes. Kept tasks aren't asked about again until they change;
+  flagged tasks are left out of the brief until answered. Email-made tasks (`src/agent/emailTasks.ts`) are only for
+  asks put to Hunter himself, and not production work on a won job unless he's named.
 - ITEL reports (`src/workflows/itel.ts`): the job review searches the job's email for them, saves PDFs to
   `files/ITEL/` with a Gemini summary (material, rooms, matched product, unit price, installed or not), and the
   estimators are pointed at the skill's "ITEL pricing" rule (in the skill, not here). The free check validates

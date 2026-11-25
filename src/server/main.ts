@@ -957,6 +957,14 @@ const server = http.createServer(async (req, res) => {
 
     // ---- Google Tasks (the real lists: what's made here shows on the phone, and the other way round)
     // ---- walk recordings
+    if (p === "/api/tasks/check" && req.method === "POST") {
+      // "Check my tasks": the card pops up (Hunter pressed it).
+      return send(res, 202, task("Checking your tasks", undefined, async () => {
+        const r = await (await import("../workflows/taskCheck.js")).reviewTasks(hub, { asked: true });
+        bus.emit({ type: "notice", text: !r.checked ? "No open tasks to check." : r.changes.length ? (r.changed ? `Cleaned up ${r.changed} of ${r.checked} tasks.` : "No tasks changed.") : `All ${r.checked} open tasks look right and yours.` });
+        bus.emit({ type: "changed", what: "tasks" });
+      }));
+    }
     if (p === "/api/walks" && req.method === "GET") {
       const w = await import("../workflows/walks.js");
       return send(res, 200, { status: w.walksStatus(hub), running: walksRunning, items: w.walkFolder(hub) });
@@ -1351,6 +1359,14 @@ function startPlan(trigger: "button" | "morning"): { taskId: string } | { error:
       const { autopilot, autopilotNote } = await import("../workflows/autopilot.js");
       const renamed = await (await import("../workflows/taskTitle.js")).reformatOpenTasks(hub).catch(() => 0);
       if (renamed) hub.say(`Renamed ${renamed} task${renamed === 1 ? "" : "s"} to "Job name - what to do".`);
+      // Every open task checked against its job: ones that are done, not mine or outdated wait in To review, and the
+      // brief leaves them out meanwhile.
+      const tc = await import("../workflows/taskCheck.js");
+      const checkedTasks = await tc.checkTasks(hub).catch((e) => (hub.say(`Task check: ${(e as Error).message}`), null));
+      if (checkedTasks?.changes.length) {
+        hub.say(`${checkedTasks.changes.length} of your tasks look done, not yours or wrong: they're in To review.`);
+        void tc.askAndApply(hub, checkedTasks.changes).then(() => bus.emit({ type: "changed", what: "tasks" })).catch(() => {});
+      }
       plan.steps.push("Keystone is handling what it can first: drafting replies and follow-ups, closing tasks that are done");
       savePlan(plan); bus.emit({ type: "changed", what: "plan" });
       const auto = await autopilot(hub, list).catch((e) => ({ ran: false, note: (e as Error).message, handled: [], leftForHunter: [], draftsWaiting: 0 }));
@@ -1580,7 +1596,8 @@ async function myDay(): Promise<{ text: string; tasks: Record<string, import("..
   if (hub.tasks.connected()) {
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Denver" });
     const soon = new Date(Date.now() + 86400_000).toLocaleDateString("en-CA", { timeZone: "America/Denver" });
-    const ts = (await hub.tasks.tasks().catch(() => [])).filter((t) => !t.completed && t.due && t.due <= soon).sort((a, b) => (a.due ?? "").localeCompare(b.due ?? ""));
+    const { flaggedTasks } = await import("../workflows/taskCheck.js");
+    const ts = (await hub.tasks.tasks().catch(() => [])).filter((t) => !t.completed && !flaggedTasks.has(t.id) && t.due && t.due <= soon).sort((a, b) => (a.due ?? "").localeCompare(b.due ?? ""));
     const lab = (await import("../workflows/briefTasks.js")).labelTasks(ts);
     taskMap = lab.map;
     lines.push("", "My Google Tasks due by tomorrow (and overdue), each with its tag:", ...(ts.length ? ts.map((t) => `- [${lab.tagOf(t)}] ${t.title}${t.due! < today ? ` (overdue since ${day(t.due!)})` : t.due === today ? " (due today)" : " (due tomorrow)"}`) : ["- none"]));
