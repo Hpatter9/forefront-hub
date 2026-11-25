@@ -123,7 +123,7 @@
   .job { padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; }
   .job:hover { background: var(--soft); }
   .job.sel { background: var(--panel-2); box-shadow: inset 3px 0 0 var(--ink); }
-  .job .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .job .t { font-weight: 600; overflow-wrap: anywhere; } /* labels like "LCP Development: 5925 E Evans #302" wrap so the unit shows */
   .n { color: var(--muted); font-weight: 400; }
   .amt { text-align: right; font-variant-numeric: tabular-nums; }
   .sub { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1256,7 +1256,7 @@ function rememberJob(n, name) {
   const r = store.get("recent", []).filter((x) => x.n !== n); r.unshift({ n, name }); store.set("recent", r.slice(0, 4)); renderRecent();
 }
 function renderRecent() {
-  $("#recent").innerHTML = store.get("recent", []).map((x) => `<button type="button" data-do="open" data-n="${x.n}" title="#${x.n} ${esc(x.name)}">⌂ #${x.n} ${esc(x.name)}</button>`).join("");
+  $("#recent").innerHTML = store.get("recent", []).map((x) => `<button type="button" data-do="open" data-n="${x.n}" title="${esc(jobLabel(x.n, x.name))}">⌂ ${esc(jobLabel(x.n, x.name))}</button>`).join("");
 }
 $("#globalq").addEventListener("keydown", (e) => { if (e.key !== "Enter") return; const q = $("#globalq").value.trim(); if (!q) return; if (/^#?\d{4}$/.test(q)) { showTab("jobs"); openJob(Number(q.replace("#", ""))); } else { showTab("jobs"); $("#q").value = q; renderList(); } $("#globalq").value = ""; });
 $("#logo").addEventListener("click", (e) => { e.preventDefault(); showTab("today"); });
@@ -1383,7 +1383,7 @@ const ACTIONS = {
   stale: (r) => `<button class="btn small" data-do="claude" data-p="Job #${r.jobNumber} hasn't been touched in a week. Look at where it stands and tell me the next step; draft any email that's needed (draft only).">What's next?</button>`,
 };
 function remRow(r) {
-  return `<div class="rem"><div class="l"><div class="ttl"><a href="#" data-do="open" data-n="${r.jobNumber}">#${r.jobNumber} ${esc(r.name)}</a> · ${esc(r.title)}</div><div class="small muted">${esc(r.detail)}${r.detail ? " · " : ""}<span class="stage">${esc(r.stage)}</span>${r.days && r.days < 999 ? ` · ${r.days} day${r.days === 1 ? "" : "s"}` : ""}</div>${r.why ? `<div class="small" style="margin-top:4px"><b>Why:</b> ${esc(r.why)}</div>` : ""}</div><div class="r">${ACTIONS[r.kind]?.(r) ?? ""}</div></div>`;
+  return `<div class="rem"><div class="l"><div class="ttl"><a href="#" data-do="open" data-n="${r.jobNumber}">${esc(jobLabel(r.jobNumber, r.name))}</a> · ${esc(r.title)}</div><div class="small muted">${esc(r.detail)}${r.detail ? " · " : ""}<span class="stage">${esc(r.stage)}</span>${r.days && r.days < 999 ? ` · ${r.days} day${r.days === 1 ? "" : "s"}` : ""}</div>${r.why ? `<div class="small" style="margin-top:4px"><b>Why:</b> ${esc(r.why)}</div>` : ""}</div><div class="r">${ACTIONS[r.kind]?.(r) ?? ""}</div></div>`;
 }
 let dashFilter = null;
 async function loadToday() {
@@ -1419,10 +1419,10 @@ async function loadToday() {
     <div class="cols">
       <div class="card"><h3>Needs you ${dashFilter ? `<button class="btn small" data-filter="">Show everything</button>` : ""}</h3>
         <div class="needs">
-        ${d.walks?.length && !dashFilter ? `<div class="group"><h3>Walk recordings <span class="muted">${d.walks.length} · pick the job, or try again</span></h3><datalist id="dl-jobs">${jobs.map((j) => `<option value="#${j.jobNumber} ${esc(j.name)}">`).join("")}</datalist>
-          ${d.walks.map((w) => `<div class="rem"><div class="l"><div class="ttl">${esc(w.name)} <span class="muted small">${fmtDate(w.recordedAt)}</span></div><div class="small muted">${w.status === "error" ? `<span style="color:var(--bad)">${esc(w.error || "Couldn't process it")}</span>` : esc((w.summary || "").slice(0, 220))}</div></div><div class="r">${w.status === "needs-job" ? `${(w.candidates || []).map((c) => `<button class="btn small primary" data-walk="${esc(w.id)}" data-walkjob="${c.jobNumber}">#${c.jobNumber} ${esc(c.name)}</button>`).join("")}<input type="text" class="walkpick" data-walk="${esc(w.id)}" list="dl-jobs" placeholder="Job # or name…" style="width:150px"><button class="btn small" data-walk="${esc(w.id)}" data-walkgo="1">File</button>` : `<button class="btn small" data-walk="${esc(w.id)}" data-walkretry="1">Try again</button>`}<button class="btn small" data-walk="${esc(w.id)}" data-walkdrop="1" title="Leave this recording out">Dismiss</button></div></div>`).join("")}</div>` : ""}
+        ${d.walks?.length && !dashFilter ? `<div class="group"><h3>Walk recordings <span class="muted">${d.walks.length} · pick the job, or try again</span></h3><datalist id="dl-jobs">${jobs.map((j) => `<option value="#${j.jobNumber} ${esc(jobLabel(j.jobNumber, j.name))}">`).join("")}</datalist>
+          ${d.walks.map((w) => `<div class="rem"><div class="l"><div class="ttl">${esc(w.name)} <span class="muted small">${fmtDate(w.recordedAt)}</span></div><div class="small muted">${w.status === "error" ? `<span style="color:var(--bad)">${esc(w.error || "Couldn't process it")}</span>` : esc((w.summary || "").slice(0, 220))}</div></div><div class="r">${w.status === "needs-job" ? `${(w.candidates || []).map((c) => `<button class="btn small primary" data-walk="${esc(w.id)}" data-walkjob="${c.jobNumber}">${esc(jobLabel(c.jobNumber, c.name))}</button>`).join("")}<input type="text" class="walkpick" data-walk="${esc(w.id)}" list="dl-jobs" placeholder="Job # or name…" style="width:150px"><button class="btn small" data-walk="${esc(w.id)}" data-walkgo="1">File</button>` : `<button class="btn small" data-walk="${esc(w.id)}" data-walkretry="1">Try again</button>`}<button class="btn small" data-walk="${esc(w.id)}" data-walkdrop="1" title="Leave this recording out">Dismiss</button></div></div>`).join("")}</div>` : ""}
         ${d.unfiled?.length && (!dashFilter || dashFilter === "reply") ? `<div class="group"><h3>Emails to file <span class="muted">${d.unfiled.length} · couldn't tell which job; pick one</span></h3>
-          ${d.unfiled.map((u) => `<div class="rem"><div class="l"><div class="ttl">${esc(u.subject || "(no subject)")}</div><div class="small muted">from ${esc(u.from)} · ${fmtDate(u.at)}</div></div><div class="r">${u.candidates.map((c) => `<button class="btn small primary" data-do="fileto" data-thread="${esc(u.threadId)}" data-msg="${esc(u.messageId)}" data-n="${c.jobNumber}">#${c.jobNumber} ${esc(c.name)}</button>`).join("")}<button class="btn small" data-do="thread" data-thread="${esc(u.threadId)}">Open</button><button class="btn small" data-do="notjob" data-msg="${esc(u.messageId)}">Not a job email</button></div></div>`).join("")}</div>` : ""}
+          ${d.unfiled.map((u) => `<div class="rem"><div class="l"><div class="ttl">${esc(u.subject || "(no subject)")}</div><div class="small muted">from ${esc(u.from)} · ${fmtDate(u.at)}</div></div><div class="r">${u.candidates.map((c) => `<button class="btn small primary" data-do="fileto" data-thread="${esc(u.threadId)}" data-msg="${esc(u.messageId)}" data-n="${c.jobNumber}">${esc(jobLabel(c.jobNumber, c.name))}</button>`).join("")}<button class="btn small" data-do="thread" data-thread="${esc(u.threadId)}">Open</button><button class="btn small" data-do="notjob" data-msg="${esc(u.messageId)}">Not a job email</button></div></div>`).join("")}</div>` : ""}
         ${groups.map((g) => `<div class="group"><h3>${esc(g.label)} <span class="muted">${by[g.kind].length} · ${esc(g.hint)}</span></h3>${by[g.kind].map(remRow).join("")}</div>`).join("") || `<div class="alldone">${d.lastSync || d.folders ? "Nothing is waiting on you." : "The first sync is still running. This fills in when it finishes (about a minute)."}</div>`}
         </div></div>
       <div class="side">
@@ -1438,9 +1438,9 @@ async function loadToday() {
           ${d.byStage.map((x) => `<tr data-stage="${esc(x.stage)}" data-tip="${esc(x.stage)}: ${x.count} job${x.count === 1 ? "" : "s"}${x.amount ? ` · ${usd(x.amount)}` : ""}"><td>${esc(x.stage)}<div><span class="sbar" style="width:${Math.round((x.count / max) * 100)}%"></span></div></td><td class="num">${x.amount ? usd(x.amount).replace(/\.\d\d$/, "") : ""}</td><td class="num"><b>${x.count}</b></td></tr>`).join("")}
           </tbody></table></div>
         <div class="card"><h3><span><span class="muted small">02</span> Proposals out</span><span class="small muted">largest first</span></h3>
-          ${d.proposals.length ? `<table class="tbl"><tbody>${d.proposals.map((x) => `<tr><td><a href="#" data-do="open" data-n="${x.jobNumber}">#${x.jobNumber} ${esc(x.name)}</a>${x.waiting ? ` <span class="tag in">reply</span>` : ""}<div class="small muted">${x.lastTouch ? esc(x.lastTouch) : "no activity"}</div></td><td class="num">${usd(x.amount) || "—"}<div class="small muted">${daysSince(x.lastTouchAt) ?? "?"}d quiet</div></td></tr>`).join("")}</tbody></table>` : `<p class="muted">None out.</p>`}</div>
+          ${d.proposals.length ? `<table class="tbl"><tbody>${d.proposals.map((x) => `<tr><td><a href="#" data-do="open" data-n="${x.jobNumber}">${esc(jobLabel(x.jobNumber, x.name))}</a>${x.waiting ? ` <span class="tag in">reply</span>` : ""}<div class="small muted">${x.lastTouch ? esc(x.lastTouch) : "no activity"}</div></td><td class="num">${usd(x.amount) || "—"}<div class="small muted">${daysSince(x.lastTouchAt) ?? "?"}d quiet</div></td></tr>`).join("")}</tbody></table>` : `<p class="muted">None out.</p>`}</div>
         <div class="card"><h3><span><span class="muted small">03</span> Recent activity</span></h3>
-          ${d.activity.length ? `<ul class="items">${d.activity.map((a) => `<li><a href="#" data-do="open" data-n="${a.jobNumber}">#${a.jobNumber} ${esc(a.name)}</a> <span class="small muted">${fmtWhen(a.at)}</span><div class="small">${esc(a.what)}</div></li>`).join("")}</ul>` : `<p class="muted">Nothing yet. Activity from Keystone shows here.</p>`}</div>
+          ${d.activity.length ? `<ul class="items">${d.activity.map((a) => `<li><a href="#" data-do="open" data-n="${a.jobNumber}">${esc(jobLabel(a.jobNumber, a.name))}</a> <span class="small muted">${fmtWhen(a.at)}</span><div class="small">${esc(a.what)}</div></li>`).join("")}</ul>` : `<p class="muted">Nothing yet. Activity from Keystone shows here.</p>`}</div>
       </div>
     </div>`;
   $("#plan")?.addEventListener("click", startPlan);
@@ -1495,7 +1495,7 @@ async function loadJobs() {
 }
 function renderList() {
   const q = $("#q").value.trim().toLowerCase(), st = $("#stage").value, sort = $("#sort").value;
-  const rows = jobs.filter((j) => (!st || j.stage === st) && (!q || `${j.jobNumber} ${j.name} ${j.address}`.toLowerCase().includes(q)));
+  const rows = jobs.filter((j) => (!st || j.stage === st) && (!q || `${j.jobNumber} ${j.name} ${j.label || ""} ${j.address}`.toLowerCase().includes(q)));
   const key = { days: (j) => -(daysSince(j.stageSince) ?? -1), touch: (j) => -(daysSince(j.lastTouchAt) ?? 9999), num: (j) => -j.jobNumber, amt: (j) => -(j.proposalAmount ?? 0) }[sort];
   rows.sort((a, b) => key(a) - key(b));
   $("#count").textContent = `${rows.length} job${rows.length === 1 ? "" : "s"}`;
@@ -1504,7 +1504,7 @@ function renderList() {
     const old = d !== null && ((j.stage === "Proposal Submitted" && d >= 10) || d >= 30);
     const dots = (j.flags || []).filter((f) => ["reply", "log", "estimate", "followup", "stale"].includes(f)).map((f) => `<span class="dot ${f}" title="${esc(meta.reminderGroups.find((g) => g.kind === f)?.label ?? f)}"></span>`).join("");
     return `<div class="job ${j.jobNumber === selected ? "sel" : ""}" data-n="${j.jobNumber}">
-      <div class="t"><span class="n">#${j.jobNumber}</span> ${esc(j.name)}${dots}</div><div class="amt">${usd(j.proposalAmount)}</div>
+      <div class="t"><span class="n">#${j.jobNumber}</span> ${esc(jobLabel(j.jobNumber, j.name))}${dots}</div><div class="amt">${usd(j.proposalAmount)}</div>
       <div class="sub"><span class="stage">${esc(j.stage)}</span> ${esc(j.address.split(",")[0])}</div><div class="days ${old ? "old" : ""}">${d === null ? "" : d + "d"}</div></div>`;
   }).join("") || `<div class="empty">No jobs match.</div>`;
 }
@@ -2009,19 +2009,27 @@ async function moveThreads(ids, target) {
     loadThreads(); loadMailCounts();
   });
 }
+/** A job's name as menus show it: "Gorrell", or "LCP Development: 5925 E Evans" / "McCandless: 19 Foxtail" for
+ * property-management jobs and customers with more than one job (the server works the label out). */
+function jobLabel(n, name = "") {
+  const j = jobs.find((x) => x.jobNumber === Number(n));
+  return j?.label || j?.name || name || `#${n}`;
+}
 /**
- * Pop-ups name the job, not its number: "#3212 Gorrell" and a bare "#3212" both read "Gorrell". A number Keystone
- * has no job for stays as it is, and when two jobs share a name the number stays beside it so they can be told apart.
+ * Pop-ups name the job, not its number: "#3212 Gorrell" and a bare "#3212" both read "Gorrell" (or the job's label,
+ * "LCP Development: 5925 E Evans"). A number Keystone has no job for stays as it is; a label that two jobs still share
+ * keeps the number beside it.
  */
 function jobNames(text) {
   let out = String(text ?? "");
   for (const num of new Set([...out.matchAll(/(?:^|[^\w&+])#(\d{3,6})\b/g)].map((m) => m[1]))) {
     const j = jobs.find((x) => x.jobNumber === Number(num));
     if (!j?.name) continue;
-    const twin = jobs.some((x) => x.jobNumber !== j.jobNumber && (x.name || "").toLowerCase() === j.name.toLowerCase());
-    const name = j.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    // The name is often written right after the number already: it isn't said twice.
-    out = out.replace(new RegExp(`(^|[^\\w&+])#${num}\\b(?: +${name}(?![\\w]))?`, "gi"), (all, pre) => `${pre}${j.name}${twin ? ` (#${num})` : ""}`);
+    const label = j.label || j.name;
+    const twin = jobs.some((x) => x.jobNumber !== j.jobNumber && (x.label || x.name || "").toLowerCase() === label.toLowerCase());
+    const rx = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // The name (or label) is often written right after the number already: it isn't said twice.
+    out = out.replace(new RegExp(`(^|[^\\w&+])#${num}\\b(?: +(?:${rx(label)}|${rx(j.name)})(?![\\w]))?`, "gi"), (all, pre) => `${pre}${label}${twin ? ` (#${num})` : ""}`);
   }
   return out;
 }
@@ -2096,10 +2104,10 @@ async function openThread(id) {
       <button class="gm-ib" data-m="archive" title="Archive">${msI("archive")}</button><button class="gm-ib" data-m="spam" title="Report spam">${msI("report")}</button><button class="gm-ib" data-m="trash" title="Delete">${msI("delete")}</button>
       <i class="gm-sep"></i><button class="gm-ib" data-m="unread" title="Mark as unread">${msI("mark_email_unread")}</button><button class="gm-ib" data-m="move" title="Move to">${msI("drive_file_move")}</button><button class="gm-ib" data-m="label" title="Labels">${msI("label")}</button><button class="gm-ib" data-m="star" title="${starred ? "Starred" : "Not starred"}">${msI("star", starred)}</button></div>
     <div class="gm-th">
-      <h1>${esc(t.messages[0]?.subject || "(no subject)")}${labelsOn.map((l) => `<span class="chip">${esc(GLABELS.find((g) => g[0] === l)?.[1] || l)}</span>`).join("")}${t.jobs.map((j) => `<a href="#" class="chip" data-do="open" data-n="${j.jobNumber}" title="${esc(j.stage)}">#${j.jobNumber} ${esc(j.name)}</a>`).join("")}</h1>
+      <h1>${esc(t.messages[0]?.subject || "(no subject)")}${labelsOn.map((l) => `<span class="chip">${esc(GLABELS.find((g) => g[0] === l)?.[1] || l)}</span>`).join("")}${t.jobs.map((j) => `<a href="#" class="chip" data-do="open" data-n="${j.jobNumber}" title="${esc(j.stage)}">${esc(jobLabel(j.jobNumber, j.name))}</a>`).join("")}</h1>
       ${peopleRow(t)}
       <div class="gm-filebar">${t.jobs.length ? t.jobs.map((j) => `<button class="gm-pill" data-do="filethread" data-thread="${esc(t.id)}" data-n="${j.jobNumber}" type="button">${msI("drive_file_move")}File to #${j.jobNumber}</button>`).join("") : `<span>Not matched to a job.</span>`}
-        <select id="fileto-job" aria-label="File to another job"><option value="">File to another job…</option>${jobs.map((j) => `<option value="${j.jobNumber}">#${j.jobNumber} ${esc(j.name)}</option>`).join("")}</select><button class="gm-pill" data-do="filethread" data-thread="${esc(t.id)}" type="button">File</button></div>
+        <select id="fileto-job" aria-label="File to another job"><option value="">File to another job…</option>${jobs.map((j) => `<option value="${j.jobNumber}">${esc(jobLabel(j.jobNumber, j.name))}</option>`).join("")}</select><button class="gm-pill" data-do="filethread" data-thread="${esc(t.id)}" type="button">File</button></div>
       ${t.messages.map(msgHtml).join("")}
       <div class="gm-msg gm-replybox" id="gm-replybox" hidden>${avatar("Hunter")}<div style="min-width:0"><div class="ge-host"></div></div></div>
       <div class="gm-replies" id="gm-replies"><button class="gm-pill" data-reply="reply" type="button">${msI("reply")}Reply</button>${multi ? `<button class="gm-pill" data-reply="all" type="button">${msI("reply_all")}Reply all</button>` : ""}<button class="gm-pill" data-reply="forward" type="button">${msI("forward")}Forward</button>${status.agent ? `<button class="gm-pill ai" id="claudereply" type="button">${msI("auto_awesome")}Draft reply with ${AI()}</button>` : ""}</div>
@@ -2234,7 +2242,7 @@ $$(".bj-toggle button").forEach((b) => b.addEventListener("click", () => setMail
 async function loadByJob() {
   try { bjList = await api("/api/mail/jobs"); } catch (e) { $("#bj-jobs").innerHTML = `<p class="muted small">${esc(e.message)}</p>`; return; }
   if (!bjList.some((j) => j.jobNumber === bjJob)) bjJob = bjList[0]?.jobNumber ?? null;
-  $("#bj-jobs").innerHTML = (bjList.map((j) => `<button type="button" class="bj-job ${j.jobNumber === bjJob ? "on" : ""}" data-bjjob="${j.jobNumber}" data-search="${esc(`#${j.jobNumber} ${j.name} ${j.stage} ${j.people || ""}`.toLowerCase())}"><span class="top"><b>#${j.jobNumber} ${esc(j.name)}</b>${j.waiting ? `<span class="wait">waiting on you</span>` : j.quietDays != null ? `<span class="small muted">${j.quietDays === 0 ? "today" : `quiet ${j.quietDays}d`}</span>` : ""}</span><span class="small muted">${esc(j.stage)} · ${esc(j.address)}</span></button>`).join("") || `<p class="muted small" style="padding:8px">No open jobs yet. They show up after the first sync.</p>`) + `<button type="button" class="bj-job" data-mailmode-go="inbox" style="border-style:dashed;color:var(--muted);margin-top:6px">Everything else: open the Inbox</button>`;
+  $("#bj-jobs").innerHTML = (bjList.map((j) => `<button type="button" class="bj-job ${j.jobNumber === bjJob ? "on" : ""}" data-bjjob="${j.jobNumber}" data-search="${esc(`#${j.jobNumber} ${j.name} ${j.label || ""} ${j.stage} ${j.people || ""}`.toLowerCase())}"><span class="top"><b>${esc(jobLabel(j.jobNumber, j.name))}</b>${j.waiting ? `<span class="wait">waiting on you</span>` : j.quietDays != null ? `<span class="small muted">${j.quietDays === 0 ? "today" : `quiet ${j.quietDays}d`}</span>` : ""}</span><span class="small muted">${esc(j.stage)} · ${esc(j.address)}</span></button>`).join("") || `<p class="muted small" style="padding:8px">No open jobs yet. They show up after the first sync.</p>`) + `<button type="button" class="bj-job" data-mailmode-go="inbox" style="border-style:dashed;color:var(--muted);margin-top:6px">Everything else: open the Inbox</button>`;
   if ($("#mq").value.trim()) bjSearch($("#mq").value.trim());
   if (bjJob) openBj(bjJob); else { $("#bj-head").innerHTML = ""; $("#bj-stream").innerHTML = ""; $("#bj-bar").innerHTML = ""; $("#bj-facts").innerHTML = ""; }
 }
@@ -2372,7 +2380,7 @@ function mkEditor(host, o, ui = {}) {
       <button type="button" class="ge-ib" data-a="attach" title="Attach files">${msI("attach_file")}</button>
       <button type="button" class="ge-ib" data-a="link" title="Insert link (Ctrl-K)">${msI("link")}</button>
       <button type="button" class="ge-ib" data-a="jobfiles" title="Attach a file from the job's folder (estimate, agreement, photo report)">${msI("folder_open")}</button>
-      <select class="ge-job" title="The job this email belongs to: adds the Homebase Bcc and lets you attach its files"><option value="">No job</option>${jobs.map((j) => `<option value="${j.jobNumber}" ${Number(o.job) === j.jobNumber ? "selected" : ""}>#${j.jobNumber} ${esc(j.name)}</option>`).join("")}</select>
+      <select class="ge-job" title="The job this email belongs to: adds the Homebase Bcc and lets you attach its files"><option value="">No job</option>${jobs.map((j) => `<option value="${j.jobNumber}" ${Number(o.job) === j.jobNumber ? "selected" : ""}>${esc(jobLabel(j.jobNumber, j.name))}</option>`).join("")}</select>
       <span class="ge-saved" aria-live="polite"></span><span style="flex:1"></span>
       <button type="button" class="ge-ib" data-a="discard" title="Discard draft">${msI("delete")}</button>
       <input type="file" multiple hidden></div></div>`;
@@ -2643,7 +2651,7 @@ function chooseTarget(files, job) {
   pendingFiles = files;
   $("#fd-count").textContent = files.length === 1 ? files[0].name : `${files.length} files`;
   $("#fd-names").textContent = files.length > 1 ? files.map((f) => f.name).join(", ") : "";
-  $("#fd-job").innerHTML = jobs.map((j) => `<option value="${j.jobNumber}" ${j.jobNumber === job ? "selected" : ""}>#${j.jobNumber} ${esc(j.name)}</option>`).join("");
+  $("#fd-job").innerHTML = jobs.map((j) => `<option value="${j.jobNumber}" ${j.jobNumber === job ? "selected" : ""}>${esc(jobLabel(j.jobNumber, j.name))}</option>`).join("");
   $("#filedlg").showModal();
 }
 $("#filedlg").addEventListener("close", async () => {
@@ -2953,7 +2961,7 @@ function openEvent(o) {
   $("#ev-date").value = ymd(s); $("#ev-start").value = s.toTimeString().slice(0, 5); $("#ev-end").value = en.toTimeString().slice(0, 5);
   $("#ev-allday").checked = !!o.allDay;
   $("#ev-loc").value = o.location || ""; $("#ev-desc").value = o.description || ""; $("#ev-att").value = (o.attendees || []).map((a) => a.email).join(", "); $("#ev-rem").value = "";
-  $("#ev-job").innerHTML = `<option value="">(none)</option>` + jobs.map((j) => `<option value="${j.jobNumber}" ${(o.job ?? o.jobNumber) === j.jobNumber ? "selected" : ""}>#${j.jobNumber} ${esc(j.name)}</option>`).join("");
+  $("#ev-job").innerHTML = `<option value="">(none)</option>` + jobs.map((j) => `<option value="${j.jobNumber}" ${(o.job ?? o.jobNumber) === j.jobNumber ? "selected" : ""}>${esc(jobLabel(j.jobNumber, j.name))}</option>`).join("");
   if (o.calendarId) $("#ev-cal").value = o.calendarId;
   $("#ev-cal").disabled = editing;
   $("#ev-del").hidden = !editing;
@@ -3001,7 +3009,7 @@ function openEvent(o) {
 })();
 $("#ev-job").addEventListener("change", () => {
   const j = jobs.find((x) => x.jobNumber === Number($("#ev-job").value)); if (!j) return;
-  if (!$("#ev-title").value.includes(`#${j.jobNumber}`)) $("#ev-title").value = `${$("#ev-title").value || "Scope walk"} #${j.jobNumber} ${j.name}`.trim();
+  if (!$("#ev-title").value.includes(`#${j.jobNumber}`)) $("#ev-title").value = `${$("#ev-title").value || "Scope walk"} #${j.jobNumber} ${jobLabel(j.jobNumber, j.name)}`.trim();
   if (!$("#ev-loc").value) $("#ev-loc").value = j.address;
 });
 $("#evdlg").addEventListener("close", async () => {
@@ -3358,7 +3366,7 @@ async function showWalk(name) {
   const x = (window._walks || []).find((i) => i.name === name); if (!x) return;
   $$("#walks-list .walkrow").forEach((b) => b.classList.toggle("on", b.dataset.walkname === name));
   const w = x.walk, el = $("#walks-detail");
-  const picker = (label) => `<span class="row" style="gap:6px;flex-wrap:wrap">${(w?.candidates || []).map((c) => `<button class="btn small primary" data-walk="${esc(w.id)}" data-walkjob="${c.jobNumber}">#${c.jobNumber} ${esc(c.name)}</button>`).join("")}<datalist id="dl-jobs2">${jobs.map((j) => `<option value="#${j.jobNumber} ${esc(j.name)}">`).join("")}</datalist><input type="text" class="walkpick" data-walk="${esc(w.id)}" list="dl-jobs2" placeholder="Job # or name…" style="width:170px"><button class="btn small" data-walk="${esc(w.id)}" data-walkgo="1">${label}</button></span>`;
+  const picker = (label) => `<span class="row" style="gap:6px;flex-wrap:wrap">${(w?.candidates || []).map((c) => `<button class="btn small primary" data-walk="${esc(w.id)}" data-walkjob="${c.jobNumber}">${esc(jobLabel(c.jobNumber, c.name))}</button>`).join("")}<datalist id="dl-jobs2">${jobs.map((j) => `<option value="#${j.jobNumber} ${esc(jobLabel(j.jobNumber, j.name))}">`).join("")}</datalist><input type="text" class="walkpick" data-walk="${esc(w.id)}" list="dl-jobs2" placeholder="Job # or name…" style="width:170px"><button class="btn small" data-walk="${esc(w.id)}" data-walkgo="1">${label}</button></span>`;
   const removeBtn = (key) => `<button class="btn small" data-walkremove="${esc(key)}" title="Takes it out of Keystone and out of the job. The original stays in the recordings folder.">Remove this recording</button>`;
   if (!w) { el.innerHTML = `<div class="card"><h3>${esc(x.name)}</h3><p>${esc(x.waiting || "")}</p><button class="btn primary" data-walktranscribe="${esc(x.name)}">Transcribe this recording now</button> ${removeBtn(x.name)}</div>`; return; }
   if (w.status === "error") { el.innerHTML = `<div class="card"><h3>${esc(x.name)}</h3><p style="color:var(--bad)">${esc(w.error || "Couldn't process it.")}</p><button class="btn primary" data-walk="${esc(w.id)}" data-walkretry="1">Try again</button> ${removeBtn(w.id)}</div>`; return; }
@@ -3427,7 +3435,7 @@ document.addEventListener("click", async (e) => {
       if (wb.dataset.walkjob) await api("/api/walks/file", { method: "POST", body: { id, job: Number(wb.dataset.walkjob) } });
       else if (wb.dataset.walkgo) {
         const v = document.querySelector(`input.walkpick[data-walk="${CSS.escape(id)}"]`)?.value || "";
-        const n = Number(v.match(/\d{4}/)?.[0]) || jobs.find((j) => j.name.toLowerCase() === v.trim().toLowerCase())?.jobNumber;
+        const n = Number(v.match(/\d{4}/)?.[0]) || jobs.find((j) => [j.name, j.label].some((x) => (x || "").toLowerCase() === v.trim().toLowerCase()))?.jobNumber;
         if (!n) { snack("Type the job number (or pick it from the list) first."); return; }
         await api("/api/walks/file", { method: "POST", body: { id, job: n } });
         snack(`Filed to #${n}.`);
@@ -3618,7 +3626,7 @@ async function loadEst() {
 function fillEstJobs() {
   const recent = store.get("estRecent", []).map((n) => jobs.find((j) => j.jobNumber === n)).filter(Boolean);
   const list = [...recent, ...jobs.filter((j) => !recent.includes(j))];
-  $("#est-job").innerHTML = `<option value="">Pick a job…</option>` + list.map((j) => `<option value="${j.jobNumber}" ${j.jobNumber === estJob ? "selected" : ""}>#${j.jobNumber} ${esc(j.name)}${j.stage ? ` · ${esc(j.stage)}` : ""}</option>`).join("");
+  $("#est-job").innerHTML = `<option value="">Pick a job…</option>` + list.map((j) => `<option value="${j.jobNumber}" ${j.jobNumber === estJob ? "selected" : ""}>${esc(jobLabel(j.jobNumber, j.name))}${j.stage ? ` · ${esc(j.stage)}` : ""}</option>`).join("");
   if (estJob && !jobs.some((j) => j.jobNumber === estJob)) $("#est-job").insertAdjacentHTML("beforeend", `<option value="${estJob}" selected>#${estJob}</option>`);
 }
 async function openEst(n) {
@@ -3627,7 +3635,7 @@ async function openEst(n) {
   setCrumbs(`Estimator / <b>#${n}</b>`);
   $("#est-log").innerHTML = `<div class="hello">Loading #${n}…</div>`;
   try { estData = await api(`/api/studio/${n}`); } catch (e) { estData = null; $("#est-log").innerHTML = `<div class="hello">Couldn't open #${n}: ${esc(e.message)}</div>`; return; }
-  if (estData.job.name) setCrumbs(`Estimator / <b>#${n} ${esc(estData.job.name)}</b>`);
+  if (estData.job.name) setCrumbs(`Estimator / <b>${esc(jobLabel(n, estData.job.name))}</b>`);
   renderEst();
 }
 async function refreshEstFiles() {
@@ -3640,7 +3648,7 @@ function renderEstSide() {
   const d = estData;
   if (!d) { $("#est-jobinfo").innerHTML = `<span class="muted small">Pick a job to start. The estimator works in that job's folder with the estimating skill, like a chat.</span>`; $("#est-docs").innerHTML = ""; $("#est-inputs").innerHTML = ""; $("#est-other").innerHTML = ""; return; }
   const j = d.job;
-  $("#est-jobinfo").innerHTML = `<b>#${j.jobNumber} ${esc(j.name)}</b>${esc(j.address || "")}<br><span class="muted">${esc(j.stage || "")}${j.insurance === "oop" ? " · Out of pocket" : j.carrier ? ` · ${esc(j.carrier)}` : ""}${j.claimNumber ? ` · ${esc(j.claimNumber)}` : ""}</span>${j.estimate?.total ? `<br>Estimate total: <b style="display:inline">$${Number(j.estimate.total).toLocaleString("en-US", { minimumFractionDigits: 2 })}</b>` : ""}`;
+  $("#est-jobinfo").innerHTML = `<b>${esc(jobLabel(j.jobNumber, j.name))}</b>${esc(j.address || "")}<br><span class="muted">${esc(j.stage || "")}${j.insurance === "oop" ? " · Out of pocket" : j.carrier ? ` · ${esc(j.carrier)}` : ""}${j.claimNumber ? ` · ${esc(j.claimNumber)}` : ""}</span>${j.estimate?.total ? `<br>Estimate total: <b style="display:inline">$${Number(j.estimate.total).toLocaleString("en-US", { minimumFractionDigits: 2 })}</b>` : ""}`;
   const cur = $("#est-frame").dataset.path;
   $("#est-docs").innerHTML = d.docs.map((x) => `<button type="button" class="est-doc ${x.file ? "have" : ""} ${x.file && x.file.path === cur && !$("#est").classList.contains("noprev") ? "on" : ""}" data-est-doc="${x.key}" title="${x.key === "subs" ? "The work order for subs: what to do in each room and which walls get painted, no prices. Written by Gemini (free)." : x.file ? `Preview ${esc(x.file.name)}` : `Ask for the ${esc(x.label)}`}"><i></i><span>${esc(x.label)}<br><small>${x.file ? `Updated ${new Date(x.file.modified).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Not made yet"}</small></span><span class="mk">${x.key === "subs" && x.file ? "Remake" : x.file ? "View" : "Make"}</span></button>`).join("") + (d.revisions ? `<div class="small muted" style="padding:2px 8px">${d.revisions} earlier version${d.revisions === 1 ? "" : "s"} kept in estimate/revisions</div>` : "") + (d.estimateJson ? `<button class="btn small" type="button" id="est-check" style="margin:6px 8px 0" title="Checks every price against the price list and price book, quantities against the room sizes, and the scope against your walk notes, emails and texts. Uses no Claude.">Check the estimate (free)</button>` : "");
   $("#est-other").innerHTML = d.otherPdfs.length ? `<h5>Other PDFs</h5><div class="est-docs">${d.otherPdfs.map((f) => `<button type="button" class="est-doc have ${f.path === cur ? "on" : ""}" data-est-path="${esc(f.path)}"><i style="background:var(--muted)"></i><span>${esc(f.name)}</span><span class="mk">View</span></button>`).join("")}</div>` : "";
@@ -3657,7 +3665,7 @@ function renderEstLog() {
   const app = $("#est-ai").value === "app" && !d.running;
   $("#est-input").hidden = app; $("#est-send").hidden = app || d.running;
   if (app) { renderHandoff(d); $("#est-quick").innerHTML = ""; return; }
-  if (!d.turns.length) log.innerHTML = `<div class="hello"><h3>#${d.job.jobNumber} ${esc(d.job.name)}</h3>What do you need for this job? Pick one below or just type. ${estWho()} uses the Forefront estimating skill and saves everything in the job's estimate folder.</div>`;
+  if (!d.turns.length) log.innerHTML = `<div class="hello"><h3>${esc(jobLabel(d.job.jobNumber, d.job.name))}</h3>What do you need for this job? Pick one below or just type. ${estWho()} uses the Forefront estimating skill and saves everything in the job's estimate folder.</div>`;
   else log.innerHTML = d.turns.map(estTurnHtml).join("");
   if (d.running) log.insertAdjacentHTML("beforeend", `<div class="msg assistant" id="est-live">${estStream ? md(estStream) : ""}</div><div class="msg typing" id="est-typing">${estWho()} is working</div>`);
   const have = new Set(d.docs.filter((x) => x.file).map((x) => x.key));
@@ -3907,7 +3915,7 @@ async function teamNotesCard() {
   const rows = others.slice(0, 10);
   const fresh = others.filter((x) => x.at > seen).length;
   return `<div class="card" id="teamnotes"><h3><span>Notes that tag you ${fresh ? `<span class="tag in">${fresh} new</span>` : ""}</span>${fresh ? `<button class="btn small" data-do="notesseen">Mark read</button>` : ""}</h3>
-    ${rows.length ? `<div class="tnotes">${rows.map((x) => `<a href="#" class="tn ${x.at > seen ? "new" : ""} ${x.mentionsMe ? "me" : ""}" data-do="opennotes" data-n="${x.jobNumber}"><span class="av" style="background:${avatarColor(x.author)}">${esc(initials(x.author))}</span><span class="tb"><span class="th"><b>${esc(x.author)}</b> on #${x.jobNumber} ${esc(x.name)}${x.mentionsMe ? ` <span class="tag in">@you</span>` : ""}<span class="when">${fmtWhen(x.at)}</span></span>${x.thread ? `<span class="small muted">↳ reply to “${esc(x.thread.slice(0, 60))}”</span>` : ""}<span class="tx">${esc(x.body.slice(0, 180))}</span></span></a>`).join("")}</div>` : `<p class="muted" style="margin:0">Nobody has tagged you in a note in the last two weeks.</p>`}</div>`;
+    ${rows.length ? `<div class="tnotes">${rows.map((x) => `<a href="#" class="tn ${x.at > seen ? "new" : ""} ${x.mentionsMe ? "me" : ""}" data-do="opennotes" data-n="${x.jobNumber}"><span class="av" style="background:${avatarColor(x.author)}">${esc(initials(x.author))}</span><span class="tb"><span class="th"><b>${esc(x.author)}</b> on ${esc(jobLabel(x.jobNumber, x.name))}${x.mentionsMe ? ` <span class="tag in">@you</span>` : ""}<span class="when">${fmtWhen(x.at)}</span></span>${x.thread ? `<span class="small muted">↳ reply to “${esc(x.thread.slice(0, 60))}”</span>` : ""}<span class="tx">${esc(x.body.slice(0, 180))}</span></span></a>`).join("")}</div>` : `<p class="muted" style="margin:0">Nobody has tagged you in a note in the last two weeks.</p>`}</div>`;
 }
 document.addEventListener("click", (e) => {
   const a = e.target.closest("[data-do=opennotes],[data-do=notesseen]"); if (!a) return;
@@ -4004,7 +4012,7 @@ async function loadUnknown(show) {
 }
 function renderUnknown(r) {
   pplSel = null; $$("#ppl-rows .job").forEach((x) => x.classList.remove("sel"));
-  const jobOpts = `<datalist id="dl-unkjobs">${jobs.map((j) => `<option value="#${j.jobNumber} ${esc(j.name)}">`).join("")}</datalist>`;
+  const jobOpts = `<datalist id="dl-unkjobs">${jobs.map((j) => `<option value="#${j.jobNumber} ${esc(jobLabel(j.jobNumber, j.name))}">`).join("")}</datalist>`;
   $("#ppl-card").innerHTML = `<h2 style="margin:0 0 4px">Unknown numbers</h2>
     <p class="muted" style="margin:0 0 14px">Numbers in your texts that aren't on any job or in your contacts, where the conversation is clearly about work. Name one and pick its job, and its whole conversation files to that job. Skip the ones that don't matter. This list is worked out on this PC; nothing here goes to an AI.</p>${jobOpts}
     ${unkList.map((u) => `<div class="card unk" data-unk="${esc(u.key)}" style="margin-bottom:12px">
@@ -4028,7 +4036,7 @@ document.addEventListener("click", async (e) => {
   if (e.target.closest("[data-unksave]")) {
     const name = card.querySelector(".unk-name").value.trim(), job = card.querySelector(".unk-job").value.trim();
     if (!name) { snack("Type a name first."); return; }
-    const n = job ? Number(job.match(/\d{4}/)?.[0]) || jobs.find((j) => j.name.toLowerCase() === job.toLowerCase())?.jobNumber : undefined;
+    const n = job ? Number(job.match(/\d{4}/)?.[0]) || jobs.find((j) => [j.name, j.label].some((x) => (x || "").toLowerCase() === job.toLowerCase()))?.jobNumber : undefined;
     if (job && !n) { snack("Pick the job from the list, or leave it empty."); return; }
     try {
       const r = await api("/api/contacts/unknown/name", { method: "POST", body: { key, name, job: n, role: card.querySelector(".unk-role").value.trim() || undefined, homebase: card.querySelector(".unk-hb").checked } });
@@ -4059,7 +4067,7 @@ async function showPerson(id, refresh) {
         <dt>Email</dt><dd>${p.emails.map((e) => `<button type="button" class="pv" data-copy="${esc(e)}" title="Copy">${esc(e)} ${msI("content_copy")}</button>`).join("") || `<span class="muted">none yet</span>`}</dd>
         <dt>Phone</dt><dd>${p.phones.map((x) => `<span class="pv"><a href="tel:${esc(x.number.replace(/[^\d+]/g, ""))}">${esc(x.number)}</a>${x.label ? ` <span class="muted small">${esc(x.label)}</span>` : ""} <button type="button" class="linkbtn" data-copy="${esc(x.number)}" title="Copy">${msI("content_copy")}</button>${x.from === "email" ? ` <span class="muted small">from their email signature</span>` : ""}</span>`).join("") || `<span class="muted">none yet</span>`}</dd>
         ${p.title ? `<dt>Title</dt><dd>${esc(p.title)}</dd>` : ""}${p.company ? `<dt>Company</dt><dd>${esc(p.company)}</dd>` : ""}
-        <dt>Jobs</dt><dd>${p.jobs.map((j) => `<a href="#" class="pv" data-do="open" data-n="${j.jobNumber}">#${j.jobNumber} ${esc(j.name)} <span class="muted small">${esc(j.role)}</span></a>`).join("") || `<span class="muted">not on a job</span>`}</dd>
+        <dt>Jobs</dt><dd>${p.jobs.map((j) => `<a href="#" class="pv" data-do="open" data-n="${j.jobNumber}">${esc(jobLabel(j.jobNumber, j.name))} <span class="muted small">${esc(j.role)}</span></a>`).join("") || `<span class="muted">not on a job</span>`}</dd>
         <dt>Email history</dt><dd>${p.emailCount ? `${p.emailCount} email${p.emailCount === 1 ? "" : "s"} from them seen${p.lastEmailAt ? ` · last ${fmtWhen(p.lastEmailAt)}` : ""}` : `<span class="muted">none seen yet</span>`} · <a href="#" data-pfind="${esc(p.emails[0] || p.name)}">Find in Gmail</a></dd>
         <dt>In Homebase</dt><dd>${p.homebaseId ? "Yes" : `<span class="muted">not matched yet</span>`}</dd>
       </dl></div>`;
@@ -4264,7 +4272,7 @@ function renderHandoff(d) {
       <p class="small muted" style="margin:10px 0 4px">Until then, the manual way:</p>`}
     <div class="banner"><b>Write it in a Claude chat (through Google Drive):</b> pick what you want below, add a note if you like, and press <b>Send to Claude chat</b>. Then in your Claude chat just say what you want on job ${d.job.jobNumber}. When Claude finishes, the PDFs come back here by themselves within a couple of minutes (or press <b>Get what Claude made</b>).
       <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn primary" type="button" id="ho-drive">Send to Claude chat</button><button class="btn" type="button" id="ho-drive-get">Get what Claude made</button></div></div>
-    <p class="muted" style="margin-top:10px">Or by hand: Keystone writes the request with everything it knows about #${d.job.jobNumber} ${esc(d.job.name)}; you attach the files and drop the PDFs back here.</p>
+    <p class="muted" style="margin-top:10px">Or by hand: Keystone writes the request with everything it knows about ${esc(jobLabel(d.job.jobNumber, d.job.name))}; you attach the files and drop the PDFs back here.</p>
     <div class="hacts">${HANDOFF.map(([k, v]) => `<button type="button" class="${k === handoffAct ? "on" : ""}" data-hact="${k}">${esc(v)}</button>`).join("")}</div>
     <textarea id="ho-note" rows="2" placeholder="${handoffAct === "revise" ? "What to change (e.g. make the hallway LVP instead of carpet)" : "Anything to add for Claude (optional)"}"></textarea>
     <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" id="ho-pack">1. Get the files ready</button><button class="btn primary" type="button" id="ho-go">2. Copy &amp; open Claude</button><button class="btn" type="button" id="ho-back">3. Add what Claude made</button><button class="btn" type="button" id="ho-folder">Show the job's files</button></div>

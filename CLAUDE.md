@@ -139,6 +139,10 @@
 - Pop-ups (question cards, the notice at the bottom left, game toasts) name the job, not its number: `jobNames` in
   `src/server/ui.html` turns "#3212 Gorrell" and a bare "#3212" into "Gorrell" (the number stays only when two jobs
   share a name or Keystone doesn't know the job). Write messages with `#<number>` as before; the page swaps it.
+- Job labels (`src/core/jobLabel.ts`, `label` on GET /api/jobs, `jobLabel()` in ui.html): a property-management job or a
+  customer with more than one open job reads "LCP Development: 5925 E Evans" / "McCandless: 19 Foxtail" (street type
+  dropped), plus "#302" when two share a street, plus the job number only if still tied. Menus and pop-ups use it;
+  `job.name` (folders, matching, emails) is unchanged.
 - Cards from background work wait in "To review" instead of popping up: code run inside `asLater()`
   (`src/core/approval.ts`) asks with `later: true` and a 3-day wait instead of 15 minutes. Wrapped: the proposal
   check, auto-run Proposal Submitted Notes, the brief's Homebase steps, Claude's results from Drive. The page shows a

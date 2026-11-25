@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { jobLabels } from "../core/jobLabel.js";
 import { createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import http, { type IncomingMessage, type ServerResponse } from "node:http";
 import path from "node:path";
@@ -447,7 +448,10 @@ const server = http.createServer(async (req, res) => {
       const local = new Map(hub.jobs.list().map((j) => [j.jobNumber, j]));
       const rem = reminders(hub);
       // Property-management jobs go by the management company (job.json), not Homebase's owner name.
-      return send(res, 200, jobs.map((j) => ({ ...j, name: local.get(j.jobNumber)?.customer.company ? local.get(j.jobNumber)!.name : j.name, flags: [...new Set(rem.filter((r) => r.jobNumber === j.jobNumber).map((r) => r.kind))], lastTouchAt: local.get(j.jobNumber)?.pulse.lastTouchAt || null })));
+      const named = jobs.map((j) => ({ ...j, name: local.get(j.jobNumber)?.customer.company ? local.get(j.jobNumber)!.name : j.name, company: local.get(j.jobNumber)?.customer.company || "" }));
+      // "LCP Development: 5925 E Evans", "McCandless: 19 Foxtail": PM jobs and repeat customers told apart by street.
+      const labels = jobLabels(named);
+      return send(res, 200, named.map((j) => ({ ...j, label: labels.get(j.jobNumber) ?? j.name, flags: [...new Set(rem.filter((r) => r.jobNumber === j.jobNumber).map((r) => r.kind))], lastTouchAt: local.get(j.jobNumber)?.pulse.lastTouchAt || null })));
     }
     if (p === "/api/accounts") return send(res, 200, (await hub.homebase.searchAccounts?.(q("q"), q("kind") || undefined)) ?? []);
 
