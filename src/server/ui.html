@@ -3955,7 +3955,10 @@ async function renderBrief() {
       const n = Number(li.textContent.match(/#(\d{4})\b/)?.[1]); if (!n) return;
       li.insertAdjacentHTML("beforeend", goButton(n, placeFor(li.textContent)));
     });
+    // Calendar lines (and the "Handled by Keystone" / "at a glance" notes) are information, not things to tick off.
+    const infoList = (li) => { const head = li.closest("ul,ol")?.previousElementSibling?.textContent || ""; return /^\s*(On the calendar|Handled by Keystone|Today at a glance)/i.test(head); };
     box.querySelectorAll("li").forEach((li) => {
+      if (infoList(li)) { li.classList.add("binfo"); return; }
       const plain = li.cloneNode(true); plain.querySelectorAll(".bgo, .bmail, .btask").forEach((x) => x.remove());
       const gtask = li.querySelector(".btask")?.dataset.t || "";
       // A task line is done when the task is done anywhere (Google's state wins); other lines by their own tick.

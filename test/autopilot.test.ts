@@ -39,8 +39,9 @@ describe("tasks in Hunter's format", () => {
 });
 
 describe("Keystone handles what it can before the brief", () => {
-  it("drafts follow-ups and email-only tasks with draft-only tools, closes those tasks, and leaves the rest", async () => {
+  it("drafts only replies and email-only tasks, a few a day, never two for one job, and closes those tasks", async () => {
     const t = await setup();
+    await t.hub.tasks.create({ title: "Send Kim the warranty letter", due: tomorrow });
     await t.hub.tasks.create({ title: "Belvill - send Dana the selections link", due: tomorrow, notes: "Job #9001" });
     await t.hub.tasks.create({ title: "Belvill - measure the hallway", due: tomorrow, notes: "Job #9001" });
     let draftN = 0;
@@ -49,26 +50,28 @@ describe("Keystone handles what it can before the brief", () => {
       // Sorting: going by what each task says, not by its place in the list.
       if (req.jsonSchema) return JSON.stringify({ tasks: [...text.matchAll(/\[(T\d+)\] ([^\n\\]+)/g)].map(([, tag, title]) => /measure/.test(title) ? { tag, action: "hunter", why: "a site visit" } : { tag, action: "email", why: "an email" }) });
       // The drafting run: make one draft, then report.
-      if (!text.includes("functionResponse")) return { calls: [{ name: "gmail_create_draft", args: { jobNumber: 9001, to: ["dana@example.com"], subject: `Draft ${++draftN}`, body: "Hi Dana,\n\nChecking in.\n\nThanks," } }] };
+      if (!text.includes("functionResponse")) return { calls: [{ name: "gmail_create_draft", args: { jobNumber: /warranty/.test(text) ? undefined : 9001, to: ["dana@example.com"], subject: `Draft ${++draftN}`, body: "Hi Dana,\n\nChecking in.\n\nThanks," } }] };
       return "DRAFTED: to Dana, checking in.";
     });
-    const r = await autopilot(t.hub, [reminder({ kind: "followup" }), reminder({ kind: "estimate", title: "Estimating: write the estimate" })]);
-    expect(r.ran).toBe(true);
-    expect(r.handled.map((h) => h.what)).toEqual(["Drafted a follow-up for #9001 Belvill", 'Drafted "Belvill - send Dana the selections link" and closed the task']);
-    expect(r.leftForHunter).toEqual([{ title: "Belvill - measure the hallway", why: "a site visit" }]);
-    expect(generatedDrafts(t.hub)).toHaveLength(2);
-    const open = (await t.hub.tasks.tasks()).filter((x) => !x.completed).map((x) => x.title);
-    expect(open).toEqual(["Belvill - measure the hallway"]);
-    const closed = (await t.hub.tasks.tasks({ showCompleted: true })).find((x) => x.title.includes("selections link"))!;
-    expect(closed.notes).toMatch(/Handled by Keystone .*Gmail Drafts/);
-    // Only reading and drafting tools were offered.
-    const offered = (t.hub.gemini as MockGemini).requests.filter((q) => q.tools).flatMap((q) => q.tools!.map((x) => x.name));
-    expect(new Set(offered)).toEqual(new Set(AUTOPILOT_TOOLS));
-    expect(autopilotNote(r)).toMatch(/drafts waiting in Gmail .*: 2/);
-    // Run again: nothing is drafted twice.
-    const again = await autopilot(t.hub, [reminder({ kind: "followup" })]);
-    expect(again.handled, JSON.stringify(again.handled)).toEqual([]);
-    expect(generatedDrafts(t.hub)).toHaveLength(2);
+    process.env.HUB_AUTOPILOT_MAX = "2";
+    try {
+      const r = await autopilot(t.hub, [reminder({ kind: "followup" }), reminder({ kind: "reply", title: "Dana asked about tile" }), reminder({ kind: "estimate", title: "Estimating: write the estimate" })]);
+      expect(r.ran).toBe(true);
+      // No unasked-for follow-up; the reply is drafted; the job's other email task waits (its draft is already there).
+      expect(r.handled.map((h) => h.what)).toEqual(["Drafted the reply for #9001 Belvill", 'Drafted "Send Kim the warranty letter" and closed the task']);
+      expect(r.leftForHunter.map((x) => x.title).sort()).toEqual(["Belvill - measure the hallway", "Belvill - send Dana the selections link"]);
+      expect(generatedDrafts(t.hub)).toHaveLength(2);
+      const closed = (await t.hub.tasks.tasks({ showCompleted: true })).find((x) => x.title.includes("warranty"))!;
+      expect(closed.notes).toMatch(/Handled by Keystone .*Gmail Drafts/);
+      // Only reading and drafting tools were offered.
+      const offered = (t.hub.gemini as MockGemini).requests.filter((q) => q.tools).flatMap((q) => q.tools!.map((x) => x.name));
+      expect(new Set(offered)).toEqual(new Set(AUTOPILOT_TOOLS));
+      expect(autopilotNote(r)).toMatch(/drafts waiting in Gmail .*: 2/);
+      // Later the same day: the day's limit is used up, so nothing more is drafted.
+      const again = await autopilot(t.hub, [reminder({ kind: "reply", jobNumber: 9002, name: "Other", title: "Question" })]);
+      expect(again.handled, JSON.stringify(again.handled)).toEqual([]);
+      expect(generatedDrafts(t.hub)).toHaveLength(2);
+    } finally { delete process.env.HUB_AUTOPILOT_MAX; }
   });
 
   it("never runs on Claude, so it can't spend API money", async () => {

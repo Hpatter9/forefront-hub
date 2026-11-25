@@ -17,8 +17,10 @@ import type { Reminder } from "./reminders.js";
  * What's left (site visits, calls, writing estimates, decisions) goes to the brief, grouped.
  *
  * Everything here runs on the free AI (Gemini) with a short, draft-only list of tools. With Claude as the everyday
- * AI it does nothing, so it never spends API money. Each run is capped (HUB_AUTOPILOT_MAX, default 10 drafts); the
- * rest are picked up by the next brief. HUB_AUTOPILOT=off turns it off.
+ * AI it does nothing, so it never spends API money. Hunter found 10 a run (50 a day) far too many, so it's kept small:
+ * only replies to emails waiting on him and tasks that are just an email (no unasked-for follow-ups, check-ins or
+ * walk-booking emails: those stay on the brief), at most HUB_AUTOPILOT_MAX (default 3) a DAY across every brief, and
+ * never a second draft for a job that still has an unsent Keystone draft. HUB_AUTOPILOT=off turns it off.
  */
 export interface Handled {
   what: string;
@@ -39,7 +41,10 @@ export interface AutopilotReport {
 
 /** The only tools a handled item may use: reading the job and the mail, the calendar's free time, and making drafts. */
 export const AUTOPILOT_TOOLS = ["job_get", "job_timeline", "homebase_get_job", "contacts_find", "gmail_search", "gmail_read_thread", "calendar_events", "calendar_free_time", "gmail_create_draft"];
-const DRAFTABLE: Reminder["kind"][] = ["reply", "followup", "adjuster", "walk"];
+const DRAFTABLE: Reminder["kind"][] = ["reply"];
+export const AUTOPILOT_SOURCE = "Keystone (before the brief)";
+/** How many drafts the autopilot may make in a day, across every brief. */
+export const dailyLimit = () => Number(process.env.HUB_AUTOPILOT_MAX) || 3;
 
 interface State {
   /** key -> when it was handled; a key isn't handled twice within REDO_DAYS. */
@@ -90,7 +95,9 @@ export async function autopilot(hub: Hub, reminders: Reminder[], o: { max?: numb
   if (aiProvider(hub) !== "gemini") return { ...report, note: "Keystone only does this with the free AI (Gemini), so it never spends Claude API money." };
   report.ran = true;
   const s = load(hub);
-  const max = o.max ?? (Number(process.env.HUB_AUTOPILOT_MAX) || 10);
+  const today0 = new Date().toLocaleDateString("en-CA", { timeZone: "America/Denver" });
+  const madeToday = generatedDrafts(hub).filter((g) => g.source === AUTOPILOT_SOURCE && new Date(g.createdAt).toLocaleDateString("en-CA", { timeZone: "America/Denver" }) === today0).length;
+  const max = Math.max(0, (o.max ?? dailyLimit()) - madeToday);
   let drafted = 0;
   const me = hub.cfg.gmail.address.toLowerCase();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Denver" });
@@ -134,10 +141,11 @@ export async function autopilot(hub: Hub, reminders: Reminder[], o: { max?: numb
 
   // ---- the drafting itself: one item at a time, draft-only tools
   const handledThreads = new Set(openDrafts(hub).map((g) => g.threadId).filter(Boolean) as string[]);
-  const draftedJobs = new Set(openDrafts(hub).filter((g) => Date.now() - Date.parse(g.createdAt) < REDO_DAYS * 864e5).map((g) => g.jobNumber).filter(Boolean) as number[]);
+  // A job with a Keystone draft still waiting to be sent doesn't get another one, however old that draft is.
+  const draftedJobs = new Set(openDrafts(hub).map((g) => g.jobNumber).filter(Boolean) as number[]);
   const draftOne = async (job: number | undefined, instruction: string): Promise<boolean> => {
     const before = new Set(generatedDrafts(hub).map((g) => g.draftId));
-    const answer = await withDraftSource("Keystone (before the brief)", () => agentAsk(hub, `${instruction}
+    const answer = await withDraftSource(AUTOPILOT_SOURCE, () => agentAsk(hub, `${instruction}
 
 Do only this one thing. Read what you need first (the job, the email thread, the contacts). Then write the email as a Gmail DRAFT with gmail_create_draft (it is never sent; Hunter reviews and sends it). Reply inside the existing thread when there is one. If this can't be done by email, or you'd have to guess a fact, a price, a date or a promise, don't draft: reply "CAN'T: " and the reason. Otherwise reply "DRAFTED: " and one line saying who it's to and what it says.`, { jobNumber: job, tools: AUTOPILOT_TOOLS, maxSteps: 10 })).catch((e) => `CAN'T: ${(e as Error).message}`);
     const made = generatedDrafts(hub).filter((g) => !before.has(g.draftId));
@@ -154,7 +162,7 @@ Do only this one thing. Read what you need first (the job, the email thread, the
   for (const r of reminders.filter((x) => DRAFTABLE.includes(x.kind))) {
     if (drafted >= max) break;
     const key = `${r.kind}:${r.jobNumber}:${r.threadId ?? ""}`;
-    if (recently(s, key) || (r.threadId && handledThreads.has(r.threadId)) || (r.kind !== "reply" && draftedJobs.has(r.jobNumber))) continue;
+    if (recently(s, key) || (r.threadId && handledThreads.has(r.threadId)) || draftedJobs.has(r.jobNumber)) continue;
     const instruction = {
       reply: `Job #${r.jobNumber} ${r.name}: draft Hunter's reply to the newest email in thread ${r.threadId ?? "(find it with gmail_search)"} ("${r.title}", ${r.detail}). Answer what they asked using only facts in the job, the thread and Keystone; if a question can only be answered by Hunter, say in the draft that he'll get back to them on that point.`,
       followup: `Job #${r.jobNumber} ${r.name} (${r.stage}): draft a short, friendly follow-up to the customer about the proposal Hunter sent, asking whether they have questions or are ready to move ahead. ${r.detail}`,
@@ -168,8 +176,10 @@ Do only this one thing. Read what you need first (the job, the email thread, the
     save(hub, s);
   }
   for (const { t } of asEmail) {
-    if (drafted >= max) { report.leftForHunter.push({ title: t.title, why: "Keystone will draft it next time (today's limit reached)" }); continue; }
+    if (drafted >= max) { report.leftForHunter.push({ title: t.title, why: "needs you (Keystone's few drafts for today are done)" }); continue; }
     if (recently(s, `task:${t.id}`)) continue;
+    const tj = t.jobNumber ?? jobOf(t.title);
+    if (tj && draftedJobs.has(tj)) { report.leftForHunter.push({ title: t.title, why: "there's already a Keystone draft for this job waiting in Gmail" }); continue; }
     const th = threadOf(t);
     if (th && handledThreads.has(th)) {
       await close(t, "the reply is already drafted in Gmail.").catch(() => {});

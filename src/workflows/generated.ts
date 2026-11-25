@@ -97,7 +97,11 @@ export async function deleteThread(hub: Hub, threadId: string): Promise<{ drafts
   return { drafts, trashed: others || !drafts };
 }
 
+const BRIEF_SOURCES = ["Morning brief", "Plan my day"];
+
 export async function createGeneratedDraft(hub: Hub, d: DraftInput, meta: { jobNumber?: number; source?: string; /** It's the adjuster's email, even if the address isn't recognisably the carrier's. */ toInsurance?: boolean } = {}): Promise<DraftRef> {
+  // Writing the brief is planning, not drafting: Hunter asked for far fewer AI drafts, so the brief makes none.
+  if (BRIEF_SOURCES.includes(meta.source ?? where.getStore()?.source ?? "")) throw new Error("The brief doesn't draft emails. Put it on the list as something for Hunter to do instead.");
   const job = meta.jobNumber && hub.jobs.exists(meta.jobNumber) ? hub.jobs.get(meta.jobNumber) : null;
   d = { ...d, body: cleanDraftBody(d.body, { companies: [job?.carrier ?? "", job?.customer.company ?? ""] }), subject: d.subject.replace(/\\n/g, " ").trim() };
   // A new email to the job's insurance follows the carrier's rule (its claims address; the subject it files by).

@@ -76,8 +76,11 @@
   turned into a git copy, with changed files stashed and `data/` left alone). It only acts on Windows (or `KEYSTONE_UPDATE=1`), so a developer's copy is left alone. The app shows the running
   version and an "Update ready" chip (`src/server/version.ts`); exit code 75 means "restart me" to `Start Keystone.bat`.
 - Before every brief, `src/workflows/autopilot.ts` does what Keystone can itself (Gemini only, draft-only tools):
-  closes tasks already done, drafts replies/follow-ups/check-ins/walk-booking emails and email-only tasks, and queues
-  Homebase steps as Yes/No cards; the brief lists only what's left, grouped. Task titles are "Job name - what to do"
+  closes tasks already done, drafts ONLY replies to emails waiting on Hunter and email-only tasks (no unasked-for
+  follow-ups/check-ins/walk emails; Hunter found ~50 drafts a day far too many), at most HUB_AUTOPILOT_MAX (3) a day
+  across all briefs and never a second one for a job with an unsent Keystone draft, and queues Homebase steps as
+  Yes/No cards; the brief lists only what's left, grouped. The brief itself never drafts (`createGeneratedDraft`
+  refuses "Morning brief" / "Plan my day"), and its "On the calendar" lines are information, with no tick box. Task titles are "Job name - what to do"
   (`src/workflows/taskTitle.ts`, job number in the notes). A brief line that is a Google Task takes its ticked state
   from Google, so a tick anywhere shows everywhere.
 - Task check (`src/workflows/taskCheck.ts`): before each brief and from "Check my tasks" (POST /api/tasks/check),

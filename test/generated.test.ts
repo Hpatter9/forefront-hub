@@ -9,11 +9,13 @@ describe("Claude drafts folder", () => {
     const orig = hub.gmail.createDraft.bind(hub.gmail);
     hub.gmail.createDraft = async (d) => (sent.push(d), orig(d));
     await createGeneratedDraft(hub, { to: ["eileen@example.com"], bcc: [], subject: "Hallway photos", body: "Hi Eileen,\n\nAttached.", attachments: [] }, { jobNumber: 3226 });
-    await withDraftSource("Plan my day", () => createGeneratedDraft(hub, { to: ["alex@carrier.example"], bcc: [], subject: "Follow-up", body: "Hi Alex", attachments: [] }));
+    await withDraftSource("Estimator", () => createGeneratedDraft(hub, { to: ["alex@carrier.example"], bcc: [], subject: "Follow-up", body: "Hi Alex", attachments: [] }));
+    // The brief plans; it never drafts.
+    await expect(withDraftSource("Plan my day", () => createGeneratedDraft(hub, { to: ["x@example.com"], bcc: [], subject: "No", body: "No", attachments: [] }))).rejects.toThrow(/doesn't draft/);
     expect(sent[0].labels).toEqual([GENERATED_LABEL]);
     const open = await openGeneratedDrafts(hub);
     expect(open.map((g) => [g.subject, g.source, g.jobNumber])).toEqual([
-      ["Follow-up", "Plan my day", undefined],
+      ["Follow-up", "Estimator", undefined],
       ["Hallway photos", "Claude", 3226],
     ]);
   });
